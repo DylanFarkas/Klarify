@@ -15,9 +15,12 @@ export function HeroLanding() {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (prefersReducedMotion) {
-      setTypedLength(heroTitle.length);
-      setShowContent(true);
-      return;
+      const revealTimer = window.setTimeout(() => {
+        setTypedLength(heroTitle.length);
+        setShowContent(true);
+      }, 0);
+
+      return () => window.clearTimeout(revealTimer);
     }
 
     if (typedLength >= heroTitle.length) {
@@ -47,11 +50,11 @@ export function HeroLanding() {
 
   return (
     <div className="min-h-screen bg-white text-[#191c1d]">
-      <main className="particle-bg overflow-hidden">
-        <section className="relative mx-auto max-w-360 px-5 pb-24 pt-24 text-center md:px-16 md:pb-32 md:pt-32">
+      <main className="overflow-hidden">
+        <section className="relative mx-auto max-w-360 px-5 pb-24 pt-10 text-center md:px-16 md:pt-22">
           <div className="absolute left-1/2 top-20 z-0 h-72 w-72 -translate-x-1/2 rounded-full" />
 
-          <div className="relative z-10 mb-4 flex justify-center">
+          <div className="relative z-10 mb-4 pb-5 flex justify-center">
             <div>
               <span className="h-2 w-2 rounded-full" />
               <span
