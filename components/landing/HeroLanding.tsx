@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 const titleStart = "Transforma ideas en ";
 const titleHighlight = "backlogs ejecutables";
@@ -88,18 +89,18 @@ export function HeroLanding() {
                 </p>
 
                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                  <a
+                  <Link
                     className="flex items-center gap-2 rounded-xl bg-[#191c1d] px-8 py-4 font-bold text-white shadow-xl transition-transform hover:-translate-y-0.5"
-                    href="#"
+                    href="/agentes/1"
                   >
                     Empezar gratis
-                  </a>
-                  <a
+                  </Link>
+                  <Link
                     className="flex items-center gap-2 rounded-xl border border-[#c1c6d6]/50 bg-white px-8 py-4 font-bold text-[#191c1d] transition-colors hover:bg-[#edeeef]"
-                    href="#"
+                    href="/agentes/1"
                   >
-                    Ver agentes en accion
-                  </a>
+                    Ver agentes en acción
+                  </Link>
                 </div>
               </>
             ) : null}
