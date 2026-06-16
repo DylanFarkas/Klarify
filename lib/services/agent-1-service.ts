@@ -10,24 +10,28 @@
  */
 
 import type { TranscriptionResult, Wish } from '@/lib/types/agent-1';
-import { MOCK_TRANSCRIPTION, MOCK_WISHES } from '@/lib/mock/agent-1-mock';
 import {
   WISH_ID_PREFIX,
-  TRANSCRIPTION_DELAY_MS,
-  EXTRACTION_DELAY_MS,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
 } from '@/lib/constants/agent-1';
 
+import { IASRAdapter } from '@/lib/adapters/agent-1/IASRAdapter';
+import { ILLMAdapter } from '@/lib/adapters/agent-1/ILLMAdapter';
+import { MockASRAdapter } from '@/lib/adapters/agent-1/MockASRAdapter';
+import { MockLLMAdapter } from '@/lib/adapters/agent-1/MockLLMAdapter';
+
+// ---------------------------------------------------------------------------
+// Adaptadores
+// ---------------------------------------------------------------------------
+// Instanciamos los adaptadores. En el futuro, se puede inyectar la API real.
+const asrAdapter: IASRAdapter = new MockASRAdapter();
+const llmAdapter: ILLMAdapter = new MockLLMAdapter();
+
 // ---------------------------------------------------------------------------
 // Utilidades internas
 // ---------------------------------------------------------------------------
-
-/** Promesa que se resuelve después de `ms` milisegundos */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /**
  * Genera un ID de deseo con formato DESEO-001, DESEO-002, etc.
@@ -100,41 +104,21 @@ export function validateFile(
 }
 
 // ---------------------------------------------------------------------------
-// Procesamiento de archivos (MOCK → reemplazar por API real)
+// Procesamiento de archivos
 // ---------------------------------------------------------------------------
 
 /**
  * Procesa un archivo subido y genera la transcripción.
- *
- * 🔄 TODO: Reemplazar por llamada a Whisper API o similar.
- * La interfaz pública (entrada File → salida TranscriptionResult) no cambia.
  */
-export async function processFile(_file: File): Promise<TranscriptionResult> {
-  // Simular tiempo de procesamiento de la API
-  await delay(TRANSCRIPTION_DELAY_MS);
-
-  // Retornar transcripción mock
-  return { ...MOCK_TRANSCRIPTION };
+export async function processFile(file: File): Promise<TranscriptionResult> {
+  return asrAdapter.transcribe(file);
 }
 
 /**
  * Extrae deseos/necesidades del cliente a partir de la transcripción.
- *
- * 🔄 TODO: Reemplazar por llamada a Gemini/GPT con prompt de extracción.
- * La interfaz pública no cambia.
  */
 export async function extractWishes(
-  _transcription: TranscriptionResult
+  transcription: TranscriptionResult
 ): Promise<Wish[]> {
-  // Simular tiempo de procesamiento del LLM
-  await delay(EXTRACTION_DELAY_MS);
-
-  // Generar IDs secuenciales para los deseos mock
-  const wishes: Wish[] = MOCK_WISHES.map((wishData, index) => ({
-    ...wishData,
-    id: `${WISH_ID_PREFIX}-${String(index + 1).padStart(3, '0')}`,
-    createdAt: Date.now() + index, // IDs temporales únicos
-  }));
-
-  return wishes;
+  return llmAdapter.extractWishes(transcription);
 }
