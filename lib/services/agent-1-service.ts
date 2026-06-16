@@ -21,13 +21,22 @@ import { IASRAdapter } from '@/lib/adapters/agent-1/IASRAdapter';
 import { ILLMAdapter } from '@/lib/adapters/agent-1/ILLMAdapter';
 import { MockASRAdapter } from '@/lib/adapters/agent-1/MockASRAdapter';
 import { MockLLMAdapter } from '@/lib/adapters/agent-1/MockLLMAdapter';
+import { OpenAIASRAdapter } from '@/lib/adapters/agent-1/OpenAIASRAdapter';
+import { GeminiLLMAdapter } from '@/lib/adapters/agent-1/GeminiLLMAdapter';
 
 // ---------------------------------------------------------------------------
 // Adaptadores
 // ---------------------------------------------------------------------------
-// Instanciamos los adaptadores. En el futuro, se puede inyectar la API real.
-const asrAdapter: IASRAdapter = new MockASRAdapter();
-const llmAdapter: ILLMAdapter = new MockLLMAdapter();
+// Instanciamos los adaptadores. Si las keys están en .env.local usamos las APIs reales,
+// de lo contrario usamos mocks para evitar fallos durante demostraciones o desarrollo.
+
+const asrAdapter: IASRAdapter = process.env.OPENAI_API_KEY 
+  ? new OpenAIASRAdapter() 
+  : new MockASRAdapter();
+
+const llmAdapter: ILLMAdapter = process.env.GEMINI_API_KEY 
+  ? new GeminiLLMAdapter() 
+  : new MockLLMAdapter();
 
 // ---------------------------------------------------------------------------
 // Utilidades internas

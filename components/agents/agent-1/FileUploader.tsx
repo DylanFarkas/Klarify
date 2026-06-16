@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ALLOWED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
@@ -32,9 +32,24 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError 
   const [isDragging, setIsDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  
+  // ── Estado de grabación en vivo ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const error = externalError || localError;
+
+  // ── Limpieza del timer ──
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   // ── Validación del archivo en cliente ───────────────────────────
   const validateFile = useCallback((file: File): string | null => {
@@ -101,6 +116,63 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError 
     },
     [handleFile]
   );
+
+  // ── Grabación en vivo (MediaRecorder) ──────────────────────────
+  const startRecording = async () => {
+    try {
+      setLocalError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], 'grabacion.webm', {
+          type: 'audio/webm',
+          lastModified: Date.now(),
+        });
+        
+        // Limpiar stream de la cámara/micrófono
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Procesar archivo como si fuera subido
+        handleFile(audioFile);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error('Error al acceder al micrófono:', err);
+      setLocalError('No se pudo acceder al micrófono. Por favor, revisa los permisos.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  const formatRecordingTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   // ── Obtener icono según extensión ──────────────────────────────
   const getFileIcon = (name: string) => {
@@ -192,26 +264,72 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError 
               o selecciona un archivo desde tu equipo
             </p>
 
-            {/* Botón de selección */}
-            <button
-              id="file-select-button"
-              onClick={() => fileInputRef.current?.click()}
-              className={[
-                'rounded-xl border border-white/20 bg-white/10 px-6 py-3',
-                'text-sm font-bold text-white backdrop-blur-sm',
-                'transition-all duration-200',
-                'hover:bg-white/15 hover:border-white/30',
-                'active:scale-95',
-                'cursor-pointer',
-              ].join(' ')}
-            >
-              Seleccionar archivo
-            </button>
+            {/* Acciones */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm">
+              {!isRecording ? (
+                <>
+                  <button
+                    id="file-select-button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={[
+                      'w-full sm:w-auto rounded-xl border border-white/20 bg-white/10 px-6 py-3',
+                      'text-sm font-bold text-white backdrop-blur-sm',
+                      'transition-all duration-200 cursor-pointer',
+                      'hover:bg-white/15 hover:border-white/30 active:scale-95',
+                    ].join(' ')}
+                  >
+                    Seleccionar archivo
+                  </button>
+
+                  <div className="hidden sm:block text-xs font-medium text-white/30">o</div>
+
+                  <button
+                    id="start-record-button"
+                    onClick={startRecording}
+                    className={[
+                      'flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-3',
+                      'text-sm font-bold text-red-400 backdrop-blur-sm',
+                      'transition-all duration-200 cursor-pointer',
+                      'hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-300 active:scale-95',
+                    ].join(' ')}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    Grabar audio
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-4 animate-[fadeIn_0.3s_ease-out]">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-3 w-3 items-center justify-center">
+                      <span className="absolute h-3 w-3 animate-ping rounded-full bg-red-400 opacity-75" />
+                      <span className="relative h-2 w-2 rounded-full bg-red-500" />
+                    </span>
+                    <span className="font-mono text-xl font-bold text-white tracking-widest">
+                      {formatRecordingTime(recordingTime)}
+                    </span>
+                  </div>
+                  
+                  <button
+                    id="stop-record-button"
+                    onClick={stopRecording}
+                    className={[
+                      'rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
+                      'transition-all duration-200 cursor-pointer',
+                      'hover:bg-gray-200 hover:scale-105 active:scale-95',
+                    ].join(' ')}
+                  >
+                    Detener grabación
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Formatos aceptados */}
-            <p className="mt-4 text-xs text-white/35">
-              Formatos: {ALLOWED_EXTENSIONS.join(', ')} · Máximo {MAX_FILE_SIZE_LABEL}
-            </p>
+            {!isRecording && (
+              <p className="mt-5 text-xs text-white/35">
+                Formatos: {ALLOWED_EXTENSIONS.join(', ')} · Máximo {MAX_FILE_SIZE_LABEL}
+              </p>
+            )}
           </>
         )}
 
