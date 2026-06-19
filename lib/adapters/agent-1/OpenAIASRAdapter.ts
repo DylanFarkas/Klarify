@@ -1,5 +1,5 @@
 /**
- * @fileoverview Adaptador real para OpenAI Whisper (Transcriptor).
+ * @fileoverview Adaptador real para OpenAI Audio (Transcriptor).
  *
  * Se conecta a la API de OpenAI para transcribir audio a texto.
  * Utiliza el formato `verbose_json` para obtener los segmentos con
@@ -30,15 +30,15 @@ export class OpenAIASRAdapter implements IASRAdapter {
     try {
       console.log(`[OpenAIASRAdapter] Iniciando transcripción de: ${file.name} (${file.size} bytes)`);
 
-      // Enviar el archivo a Whisper pidiendo verbose_json para obtener segmentos y duración
+      // Enviar el archivo a la API pidiendo verbose_json para obtener segmentos y duración
       const response = await this.openai.audio.transcriptions.create({
         file: file,
-        model: 'whisper-1',
+        model: 'gpt-4o-mini-transcribe',
         response_format: 'verbose_json',
         // prompt: 'Contexto opcional aquí para mejorar precisión'
       });
 
-      // Mapear la respuesta de Whisper a nuestro formato estandarizado
+      // Mapear la respuesta de OpenAI a nuestro formato estandarizado
       const mappedResult: TranscriptionResult = {
         fullText: response.text,
         language: response.language || 'es',
@@ -48,9 +48,9 @@ export class OpenAIASRAdapter implements IASRAdapter {
           end: seg.end,
           text: seg.text,
           confidence: Math.exp(seg.avg_logprob || 0), // Aproximación de confianza (0 a 1) a partir de logprob
-          // Nota: Whisper base no soporta diarización (speaker detection) directamente.
+          // Nota: El modelo base no soporta diarización (speaker detection) directamente.
           // Para MVP, lo dejamos undefined o se podría deducir de los canales si fuera estéreo.
-          speaker: undefined, 
+          speaker: undefined,
         })),
       };
 
@@ -59,7 +59,7 @@ export class OpenAIASRAdapter implements IASRAdapter {
 
     } catch (error) {
       console.error('[OpenAIASRAdapter] Error al transcribir:', error);
-      throw new Error(`Error en el servicio de transcripción (Whisper): ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      throw new Error(`Error en el servicio de transcripción (OpenAI): ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   }
 }

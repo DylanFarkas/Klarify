@@ -104,9 +104,11 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* Timestamp */}
-                <span className="shrink-0 pt-0.5 text-xs font-mono text-white/30">
-                  {formatTimestamp(segment.start)}
-                </span>
+                {segment.end > 0 && (
+                  <span className="shrink-0 pt-0.5 text-xs font-mono text-white/30">
+                    {formatTimestamp(segment.start)}
+                  </span>
+                )}
 
                 {/* Contenido */}
                 <div className="flex-1 min-w-0">

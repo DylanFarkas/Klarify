@@ -65,7 +65,7 @@ ${transcription.fullText}
 
       // Parsear la respuesta JSON (array de strings)
       const rawWishes: string[] = JSON.parse(responseText);
-      
+
       if (!Array.isArray(rawWishes)) {
         throw new Error('Gemini no devolvió un array JSON válido');
       }

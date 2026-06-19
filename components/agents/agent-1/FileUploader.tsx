@@ -26,28 +26,38 @@ interface FileUploaderProps {
   isProcessing: boolean;
   /** Mensaje de error externo (ej: del API) */
   error: string | null;
+  /** Callback opcional cuando se finaliza una transcripción en vivo */
+  onTranscriptionComplete?: (text: string) => void;
 }
 
-export function FileUploader({ onFileSelect, isProcessing, error: externalError }: FileUploaderProps) {
+export function FileUploader({ onFileSelect, isProcessing, error: externalError, onTranscriptionComplete }: FileUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   
   // ── Estado de grabación en vivo ──
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<BlobPart[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [liveTranscription, setLiveTranscription] = useState('');
+  
+  // Usaremos useRef para mantener la instancia de SpeechRecognition
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+  const accumulatedTranscriptRef = useRef('');
+  const isIntentionallyStoppedRef = useRef(false);
+  const latestTranscriptionRef = useRef('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const error = externalError || localError;
 
-  // ── Limpieza del timer ──
+  // ── Limpieza ──
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (recognitionRef.current) {
+        // Al desmontar sí queremos detener todo
+        isIntentionallyStoppedRef.current = true;
+        recognitionRef.current.stop();
+      }
     };
   }, []);
 
@@ -117,61 +127,104 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError 
     [handleFile]
   );
 
-  // ── Grabación en vivo (MediaRecorder) ──────────────────────────
+  // ── Grabación en vivo (SpeechRecognition) ──────────────────────────
   const startRecording = async () => {
+    setLocalError(null);
+    setLiveTranscription('');
+    accumulatedTranscriptRef.current = '';
+    latestTranscriptionRef.current = '';
+    isIntentionallyStoppedRef.current = false;
+
     try {
-      setLocalError(null);
+      // Pedir permisos de micrófono explícitamente para asegurar que el navegador lo active
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioFile = new File([audioBlob], 'grabacion.webm', {
-          type: 'audio/webm',
-          lastModified: Date.now(),
-        });
-        
-        // Limpiar stream de la cámara/micrófono
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Procesar archivo como si fuera subido
-        handleFile(audioFile);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-
+      // Podemos detener el stream inmediatamente, solo queríamos asegurar los permisos
+      stream.getTracks().forEach(track => track.stop());
     } catch (err) {
-      console.error('Error al acceder al micrófono:', err);
-      setLocalError('No se pudo acceder al micrófono. Por favor, revisa los permisos.');
+      console.error('Error de permisos de micrófono:', err);
+      setLocalError('No se pudo acceder al micrófono. Por favor revisa los permisos del navegador.');
+      return;
+    }
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      setLocalError('Tu navegador no soporta reconocimiento de voz nativo. Por favor usa Google Chrome.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true; // Sigue escuchando aunque haya pausas
+    recognition.interimResults = true; // Muestra resultados parciales
+    recognition.lang = 'es-ES';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      let currentTranscript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      
+      // Combinar texto anterior guardado con lo que está escuchando ahora mismo
+      const combined = (accumulatedTranscriptRef.current + ' ' + currentTranscript).trim();
+      latestTranscriptionRef.current = combined;
+      setLiveTranscription(combined);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (event: any) => {
+      console.warn('SpeechRecognition error:', event.error);
+      // Si el error no es no-speech, mostramos alerta.
+      // Si es no-speech, simplemente lo ignoramos y dejamos que el onend lo reinicie.
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setLocalError(`Error al escuchar: ${event.error}`);
+      }
+    };
+
+    recognition.onend = () => {
+      // Si no fue detenido intencionalmente por el usuario, lo reiniciamos
+      if (!isIntentionallyStoppedRef.current) {
+        // Guardamos lo que haya transcrito hasta ahora para no perderlo al reiniciar
+        // Usamos una función de setState para asegurarnos de tener el valor más reciente de liveTranscription
+        setLiveTranscription((currentLiveText) => {
+          accumulatedTranscriptRef.current = currentLiveText;
+          return currentLiveText;
+        });
+
+        try {
+          recognition.start();
+        } catch(e) {
+          console.error('Error al intentar reiniciar el reconocimiento de voz', e);
+        }
+      } else {
+        setIsRecording(false);
+      }
+    };
+
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecording(true);
+    } catch (err) {
+      console.error(err);
+      setLocalError('Error al iniciar la grabación.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    isIntentionallyStoppedRef.current = true;
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
       setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
+      
+      const finalText = latestTranscriptionRef.current;
+      if (finalText.trim().length > 0) {
+        onTranscriptionComplete?.(finalText);
+      } else {
+        setLocalError('No se detectó audio/texto. Asegúrate de hablar claramente al micrófono.');
+      }
     }
-  };
-
-  const formatRecordingTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
   };
 
   // ── Obtener icono según extensión ──────────────────────────────
@@ -296,29 +349,53 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError 
                     <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                     Grabar audio
                   </button>
+
+                  <div className="hidden sm:block text-xs font-medium text-white/30">o</div>
+
+                  <button
+                    id="write-text-button"
+                    onClick={() => {
+                      if (onTranscriptionComplete) onTranscriptionComplete('');
+                    }}
+                    className={[
+                      'w-full sm:w-auto rounded-xl border border-white/20 bg-white/10 px-6 py-3',
+                      'text-sm font-bold text-white backdrop-blur-sm',
+                      'transition-all duration-200 cursor-pointer',
+                      'hover:bg-white/15 hover:border-white/30 active:scale-95',
+                    ].join(' ')}
+                  >
+                    Escribir texto
+                  </button>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-4 animate-[fadeIn_0.3s_ease-out]">
-                  <div className="flex items-center gap-3">
+                <div className="flex w-full flex-col items-center gap-4 animate-[fadeIn_0.3s_ease-out]">
+                  <div className="flex items-center gap-3 self-center">
                     <span className="flex h-3 w-3 items-center justify-center">
                       <span className="absolute h-3 w-3 animate-ping rounded-full bg-red-400 opacity-75" />
                       <span className="relative h-2 w-2 rounded-full bg-red-500" />
                     </span>
-                    <span className="font-mono text-xl font-bold text-white tracking-widest">
-                      {formatRecordingTime(recordingTime)}
+                    <span className="text-sm font-bold text-white uppercase tracking-wider">
+                      Escuchando...
                     </span>
+                  </div>
+                  
+                  {/* Visualización del texto en vivo */}
+                  <div className="w-full max-w-xl bg-white/5 border border-white/10 rounded-xl p-4 min-h-[100px] max-h-[200px] overflow-y-auto text-left">
+                    <p className="text-white/80 italic text-sm">
+                      {liveTranscription || "Habla ahora, te estoy escuchando..."}
+                    </p>
                   </div>
                   
                   <button
                     id="stop-record-button"
                     onClick={stopRecording}
                     className={[
-                      'rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
+                      'mt-2 rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
                       'transition-all duration-200 cursor-pointer',
                       'hover:bg-gray-200 hover:scale-105 active:scale-95',
                     ].join(' ')}
                   >
-                    Detener grabación
+                    Detener grabación y Revisar
                   </button>
                 </div>
               )}

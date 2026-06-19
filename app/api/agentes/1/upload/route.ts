@@ -9,7 +9,7 @@
  */
 
 import { type NextRequest } from 'next/server';
-import { validateFile, processFile, extractWishes } from '@/lib/services/agent-1-service';
+import { validateFile, processFile, processText, extractWishes } from '@/lib/services/agent-1-service';
 import type { Agent1UploadResponse, Agent1ErrorResponse } from '@/lib/types/agent-1';
 
 export async function POST(request: NextRequest) {
@@ -17,25 +17,33 @@ export async function POST(request: NextRequest) {
     // 1. Parsear FormData
     const formData = await request.formData();
     const file = formData.get('file');
+    const text = formData.get('text');
 
-    if (!file || !(file instanceof File)) {
+    let transcription;
+
+    if (text && typeof text === 'string') {
+      // Flujo de texto directo (SpeechRecognition)
+      transcription = processText(text);
+    } else if (file && file instanceof File) {
+      // Flujo de archivo de audio subido
+      // 2. Validar archivo (tipo + tamaño según CA1)
+      const validation = validateFile(file.name, file.size, file.type);
+      if (!validation.valid) {
+        return Response.json(
+          { error: validation.error!, code: validation.code! } satisfies Agent1ErrorResponse,
+          { status: 400 }
+        );
+      }
+      // 3a. Procesar archivo: transcripción con OpenAI Whisper
+      transcription = await processFile(file);
+    } else {
       return Response.json(
-        { error: 'No se recibió ningún archivo.', code: 'INVALID_TYPE' } satisfies Agent1ErrorResponse,
+        { error: 'No se recibió ni un archivo ni un texto.', code: 'INVALID_TYPE' } satisfies Agent1ErrorResponse,
         { status: 400 }
       );
     }
 
-    // 2. Validar archivo (tipo + tamaño según CA1)
-    const validation = validateFile(file.name, file.size, file.type);
-    if (!validation.valid) {
-      return Response.json(
-        { error: validation.error!, code: validation.code! } satisfies Agent1ErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    // 3. Procesar: transcripción + extracción de deseos
-    const transcription = await processFile(file);
+    // 3b. Procesar: extracción de deseos con Gemini
     const wishes = await extractWishes(transcription);
 
     // 4. Respuesta exitosa
@@ -46,7 +54,7 @@ export async function POST(request: NextRequest) {
     console.error('[Agent 1 Upload] Error:', error);
     return Response.json(
       {
-        error: 'Error interno al procesar el archivo. Intente de nuevo.',
+        error: error instanceof Error ? error.message : 'Error interno al procesar el archivo. Intente de nuevo.',
         code: 'PROCESSING_ERROR',
       } satisfies Agent1ErrorResponse,
       { status: 500 }

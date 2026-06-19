@@ -14,6 +14,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Agent1State, Wish, Agent1UploadResponse } from '@/lib/types/agent-1';
 import { WISH_ID_PREFIX, STORAGE_KEY_AGENT_1 } from '@/lib/constants/agent-1';
 import { FileUploader } from '@/components/agents/agent-1/FileUploader';
@@ -48,6 +49,7 @@ const INITIAL_STATE: Agent1State = {
 // ---------------------------------------------------------------------------
 
 export default function Agent1Page() {
+  const router = useRouter();
   const [state, setState] = useState<Agent1State>(INITIAL_STATE);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -138,6 +140,60 @@ export default function Agent1Page() {
     }
   }, []);
 
+  // ── Handler: Transcripción en vivo completada ─────────────────
+  const handleLiveTranscriptionComplete = useCallback((text: string) => {
+    setState((prev) => ({
+      ...prev,
+      status: 'editing_transcription',
+      transcription: {
+        fullText: text,
+        language: 'es',
+        duration: 0,
+        segments: [{ start: 0, end: 0, text, confidence: 1 }]
+      },
+      error: null,
+    }));
+  }, []);
+
+  // ── Handler: Analizar texto editado ───────────────────────────
+  const handleAnalyzeText = useCallback(async (finalText: string) => {
+    setState((prev) => ({
+      ...prev,
+      status: 'extracting',
+      error: null,
+    }));
+
+    try {
+      const formData = new FormData();
+      formData.append('text', finalText);
+
+      const response = await fetch('/api/agentes/1/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar el texto');
+      }
+
+      const data: Agent1UploadResponse = await response.json();
+
+      setState((prev) => ({
+        ...prev,
+        transcription: data.transcription,
+        wishes: data.wishes,
+        status: 'review',
+      }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        status: 'editing_transcription',
+        error: error instanceof Error ? error.message : 'Error desconocido al analizar.',
+      }));
+    }
+  }, []);
+
   // ── Handlers HITL: CRUD de deseos (CA3) ───────────────────────
 
   const handleEditWish = useCallback((id: string, newText: string) => {
@@ -171,9 +227,13 @@ export default function Agent1Page() {
 
   // ── Handler: Aprobar deseos ───────────────────────────────────
   const handleApprove = useCallback(() => {
+    // Guardar en localStorage para que el Agente 2 lo consuma
+    localStorage.setItem('agent_2_input', JSON.stringify({
+      transcription: state.transcription,
+      wishes: state.wishes
+    }));
     setState((prev) => ({ ...prev, status: 'approved' }));
-    // TODO: Navegar al Agente 2 cuando esté implementado
-  }, []);
+  }, [state.transcription, state.wishes]);
 
   // ── Handler: Reset / Subir otro archivo ───────────────────────
   const handleReset = useCallback(() => {
@@ -208,9 +268,57 @@ export default function Agent1Page() {
       {(state.status === 'idle' || state.status === 'uploading' || state.status === 'transcribing' || state.status === 'extracting') && (
         <FileUploader
           onFileSelect={handleFileUpload}
+          onTranscriptionComplete={handleLiveTranscriptionComplete}
           isProcessing={state.status === 'transcribing' || state.status === 'extracting'}
           error={state.error}
         />
+      )}
+
+      {/* ── Sección de Edición de Transcripción (HITL Pre-análisis) ── */}
+      {state.status === 'editing_transcription' && (
+        <div className="flex flex-col gap-4 bg-white/5 p-6 rounded-2xl border border-white/10 animate-[fadeIn_0.3s_ease-out]">
+          <h2 className="text-xl font-bold text-white">
+            {state.transcription?.fullText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
+          </h2>
+          <p className="text-sm text-white/60">
+            {state.transcription?.fullText
+              ? 'Asegúrate de que la transcripción sea correcta antes de enviarla a Gemini para extraer los requerimientos. Puedes añadir detalles o corregir palabras mal interpretadas.'
+              : 'Escribe aquí el texto, apuntes o requerimientos que tengas de tu reunión. Cuando estés listo, envíalos a Gemini para procesarlos.'}
+          </p>
+          
+          <textarea 
+            className="w-full bg-black/40 border border-white/20 rounded-xl p-4 text-white min-h-[200px] focus:border-[#005BBF] outline-none"
+            placeholder={state.transcription?.fullText ? '' : 'Ejemplo: Necesito una aplicación móvil que tenga inicio de sesión con Google...'}
+            value={state.transcription?.fullText || ''}
+            onChange={(e) => setState(prev => ({
+              ...prev, 
+              transcription: {
+                ...prev.transcription!,
+                fullText: e.target.value,
+                segments: [{ start: 0, end: 0, text: e.target.value, confidence: 1 }]
+              }
+            }))}
+          />
+
+          {state.error && (
+            <p className="mt-2 text-sm text-red-400">{state.error}</p>
+          )}
+
+          <div className="flex justify-end gap-3 mt-2">
+             <button
+                onClick={handleReset}
+                className="rounded-xl border border-white/15 px-5 py-3 text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+             >
+                Descartar y volver
+             </button>
+             <button
+                onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
+                className="rounded-xl bg-[#005BBF] px-8 py-3 text-sm font-bold text-white hover:bg-[#004a9e] transition-all cursor-pointer"
+             >
+                Analizar texto con Gemini
+             </button>
+          </div>
+        </div>
       )}
 
       {/* ── Resultados: Transcripción + Deseos en paralelo (CA2) ── */}
@@ -289,13 +397,21 @@ export default function Agent1Page() {
                 </p>
               </div>
 
-              {/* Botón para resetear y volver a empezar */}
-              <button
-                onClick={handleReset}
-                className="ml-auto shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-              >
-                Nueva sesión
-              </button>
+              {/* Botones de acción final */}
+              <div className="ml-auto flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleReset}
+                  className="rounded-lg px-3 py-2 text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Nueva sesión
+                </button>
+                <button
+                  onClick={() => router.push('/agentes/2')}
+                  className="rounded-lg bg-[#22C55E] px-4 py-2 text-sm font-bold text-black hover:bg-[#1da54e] transition-all cursor-pointer"
+                >
+                  Continuar al Agente 2 →
+                </button>
+              </div>
             </div>
           )}
         </>

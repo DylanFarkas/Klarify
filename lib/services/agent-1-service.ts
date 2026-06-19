@@ -124,6 +124,25 @@ export async function processFile(file: File): Promise<TranscriptionResult> {
 }
 
 /**
+ * Crea un resultado de transcripción simulado a partir de texto plano directo.
+ */
+export function processText(text: string): TranscriptionResult {
+  return {
+    fullText: text,
+    language: 'es',
+    duration: 0, // No aplica
+    segments: [
+      {
+        start: 0,
+        end: 0,
+        text: text,
+        confidence: 1,
+      }
+    ]
+  };
+}
+
+/**
  * Extrae deseos/necesidades del cliente a partir de la transcripción.
  */
 export async function extractWishes(

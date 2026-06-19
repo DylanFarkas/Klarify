@@ -14,6 +14,7 @@ export type Agent1Status =
   | 'idle'          // Esperando que el usuario cargue un archivo
   | 'uploading'     // Archivo siendo enviado al servidor
   | 'transcribing'  // Transcripción en progreso
+  | 'editing_transcription' // Usuario editando el texto en vivo antes de extraer deseos
   | 'extracting'    // Extracción de deseos en progreso
   | 'review'        // Usuario revisando transcripción + deseos
   | 'approved';     // Deseos aprobados, listo para Agente 2
