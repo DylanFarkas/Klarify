@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Google_Sans_Flex } from "next/font/google";
+import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
 const googleSansFlex = Google_Sans_Flex({
@@ -23,7 +24,11 @@ export default function RootLayout({
       lang="es"
       className={`${googleSansFlex.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }

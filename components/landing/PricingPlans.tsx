@@ -111,7 +111,7 @@ export function PricingPlans() {
                   ? "bg-[#005bbf] text-white shadow-md hover:opacity-90"
                   : "border border-[#191c1d] text-[#191c1d] hover:bg-[#edeeef]"
               }`}
-              href="#"
+              href={plan.name === "Enterprise" ? "#" : "/login"}
             >
               {plan.cta}
             </a>
