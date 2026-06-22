@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 const titleStart = "Transforma ideas en ";
 const titleHighlight = "backlogs ejecutables";
@@ -11,6 +13,17 @@ const heroTitle = `${titleStart}${titleHighlight}${titleEnd}`;
 export function HeroLanding() {
   const [typedLength, setTypedLength] = useState(0);
   const [showContent, setShowContent] = useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const handleStartClick = () => {
+    if (!user) {
+      router.push("/login");
+    } else {
+      const lastAgent = localStorage.getItem("lastAgent") || "1";
+      router.push(`/agentes/${lastAgent}`);
+    }
+  };
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -89,18 +102,18 @@ export function HeroLanding() {
                 </p>
 
                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                  <Link
-                    className="flex items-center gap-2 rounded-xl bg-[#191c1d] px-8 py-4 font-bold text-white shadow-xl transition-transform hover:-translate-y-0.5"
-                    href="/agentes/1"
+                  <button
+                    onClick={handleStartClick}
+                    className="flex items-center gap-2 rounded-xl bg-[#191c1d] px-8 py-4 font-bold text-white shadow-xl transition-transform hover:-translate-y-0.5 cursor-pointer"
                   >
                     Empezar gratis
-                  </Link>
-                  <Link
-                    className="flex items-center gap-2 rounded-xl border border-[#c1c6d6]/50 bg-white px-8 py-4 font-bold text-[#191c1d] transition-colors hover:bg-[#edeeef]"
-                    href="/agentes/1"
+                  </button>
+                  <button
+                    onClick={handleStartClick}
+                    className="flex items-center gap-2 rounded-xl border border-[#c1c6d6]/50 bg-white px-8 py-4 font-bold text-[#191c1d] transition-colors hover:bg-[#edeeef] cursor-pointer"
                   >
                     Ver agentes en acción
-                  </Link>
+                  </button>
                 </div>
               </>
             ) : null}
