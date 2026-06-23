@@ -42,16 +42,16 @@ export function WishesList({
 
   return (
     <section
-      className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
+      className="flex flex-col rounded-2xl border border-border bg-surface-muted backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
       aria-labelledby="wishes-heading"
     >
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
-          <h3 id="wishes-heading" className="text-lg font-bold text-white">
+          <h3 id="wishes-heading" className="text-lg font-bold text-foreground">
             Deseos del Cliente
           </h3>
-          <span className="rounded-full bg-[#005BBF]/20 px-2.5 py-0.5 text-xs font-bold text-[#005BBF]">
+          <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-bold text-primary">
             {wishes.length}
           </span>
         </div>
@@ -63,8 +63,8 @@ export function WishesList({
             onClick={() => setIsAddingWish(true)}
             className={[
               'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-              'text-xs font-bold text-[#005BBF]',
-              'hover:bg-[#005BBF]/10 transition-colors cursor-pointer',
+              'text-xs font-bold text-primary',
+              'hover:bg-primary/10 transition-colors cursor-pointer',
             ].join(' ')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
@@ -80,9 +80,9 @@ export function WishesList({
         {wishes.length === 0 && !isAddingWish ? (
           // Estado vacío
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">
               <svg
-                className="h-7 w-7 text-white/30"
+                className="h-7 w-7 text-icon-muted"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -96,7 +96,7 @@ export function WishesList({
                 />
               </svg>
             </div>
-            <p className="text-sm text-white/40">
+            <p className="text-sm text-subtle">
               Los deseos del cliente aparecerán aquí tras procesar el archivo.
             </p>
           </div>
@@ -130,8 +130,8 @@ export function WishesList({
 
       {/* ── Footer con stats ───────────────────────────────────── */}
       {wishes.length > 0 && (
-        <div className="border-t border-white/10 px-6 py-3">
-          <div className="flex items-center gap-4 text-xs text-white/40">
+        <div className="border-t border-border px-6 py-3">
+          <div className="flex items-center gap-4 text-xs text-subtle">
             <span>{autoCount} extraídos por IA</span>
             {manualCount > 0 && (
               <>

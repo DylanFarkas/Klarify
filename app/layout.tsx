@@ -23,6 +23,7 @@ export default function RootLayout({
     <html
       lang="es"
       className={`${googleSansFlex.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>

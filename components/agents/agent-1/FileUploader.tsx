@@ -238,194 +238,236 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
 
   return (
     <div className="w-full">
-      {/* ── Zona de drop ───────────────────────────────────────── */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={[
-          'relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed',
-          'px-6 py-16 text-center transition-all duration-300',
-          'backdrop-blur-sm',
-          isDragging
-            ? 'border-[#005BBF] bg-[#005BBF]/10 shadow-[0_0_40px_rgba(0,91,191,0.15)]'
-            : 'border-white/20 bg-white/[0.03] hover:border-white/30 hover:bg-white/[0.05]',
-          isProcessing && 'pointer-events-none opacity-60',
-          error && 'border-red-500/50',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {/* Estado: Procesando */}
-        {isProcessing && selectedFileName && (
-          <div className="flex flex-col items-center gap-4">
-            {/* Spinner */}
-            <div className="h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#005BBF]" />
-            <div className="flex flex-col items-center gap-1">
-              <p className="text-sm font-medium text-white">
-                Procesando archivo...
-              </p>
-              <p className="text-xs text-white/50">
-                {getFileIcon(selectedFileName)} {selectedFileName}
-              </p>
-            </div>
-            {/* Barra de progreso indeterminada */}
-            <div className="h-1 w-48 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-[#005BBF]" />
-            </div>
-          </div>
-        )}
-
-        {/* Estado: Idle / Esperando archivo */}
-        {!isProcessing && (
-          <>
-            {/* Icono de carga */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* ── Zona de drop principal ───────────────────────────── */}
+        <div className="col-span-12">
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => {
+              if (!isProcessing && !isRecording) {
+                fileInputRef.current?.click();
+              }
+            }}
+            className={[
+              'group relative flex h-[min(400px,55vh)] cursor-pointer flex-col items-center justify-center',
+              'overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-300',
+              isDragging
+                ? 'border-primary bg-primary/10 shadow-[0_8px_32px_color-mix(in_srgb,var(--primary)_20%,transparent)]'
+                : 'border-border-strong bg-surface-muted shadow-sm hover:border-primary/60 hover:shadow-md',
+              isProcessing && 'pointer-events-none opacity-70',
+              isRecording && 'cursor-default border-red-500/40',
+              error && !isProcessing && 'border-red-500/40',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {/* Acento de fondo al hover */}
             <div
               className={[
-                'mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-colors duration-300',
-                isDragging ? 'bg-[#005BBF]/20' : 'bg-white/[0.06]',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <svg
-                className={[
-                  'h-8 w-8 transition-colors duration-300',
-                  isDragging ? 'text-[#005BBF]' : 'text-white/40',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                />
-              </svg>
-            </div>
+                'pointer-events-none absolute inset-0 bg-primary/5 transition-opacity duration-300',
+                isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              ].join(' ')}
+              aria-hidden="true"
+            />
 
-            {/* Texto principal */}
-            <p className="mb-1 text-base font-medium text-white">
-              {isDragging ? 'Suelta el archivo aquí' : 'Arrastra tu archivo aquí'}
-            </p>
-            <p className="mb-5 text-sm text-white/50">
-              o selecciona un archivo desde tu equipo
-            </p>
-
-            {/* Acciones */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm">
-              {!isRecording ? (
-                <>
-                  <button
-                    id="file-select-button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className={[
-                      'w-full sm:w-auto rounded-xl border border-white/20 bg-white/10 px-6 py-3',
-                      'text-sm font-bold text-white backdrop-blur-sm',
-                      'transition-all duration-200 cursor-pointer',
-                      'hover:bg-white/15 hover:border-white/30 active:scale-95',
-                    ].join(' ')}
-                  >
-                    Seleccionar archivo
-                  </button>
-
-                  <div className="hidden sm:block text-xs font-medium text-white/30">o</div>
-
-                  <button
-                    id="start-record-button"
-                    onClick={startRecording}
-                    className={[
-                      'flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-3',
-                      'text-sm font-bold text-red-400 backdrop-blur-sm',
-                      'transition-all duration-200 cursor-pointer',
-                      'hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-300 active:scale-95',
-                    ].join(' ')}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                    Grabar audio
-                  </button>
-
-                  <div className="hidden sm:block text-xs font-medium text-white/30">o</div>
-
-                  <button
-                    id="write-text-button"
-                    onClick={() => {
-                      if (onTranscriptionComplete) onTranscriptionComplete('');
-                    }}
-                    className={[
-                      'w-full sm:w-auto rounded-xl border border-white/20 bg-white/10 px-6 py-3',
-                      'text-sm font-bold text-white backdrop-blur-sm',
-                      'transition-all duration-200 cursor-pointer',
-                      'hover:bg-white/15 hover:border-white/30 active:scale-95',
-                    ].join(' ')}
-                  >
-                    Escribir texto
-                  </button>
-                </>
-              ) : (
-                <div className="flex w-full flex-col items-center gap-4 animate-[fadeIn_0.3s_ease-out]">
-                  <div className="flex items-center gap-3 self-center">
-                    <span className="flex h-3 w-3 items-center justify-center">
-                      <span className="absolute h-3 w-3 animate-ping rounded-full bg-red-400 opacity-75" />
-                      <span className="relative h-2 w-2 rounded-full bg-red-500" />
-                    </span>
-                    <span className="text-sm font-bold text-white uppercase tracking-wider">
-                      Escuchando...
-                    </span>
-                  </div>
-                  
-                  {/* Visualización del texto en vivo */}
-                  <div className="w-full max-w-xl bg-white/5 border border-white/10 rounded-xl p-4 min-h-[100px] max-h-[200px] overflow-y-auto text-left">
-                    <p className="text-white/80 italic text-sm">
-                      {liveTranscription || "Habla ahora, te estoy escuchando..."}
-                    </p>
-                  </div>
-                  
-                  <button
-                    id="stop-record-button"
-                    onClick={stopRecording}
-                    className={[
-                      'mt-2 rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
-                      'transition-all duration-200 cursor-pointer',
-                      'hover:bg-gray-200 hover:scale-105 active:scale-95',
-                    ].join(' ')}
-                  >
-                    Detener grabación y Revisar
-                  </button>
+            {/* Estado: Procesando */}
+            {isProcessing && selectedFileName && (
+              <div className="relative z-10 flex flex-col items-center gap-5">
+                <div className="h-14 w-14 animate-spin rounded-full border-2 border-border border-t-primary" />
+                <div className="flex flex-col items-center gap-1">
+                  <p className="text-base font-semibold text-foreground">
+                    Procesando archivo...
+                  </p>
+                  <p className="text-sm text-muted">
+                    {getFileIcon(selectedFileName)} {selectedFileName}
+                  </p>
                 </div>
-              )}
-            </div>
-
-            {/* Formatos aceptados */}
-            {!isRecording && (
-              <p className="mt-5 text-xs text-white/35">
-                Formatos: {ALLOWED_EXTENSIONS.join(', ')} · Máximo {MAX_FILE_SIZE_LABEL}
-              </p>
+                <div className="h-1.5 w-56 overflow-hidden rounded-full bg-border">
+                  <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
+                </div>
+              </div>
             )}
-          </>
-        )}
 
-        {/* Input oculto */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={FILE_INPUT_ACCEPT}
-          onChange={handleInputChange}
-          className="hidden"
-          aria-label="Seleccionar archivo"
-        />
+            {/* Estado: Grabando */}
+            {!isProcessing && isRecording && (
+              <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 animate-[fadeIn_0.3s_ease-out]">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wider text-foreground">
+                    Escuchando...
+                  </span>
+                </div>
+
+                <div className="min-h-[120px] w-full max-h-[200px] overflow-y-auto rounded-xl border border-border bg-input p-5 text-left">
+                  <p className="text-sm italic leading-relaxed text-body">
+                    {liveTranscription || 'Habla ahora, te estoy escuchando...'}
+                  </p>
+                </div>
+
+                <button
+                  id="stop-record-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stopRecording();
+                  }}
+                  className={[
+                    'rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
+                    'transition-all duration-200 cursor-pointer',
+                    'hover:scale-105 hover:bg-gray-100 active:scale-95',
+                  ].join(' ')}
+                >
+                  Detener grabación y Revisar
+                </button>
+              </div>
+            )}
+
+            {/* Estado: Idle / Esperando archivo */}
+            {!isProcessing && !isRecording && (
+              <div className="relative z-10">
+                <div
+                  className={[
+                    'mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500',
+                    isDragging
+                      ? 'scale-105 border-primary/40 bg-primary/20'
+                      : 'border-border bg-surface-hover group-hover:scale-105 group-hover:border-primary/30 group-hover:bg-primary/10',
+                  ].join(' ')}
+                >
+                  <svg
+                    className={[
+                      'h-10 w-10 transition-colors duration-300',
+                      isDragging ? 'text-primary' : 'text-primary/80',
+                    ].join(' ')}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
+                    />
+                  </svg>
+                </div>
+
+                <h3 className="mb-2 text-xl font-bold text-foreground">
+                  {isDragging ? 'Suelta el archivo aquí' : 'Arrastra tu archivo aquí o selecciona un método'}
+                </h3>
+                <p className="mx-auto mb-8 max-w-md text-sm text-muted">
+                  Aceptamos archivos {ALLOWED_EXTENSIONS.join(', ')}. Tamaño máximo: {MAX_FILE_SIZE_LABEL}.
+                </p>
+
+                <button
+                  id="file-select-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className={[
+                    'mx-auto inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-3',
+                    'text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)]',
+                    'transition-all duration-200 cursor-pointer',
+                    'hover:bg-primary-hover hover:shadow-lg active:scale-95',
+                  ].join(' ')}
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                  </svg>
+                  Seleccionar archivo
+                </button>
+              </div>
+            )}
+
+            {/* Input oculto */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={FILE_INPUT_ACCEPT}
+              onChange={handleInputChange}
+              className="hidden"
+              aria-label="Seleccionar archivo"
+            />
+          </div>
+        </div>
+
+        {/* ── Tarjetas de acción ───────────────────────────────── */}
+        {!isProcessing && !isRecording && (
+          <div className="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+            {/* Subir Archivo */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={[
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
+                'transition-all duration-200 cursor-pointer',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 transition-transform duration-200 group-hover:scale-110">
+                <svg className="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <h5 className="mb-1 font-bold text-foreground">Subir Archivo</h5>
+              <p className="text-xs text-muted">Importa documentos o audios pregrabados.</p>
+            </button>
+
+            {/* Grabar Audio */}
+            <button
+              type="button"
+              id="start-record-button"
+              onClick={startRecording}
+              className={[
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
+                'transition-all duration-200 cursor-pointer',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="relative mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/15 transition-transform duration-200 group-hover:scale-110">
+                <svg className="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <h5 className="mb-1 font-bold text-foreground">Grabar Audio</h5>
+              <p className="text-xs text-muted">Captura una reunión en vivo ahora mismo.</p>
+            </button>
+
+            {/* Escribir Texto */}
+            <button
+              type="button"
+              id="write-text-button"
+              onClick={() => {
+                if (onTranscriptionComplete) onTranscriptionComplete('');
+              }}
+              className={[
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
+                'transition-all duration-200 cursor-pointer',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-hover transition-transform duration-200 group-hover:scale-110">
+                <svg className="h-7 w-7 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+              </div>
+              <h5 className="mb-1 font-bold text-foreground">Escribir Texto</h5>
+              <p className="text-xs text-muted">Pega minutas de reunión o notas rápidas.</p>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Mensaje de error ───────────────────────────────────── */}
       {error && (
-        <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3">
           <svg
-            className="h-5 w-5 shrink-0 text-red-400 mt-0.5"
+            className="mt-0.5 h-5 w-5 shrink-0 text-red-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -438,7 +480,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
             />
           </svg>
-          <p className="text-sm text-red-300">{error}</p>
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
     </div>

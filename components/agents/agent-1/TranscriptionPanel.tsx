@@ -25,12 +25,12 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
   // ── Estado vacío ──────────────────────────────────────────────
   if (!transcription) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
-        <h3 className="mb-4 text-lg font-bold text-white">Transcripción</h3>
+      <section className="rounded-2xl border border-border bg-surface-muted p-6 backdrop-blur-sm">
+        <h3 className="mb-4 text-lg font-bold text-foreground">Transcripción</h3>
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">
             <svg
-              className="h-7 w-7 text-white/30"
+              className="h-7 w-7 text-icon-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -44,7 +44,7 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
               />
             </svg>
           </div>
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-subtle">
             La transcripción aparecerá aquí una vez procesado el archivo.
           </p>
         </div>
@@ -54,7 +54,7 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
 
   // ── Color de confianza ────────────────────────────────────────
   const getConfidenceColor = (confidence: number): string => {
-    if (confidence >= 0.95) return 'text-[#22C55E]';
+    if (confidence >= 0.95) return 'text-success';
     if (confidence >= 0.9) return 'text-yellow-400';
     return 'text-orange-400';
   };
@@ -67,17 +67,17 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
 
   return (
     <section
-      className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
+      className="flex flex-col rounded-2xl border border-border bg-surface-muted backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
       aria-labelledby="transcription-heading"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
-          <h3 id="transcription-heading" className="text-lg font-bold text-white">
+          <h3 id="transcription-heading" className="text-lg font-bold text-foreground">
             Transcripción
           </h3>
           {transcription.duration > 0 && (
-            <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/60">
+            <span className="rounded-full bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-muted">
               {formatTimestamp(transcription.duration)}
             </span>
           )}
@@ -86,7 +86,7 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
         {/* Toggle vista */}
         <button
           onClick={() => setShowSegments(!showSegments)}
-          className="text-xs font-medium text-[#005BBF] hover:text-[#3d8fe8] transition-colors cursor-pointer"
+          className="text-xs font-medium text-primary hover:text-primary-hover transition-colors cursor-pointer"
         >
           {showSegments ? 'Ver texto completo' : 'Ver por segmentos'}
         </button>
@@ -100,12 +100,12 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
             {transcription.segments.map((segment, index) => (
               <div
                 key={index}
-                className="group flex gap-3 rounded-xl p-3 transition-colors hover:bg-white/[0.03]"
+                className="group flex gap-3 rounded-xl p-3 transition-colors hover:bg-surface-hover"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 {/* Timestamp */}
                 {segment.end > 0 && (
-                  <span className="shrink-0 pt-0.5 text-xs font-mono text-white/30">
+                  <span className="shrink-0 pt-0.5 text-xs font-mono text-subtle">
                     {formatTimestamp(segment.start)}
                   </span>
                 )}
@@ -117,13 +117,13 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
                     <span
                       className={[
                         'mb-1 inline-block text-xs font-bold',
-                        segment.speaker === 'Cliente' ? 'text-[#005BBF]' : 'text-white/50',
+                        segment.speaker === 'Cliente' ? 'text-primary' : 'text-muted',
                       ].join(' ')}
                     >
                       {segment.speaker}
                     </span>
                   )}
-                  <p className="text-sm leading-relaxed text-white/80">
+                  <p className="text-sm leading-relaxed text-body">
                     {segment.text}
                   </p>
                 </div>
@@ -142,15 +142,15 @@ export function TranscriptionPanel({ transcription }: TranscriptionPanelProps) {
           </div>
         ) : (
           // ── Vista texto completo ──
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-white/80">
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-body">
             {transcription.fullText}
           </div>
         )}
       </div>
 
       {/* Footer con stats */}
-      <div className="border-t border-white/10 px-6 py-3">
-        <div className="flex items-center gap-4 text-xs text-white/40">
+      <div className="border-t border-border px-6 py-3">
+        <div className="flex items-center gap-4 text-xs text-subtle">
           <span>{transcription.segments.length} segmentos</span>
           <span>•</span>
           <span>Idioma: {transcription.language.toUpperCase()}</span>
