@@ -1,40 +1,52 @@
+/**
+ * @fileoverview AgentThemeContext — Contexto de temas del workspace de agentes.
+ *
+ * Provee el tema activo y permite cambiarlo entre presets predeterminados.
+ * Persiste la selección en localStorage y sincroniza `data-agent-theme`
+ * en el documento para evitar parpadeo al recargar.
+ */
+
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import {
   type AgentTheme,
   STORAGE_KEY_AGENT_THEME,
   DEFAULT_AGENT_THEME,
+  readPersistedAgentTheme,
 } from '@/lib/constants/agent-theme';
 
 interface AgentThemeContextType {
   theme: AgentTheme;
   setTheme: (theme: AgentTheme) => void;
-  toggleTheme: () => void;
 }
 
 const AgentThemeContext = createContext<AgentThemeContextType | null>(null);
 
-function readStoredTheme(): AgentTheme {
-  if (typeof window === 'undefined') return DEFAULT_AGENT_THEME;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_AGENT_THEME);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // localStorage no disponible
-  }
-  return DEFAULT_AGENT_THEME;
+function applyThemeToDocument(theme: AgentTheme) {
+  document.documentElement.setAttribute('data-agent-theme', theme);
 }
 
 export function AgentThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<AgentTheme>(DEFAULT_AGENT_THEME);
 
+  // Restaura desde localStorage al entrar al workspace (navegación SPA o recarga)
+  useLayoutEffect(() => {
+    const stored = readPersistedAgentTheme();
+    setThemeState(stored);
+    applyThemeToDocument(stored);
+  }, []);
+
+  // Limpia el atributo al salir del workspace de agentes
   useEffect(() => {
-    setThemeState(readStoredTheme());
+    return () => {
+      document.documentElement.removeAttribute('data-agent-theme');
+    };
   }, []);
 
   const setTheme = useCallback((next: AgentTheme) => {
     setThemeState(next);
+    applyThemeToDocument(next);
     try {
       localStorage.setItem(STORAGE_KEY_AGENT_THEME, next);
     } catch {
@@ -42,19 +54,9 @@ export function AgentThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  }, [theme, setTheme]);
-
   return (
-    <AgentThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      <div
-        className={
-          theme === 'dark'
-            ? 'agent-workspace dark min-h-screen'
-            : 'agent-workspace light min-h-screen'
-        }
-      >
+    <AgentThemeContext.Provider value={{ theme, setTheme }}>
+      <div className="agent-workspace min-h-screen">
         {children}
       </div>
     </AgentThemeContext.Provider>

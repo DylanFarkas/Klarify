@@ -12,16 +12,18 @@ interface AgentLayoutShellProps {
 
 export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLayoutShellProps) {
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B0F1A] dark:text-white">
+    <div className="flex min-h-screen bg-background text-foreground">
       {/* ── Sidebar (solo desktop) ─────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-slate-200 bg-white px-6 py-8 dark:border-white/10 dark:bg-[#070A12]">
+      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-surface px-6 py-8 overflow-y-auto">
         {/* Logo */}
-        <Link
-          href="/"
-          className="mb-10 text-xl font-extrabold tracking-tight text-slate-900 transition-opacity hover:opacity-80 dark:text-white"
-        >
-          <span className="text-[#005BBF]">K</span>larify
-        </Link>
+        <div className="flex justify-center mb-10">
+          <Link
+            href="/"
+            className="text-5xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
+          >
+            <span className="text-primary">K</span>larify
+          </Link>
+        </div>
 
         {/* Stepper de agentes */}
         <AgentStepper currentStep={currentStep} />
@@ -30,8 +32,8 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
         <AgentSidebarSettings />
 
         {/* Spacer + branding inferior */}
-        <div className="mt-auto pt-8 border-t border-slate-200 dark:border-white/10">
-          <p className="text-xs text-slate-400 dark:text-white/30">
+        <div className="mt-auto pt-8 border-t border-border">
+          <p className="text-xs text-subtle">
             Klarify v0.1.0 — MVP
           </p>
         </div>
@@ -39,29 +41,10 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
 
       {/* ── Área principal ──────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Header */}
-        <header className="flex items-center gap-4 border-b border-slate-200 px-6 py-4 lg:px-10 dark:border-white/10">
-          {/* Logo mobile */}
-          <Link
-            href="/"
-            className="text-xl font-extrabold tracking-tight text-slate-900 lg:hidden dark:text-white"
-          >
-            <span className="text-[#005BBF]">K</span>larify
-          </Link>
-
-          {/* Separador mobile */}
-          <div className="h-6 w-px bg-slate-200 lg:hidden dark:bg-white/15" aria-hidden="true" />
-
-          {/* Badge del agente + título */}
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#005BBF] text-sm font-bold text-white">
-              {currentStep}
-            </span>
-            <h2 className="text-base font-semibold text-slate-900 lg:text-lg dark:text-white">
-              {agentTitle}
-            </h2>
-          </div>
-        </header>
+        {/* Configuración visible en móvil/tablet */}
+        <div className="border-b border-border bg-surface px-6 py-4 lg:hidden">
+          <AgentSidebarSettings className="mt-0 border-t-0 pt-0" />
+        </div>
 
         {/* Contenido del agente */}
         <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">

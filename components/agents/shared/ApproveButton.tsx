@@ -40,14 +40,14 @@ export function ApproveButton({ onClick, disabled, label }: ApproveButtonProps) 
         'inline-flex items-center gap-3 rounded-xl px-8 py-4 text-base font-bold',
         'transition-all duration-300 cursor-pointer',
         disabled
-          ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-white/10 dark:text-white/30'
+          ? 'cursor-not-allowed bg-disabled text-disabled-text'
           : [
-              'bg-[#005BBF] text-white',
-              'shadow-[0_0_30px_rgba(0,91,191,0.3)]',
-              'hover:shadow-[0_0_40px_rgba(0,91,191,0.5)]',
+              'bg-primary text-white',
+              'shadow-[0_0_30px_color-mix(in_srgb,var(--primary)_30%,transparent)]',
+              'hover:shadow-[0_0_40px_color-mix(in_srgb,var(--primary)_50%,transparent)]',
               'hover:scale-[1.03] active:scale-95',
             ].join(' '),
-        isAnimating && 'scale-105 shadow-[0_0_50px_rgba(0,91,191,0.6)]',
+        isAnimating && 'scale-105 shadow-[0_0_50px_color-mix(in_srgb,var(--primary)_60%,transparent)]',
       ]
         .filter(Boolean)
         .join(' ')}

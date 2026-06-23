@@ -254,8 +254,8 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               'group relative flex h-[min(400px,55vh)] cursor-pointer flex-col items-center justify-center',
               'overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-300',
               isDragging
-                ? 'border-[#005BBF] bg-[#005BBF]/10 shadow-[0_8px_32px_rgba(0,91,191,0.2)]'
-                : 'border-slate-300 bg-slate-50 shadow-sm hover:border-[#005BBF]/60 hover:shadow-md dark:border-white/20 dark:bg-white/[0.02]',
+                ? 'border-primary bg-primary/10 shadow-[0_8px_32px_color-mix(in_srgb,var(--primary)_20%,transparent)]'
+                : 'border-border-strong bg-surface-muted shadow-sm hover:border-primary/60 hover:shadow-md',
               isProcessing && 'pointer-events-none opacity-70',
               isRecording && 'cursor-default border-red-500/40',
               error && !isProcessing && 'border-red-500/40',
@@ -266,7 +266,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             {/* Acento de fondo al hover */}
             <div
               className={[
-                'pointer-events-none absolute inset-0 bg-[#005BBF]/5 transition-opacity duration-300',
+                'pointer-events-none absolute inset-0 bg-primary/5 transition-opacity duration-300',
                 isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
               ].join(' ')}
               aria-hidden="true"
@@ -275,17 +275,17 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             {/* Estado: Procesando */}
             {isProcessing && selectedFileName && (
               <div className="relative z-10 flex flex-col items-center gap-5">
-                <div className="h-14 w-14 animate-spin rounded-full border-2 border-slate-200 border-t-[#005BBF] dark:border-white/15" />
+                <div className="h-14 w-14 animate-spin rounded-full border-2 border-border border-t-primary" />
                 <div className="flex flex-col items-center gap-1">
-                  <p className="text-base font-semibold text-slate-900 dark:text-white">
+                  <p className="text-base font-semibold text-foreground">
                     Procesando archivo...
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-white/50">
+                  <p className="text-sm text-muted">
                     {getFileIcon(selectedFileName)} {selectedFileName}
                   </p>
                 </div>
-                <div className="h-1.5 w-56 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                  <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-[#005BBF]" />
+                <div className="h-1.5 w-56 overflow-hidden rounded-full bg-border">
+                  <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
                 </div>
               </div>
             )}
@@ -298,13 +298,13 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
                   </span>
-                  <span className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  <span className="text-sm font-bold uppercase tracking-wider text-foreground">
                     Escuchando...
                   </span>
                 </div>
 
-                <div className="min-h-[120px] w-full max-h-[200px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-5 text-left dark:border-white/10 dark:bg-black/30">
-                  <p className="text-sm italic leading-relaxed text-slate-700 dark:text-white/80">
+                <div className="min-h-[120px] w-full max-h-[200px] overflow-y-auto rounded-xl border border-border bg-input p-5 text-left">
+                  <p className="text-sm italic leading-relaxed text-body">
                     {liveTranscription || 'Habla ahora, te estoy escuchando...'}
                   </p>
                 </div>
@@ -333,14 +333,14 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                   className={[
                     'mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500',
                     isDragging
-                      ? 'scale-105 border-[#005BBF]/40 bg-[#005BBF]/20'
-                      : 'border-slate-200 bg-slate-100 group-hover:scale-105 group-hover:border-[#005BBF]/30 group-hover:bg-[#005BBF]/10 dark:border-white/15 dark:bg-white/[0.06]',
+                      ? 'scale-105 border-primary/40 bg-primary/20'
+                      : 'border-border bg-surface-hover group-hover:scale-105 group-hover:border-primary/30 group-hover:bg-primary/10',
                   ].join(' ')}
                 >
                   <svg
                     className={[
                       'h-10 w-10 transition-colors duration-300',
-                      isDragging ? 'text-[#005BBF]' : 'text-[#005BBF]/80',
+                      isDragging ? 'text-primary' : 'text-primary/80',
                     ].join(' ')}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -356,10 +356,10 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                   </svg>
                 </div>
 
-                <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">
+                <h3 className="mb-2 text-xl font-bold text-foreground">
                   {isDragging ? 'Suelta el archivo aquí' : 'Arrastra tu archivo aquí o selecciona un método'}
                 </h3>
-                <p className="mx-auto mb-8 max-w-md text-sm text-slate-500 dark:text-white/50">
+                <p className="mx-auto mb-8 max-w-md text-sm text-muted">
                   Aceptamos archivos {ALLOWED_EXTENSIONS.join(', ')}. Tamaño máximo: {MAX_FILE_SIZE_LABEL}.
                 </p>
 
@@ -370,10 +370,10 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                     fileInputRef.current?.click();
                   }}
                   className={[
-                    'mx-auto inline-flex items-center gap-2 rounded-xl bg-[#005BBF] px-8 py-3',
-                    'text-sm font-bold text-white shadow-[0_4px_20px_rgba(0,91,191,0.35)]',
+                    'mx-auto inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-3',
+                    'text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)]',
                     'transition-all duration-200 cursor-pointer',
-                    'hover:bg-[#004a9e] hover:shadow-lg active:scale-95',
+                    'hover:bg-primary-hover hover:shadow-lg active:scale-95',
                   ].join(' ')}
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -404,18 +404,18 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className={[
-                'group rounded-2xl border border-slate-200 bg-white p-6 text-left',
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
                 'transition-all duration-200 cursor-pointer',
-                'hover:border-[#005BBF]/50 hover:bg-slate-50 hover:shadow-md dark:border-white/15 dark:bg-white/[0.03] dark:hover:bg-white/[0.05]',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
               ].join(' ')}
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#005BBF]/15 transition-transform duration-200 group-hover:scale-110">
-                <svg className="h-7 w-7 text-[#005BBF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 transition-transform duration-200 group-hover:scale-110">
+                <svg className="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-slate-900 dark:text-white">Subir Archivo</h5>
-              <p className="text-xs text-slate-500 dark:text-white/50">Importa documentos o audios pregrabados.</p>
+              <h5 className="mb-1 font-bold text-foreground">Subir Archivo</h5>
+              <p className="text-xs text-muted">Importa documentos o audios pregrabados.</p>
             </button>
 
             {/* Grabar Audio */}
@@ -424,9 +424,9 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               id="start-record-button"
               onClick={startRecording}
               className={[
-                'group rounded-2xl border border-slate-200 bg-white p-6 text-left',
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
                 'transition-all duration-200 cursor-pointer',
-                'hover:border-red-500/50 hover:bg-slate-50 hover:shadow-md dark:border-white/15 dark:bg-white/[0.03] dark:hover:bg-white/[0.05]',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
               ].join(' ')}
             >
               <div className="relative mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/15 transition-transform duration-200 group-hover:scale-110">
@@ -434,8 +434,8 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-slate-900 dark:text-white">Grabar Audio</h5>
-              <p className="text-xs text-slate-500 dark:text-white/50">Captura una reunión en vivo ahora mismo.</p>
+              <h5 className="mb-1 font-bold text-foreground">Grabar Audio</h5>
+              <p className="text-xs text-muted">Captura una reunión en vivo ahora mismo.</p>
             </button>
 
             {/* Escribir Texto */}
@@ -446,18 +446,18 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                 if (onTranscriptionComplete) onTranscriptionComplete('');
               }}
               className={[
-                'group rounded-2xl border border-slate-200 bg-white p-6 text-left',
+                'group rounded-2xl border border-border bg-surface p-6 text-left',
                 'transition-all duration-200 cursor-pointer',
-                'hover:border-slate-300 hover:bg-slate-50 hover:shadow-md dark:border-white/15 dark:bg-white/[0.03] dark:hover:border-white/30 dark:hover:bg-white/[0.05]',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
               ].join(' ')}
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 transition-transform duration-200 group-hover:scale-110 dark:bg-white/10">
-                <svg className="h-7 w-7 text-slate-500 dark:text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-hover transition-transform duration-200 group-hover:scale-110">
+                <svg className="h-7 w-7 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-slate-900 dark:text-white">Escribir Texto</h5>
-              <p className="text-xs text-slate-500 dark:text-white/50">Pega minutas de reunión o notas rápidas.</p>
+              <h5 className="mb-1 font-bold text-foreground">Escribir Texto</h5>
+              <p className="text-xs text-muted">Pega minutas de reunión o notas rápidas.</p>
             </button>
           </div>
         )}
@@ -480,7 +480,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
             />
           </svg>
-          <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
     </div>

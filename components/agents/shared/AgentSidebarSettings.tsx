@@ -1,29 +1,35 @@
 'use client';
 
+/**
+ * @fileoverview AgentSidebarSettings — Panel de configuración del sidebar.
+ *
+ * Permite al usuario elegir entre los temas predeterminados del workspace.
+ * Se renderiza en el sidebar (desktop) y en la barra superior (móvil).
+ */
+
 import { useState } from 'react';
 import { useAgentTheme } from '@/context/AgentThemeContext';
-import type { AgentTheme } from '@/lib/constants/agent-theme';
+import { AGENT_THEMES } from '@/lib/constants/agent-theme';
 
-const THEME_OPTIONS: { value: AgentTheme; label: string }[] = [
-  { value: 'light', label: 'Claro' },
-  { value: 'dark', label: 'Oscuro' },
-];
+interface AgentSidebarSettingsProps {
+  /** Clases extra para adaptar el componente en distintos layouts (ej. móvil) */
+  className?: string;
+}
 
-export function AgentSidebarSettings() {
+export function AgentSidebarSettings({ className = '' }: AgentSidebarSettingsProps) {
   const { theme, setTheme } = useAgentTheme();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="mt-8 border-t border-slate-200 pt-6 dark:border-white/10">
+    <div className={['relative z-10 mt-8 border-t border-border pt-6', className].filter(Boolean).join(' ')}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-controls="agent-sidebar-settings-panel"
         className={[
-          'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium',
-          'text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900',
-          'dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white',
+          'flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium',
+          'text-muted transition-colors hover:bg-surface-hover hover:text-foreground',
         ].join(' ')}
       >
         <svg
@@ -64,42 +70,55 @@ export function AgentSidebarSettings() {
       {isOpen && (
         <div
           id="agent-sidebar-settings-panel"
-          className="mt-2 space-y-3 rounded-lg bg-slate-50 px-3 py-3 dark:bg-white/[0.04]"
+          className="relative z-10 mt-2 space-y-3 rounded-lg bg-elevated px-3 py-3"
         >
-          <p className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-white/40">
+          <p className="px-1 text-xs font-semibold uppercase tracking-wider text-subtle">
             Tema
           </p>
-          <div className="flex flex-col gap-1" role="radiogroup" aria-label="Tema">
-            {THEME_OPTIONS.map((option) => {
-              const isSelected = theme === option.value;
+          {/* Lista de presets disponibles */}
+          <div className="flex max-h-52 flex-col gap-1 overflow-y-auto" role="radiogroup" aria-label="Tema">
+            {AGENT_THEMES.map((option) => {
+              const isSelected = theme === option.id;
               return (
                 <button
-                  key={option.value}
+                  key={option.id}
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
-                  onClick={() => setTheme(option.value)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTheme(option.id);
+                  }}
                   className={[
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
                     isSelected
-                      ? 'bg-[#005BBF]/10 text-[#005BBF] dark:bg-[#005BBF]/20 dark:text-[#4d9fff]'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/[0.06]',
+                      ? 'bg-primary/10 text-primary ring-1 ring-primary/30'
+                      : 'text-muted hover:bg-surface-hover hover:text-foreground',
                   ].join(' ')}
                 >
                   <span
-                    className={[
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
-                      isSelected
-                        ? 'border-[#005BBF] dark:border-[#4d9fff]'
-                        : 'border-slate-300 dark:border-white/30',
-                    ].join(' ')}
+                    className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-strong"
+                    style={{ backgroundColor: option.preview.bg }}
                     aria-hidden="true"
                   >
-                    {isSelected && (
-                      <span className="h-2 w-2 rounded-full bg-[#005BBF] dark:bg-[#4d9fff]" />
-                    )}
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: option.preview.accent }}
+                    />
                   </span>
-                  {option.label}
+                  <span className="flex-1">{option.label}</span>
+                  {isSelected && (
+                    <svg
+                      className="h-4 w-4 shrink-0 text-primary"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
                 </button>
               );
             })}

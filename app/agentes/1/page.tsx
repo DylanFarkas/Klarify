@@ -245,7 +245,7 @@ export default function Agent1Page() {
   if (!isHydrated) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-[#005BBF] dark:border-white/15" />
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     );
   }
@@ -255,15 +255,15 @@ export default function Agent1Page() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
       {/* ── Hero Header ───────────────────────────────────────── */}
       <div className="mb-2">
-        <div className="mb-3 flex items-center gap-3 text-[#005BBF]">
-          <span className="rounded-full bg-[#005BBF]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest">
+        <div className="mb-3 flex items-center gap-3 text-primary">
+          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest">
             Paso 01 / 06
           </span>
         </div>
-        <h1 className="mb-4 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl dark:text-white">
+        <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
           Ingesta de Contexto
         </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-slate-500 dark:text-white/55">
+        <p className="max-w-2xl text-lg leading-relaxed text-muted">
           Carga el audio o los documentos de tu reunión con el cliente para que
           la IA transcriba y extraiga sus necesidades de forma automática.
         </p>
@@ -281,19 +281,19 @@ export default function Agent1Page() {
 
       {/* ── Sección de Edición de Transcripción (HITL Pre-análisis) ── */}
       {state.status === 'editing_transcription' && (
-        <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
-          <div className="border-b border-slate-200 bg-[#005BBF]/5 px-6 py-5 md:px-8 dark:border-white/10">
+        <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+          <div className="border-b border-border bg-primary/5 px-6 py-5 md:px-8">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/[0.06]">
-                <svg className="h-6 w-6 text-[#005BBF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-hover">
+                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                <h2 className="text-xl font-bold text-foreground">
                   {state.transcription?.fullText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
                 </h2>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-white/55">
+                <p className="mt-1 text-sm leading-relaxed text-muted">
                   {state.transcription?.fullText
                     ? 'Asegúrate de que la transcripción sea correcta antes de enviarla a Gemini para extraer los requerimientos. Puedes añadir detalles o corregir palabras mal interpretadas.'
                     : 'Escribe aquí el texto, apuntes o requerimientos que tengas de tu reunión. Cuando estés listo, envíalos a Gemini para procesarlos.'}
@@ -304,7 +304,7 @@ export default function Agent1Page() {
 
           <div className="flex flex-col gap-5 p-6 md:p-8">
             <textarea
-              className="min-h-[220px] w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm leading-relaxed text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[#005BBF] focus:ring-2 focus:ring-[#005BBF]/20 dark:border-white/15 dark:bg-black/30 dark:text-white dark:placeholder:text-white/30"
+              className="min-h-[220px] w-full resize-y rounded-xl border border-input-border bg-input p-5 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-primary focus:ring-2 focus:ring-primary/20"
               placeholder={state.transcription?.fullText ? '' : 'Ejemplo: Necesito una aplicación móvil que tenga inicio de sesión con Google...'}
               value={state.transcription?.fullText || ''}
               onChange={(e) => setState(prev => ({
@@ -322,20 +322,20 @@ export default function Agent1Page() {
                 <svg className="mt-0.5 h-5 w-5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                 </svg>
-                <p className="text-sm text-red-600 dark:text-red-300">{state.error}</p>
+                <p className="text-sm text-danger">{state.error}</p>
               </div>
             )}
 
             <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
               <button
                 onClick={handleReset}
-                className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 cursor-pointer dark:border-white/15 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                className="rounded-xl border border-border px-6 py-3 text-sm font-medium text-muted transition-all hover:bg-surface-hover hover:text-foreground cursor-pointer"
               >
                 Descartar y volver
               </button>
               <button
                 onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#005BBF] px-8 py-3 text-sm font-bold text-white shadow-[0_4px_20px_rgba(0,91,191,0.35)] transition-all hover:bg-[#004a9e] hover:shadow-[0_6px_28px_rgba(0,91,191,0.45)] cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)] transition-all hover:bg-primary-hover hover:shadow-[0_6px_28px_color-mix(in_srgb,var(--primary)_45%,transparent)] cursor-pointer"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
@@ -352,17 +352,17 @@ export default function Agent1Page() {
         <>
           {/* Info del archivo procesado */}
           {state.file && (
-            <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-[#005BBF]/15 text-lg dark:border-white/10">
+            <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface-muted px-5 py-4 shadow-sm">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-lg">
                 {state.file.name.endsWith('.mp3') || state.file.name.endsWith('.wav') ? '🎵' : '📄'}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{state.file.name}</p>
-                <p className="text-xs text-slate-500 dark:text-white/45">
+                <p className="truncate text-sm font-semibold text-foreground">{state.file.name}</p>
+                <p className="text-xs text-muted">
                   Procesado exitosamente
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-[#22C55E]/30 bg-[#22C55E]/15 px-3 py-1 text-xs font-bold text-[#22C55E]">
+              <span className="shrink-0 rounded-full border border-success/30 bg-success/15 px-3 py-1 text-xs font-bold text-success">
                 ✓ Listo
               </span>
             </div>
@@ -382,14 +382,13 @@ export default function Agent1Page() {
 
           {/* ── Barra de acciones ─────────────────────────────── */}
           {state.status === 'review' && (
-            <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 sm:flex-row dark:border-white/10 dark:bg-white/[0.02]">
+            <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-border bg-surface-muted px-6 py-5 sm:flex-row">
               <button
                 onClick={handleReset}
                 className={[
-                  'inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3',
-                  'text-sm font-medium text-slate-500',
-                  'hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900',
-                  'dark:border-white/15 dark:text-white/60 dark:hover:border-white/25 dark:hover:bg-white/[0.05] dark:hover:text-white',
+                  'inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3',
+                  'text-sm font-medium text-muted',
+                  'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
                   'transition-all cursor-pointer',
                 ].join(' ')}
               >
@@ -409,18 +408,18 @@ export default function Agent1Page() {
 
           {/* ── Mensaje de aprobación ─────────────────────────── */}
           {state.status === 'approved' && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-[#22C55E]/30 bg-[#22C55E]/10 px-6 py-5 animate-[fadeIn_0.3s_ease-out] sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-4 rounded-2xl border border-success/30 bg-success/10 px-6 py-5 animate-[fadeIn_0.3s_ease-out] sm:flex-row sm:items-center">
               <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#22C55E]/30 bg-[#22C55E]/20">
-                  <svg className="h-5 w-5 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-success/30 bg-success/20">
+                  <svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#22C55E]">
+                  <p className="text-sm font-bold text-success">
                     ¡Deseos aprobados exitosamente!
                   </p>
-                  <p className="text-xs text-[#22C55E]/75">
+                  <p className="text-xs text-success/75">
                     {state.wishes.length} deseos listos. Siguiente paso → Agente 2: Análisis de Necesidades.
                   </p>
                 </div>
@@ -430,13 +429,13 @@ export default function Agent1Page() {
               <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
                 <button
                   onClick={handleReset}
-                  className="rounded-xl px-4 py-2.5 text-xs font-medium text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-900 cursor-pointer dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                  className="rounded-xl px-4 py-2.5 text-xs font-medium text-muted transition-all hover:bg-surface-hover hover:text-foreground cursor-pointer"
                 >
                   Nueva sesión
                 </button>
                 <button
                   onClick={() => router.push('/agentes/2')}
-                  className="rounded-xl bg-[#22C55E] px-5 py-2.5 text-sm font-bold text-black shadow-[0_4px_16px_rgba(34,197,94,0.35)] transition-all hover:bg-[#1da54e] cursor-pointer"
+                  className="rounded-xl bg-success px-5 py-2.5 text-sm font-bold text-black shadow-[0_4px_16px_color-mix(in_srgb,var(--success)_35%,transparent)] transition-all hover:opacity-90 cursor-pointer"
                 >
                   Continuar al Agente 2 →
                 </button>

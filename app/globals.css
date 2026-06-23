@@ -1,9 +1,31 @@
 @import "tailwindcss";
+@import "./agent-themes.css";
 
-@custom-variant dark {
-  &:where(.dark, .dark *) {
-    @slot;
-  }
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--foreground-muted);
+  --color-subtle: var(--foreground-subtle);
+  --color-body: var(--foreground-body);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-disabled: var(--disabled);
+  --color-disabled-text: var(--disabled-text);
+  --color-elevated: var(--elevated);
+  --color-icon-muted: var(--icon-muted);
+  --color-placeholder: var(--placeholder);
+  --color-step-future-border: var(--step-future-border);
+  --color-step-future-text: var(--step-future-text);
+  --color-code-bg: var(--code-bg);
 }
 
 :root {
