@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+}
+
 :root {
   --font-sans: var(--font-google-sans-flex);
 }

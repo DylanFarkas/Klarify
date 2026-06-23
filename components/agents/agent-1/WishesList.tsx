@@ -42,13 +42,13 @@ export function WishesList({
 
   return (
     <section
-      className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
+      className="flex flex-col rounded-2xl border border-slate-200 bg-white backdrop-blur-sm animate-[fadeIn_0.5s_ease-out] dark:border-white/10 dark:bg-white/[0.03]"
       aria-labelledby="wishes-heading"
     >
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-white/10">
         <div className="flex items-center gap-3">
-          <h3 id="wishes-heading" className="text-lg font-bold text-white">
+          <h3 id="wishes-heading" className="text-lg font-bold text-slate-900 dark:text-white">
             Deseos del Cliente
           </h3>
           <span className="rounded-full bg-[#005BBF]/20 px-2.5 py-0.5 text-xs font-bold text-[#005BBF]">
@@ -80,9 +80,9 @@ export function WishesList({
         {wishes.length === 0 && !isAddingWish ? (
           // Estado vacío
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/[0.06]">
               <svg
-                className="h-7 w-7 text-white/30"
+                className="h-7 w-7 text-slate-300 dark:text-white/30"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -96,7 +96,7 @@ export function WishesList({
                 />
               </svg>
             </div>
-            <p className="text-sm text-white/40">
+            <p className="text-sm text-slate-400 dark:text-white/40">
               Los deseos del cliente aparecerán aquí tras procesar el archivo.
             </p>
           </div>
@@ -130,8 +130,8 @@ export function WishesList({
 
       {/* ── Footer con stats ───────────────────────────────────── */}
       {wishes.length > 0 && (
-        <div className="border-t border-white/10 px-6 py-3">
-          <div className="flex items-center gap-4 text-xs text-white/40">
+        <div className="border-t border-slate-200 px-6 py-3 dark:border-white/10">
+          <div className="flex items-center gap-4 text-xs text-slate-400 dark:text-white/40">
             <span>{autoCount} extraídos por IA</span>
             {manualCount > 0 && (
               <>

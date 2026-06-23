@@ -33,7 +33,7 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
                   'transition-all duration-300',
                   isActive && 'bg-[#005BBF] text-white shadow-[0_0_20px_rgba(0,91,191,0.4)]',
                   isCompleted && 'bg-[#22C55E]/20 text-[#22C55E]',
-                  isFuture && 'border border-white/20 text-white/40',
+                  isFuture && 'border border-slate-300 text-slate-400 dark:border-white/20 dark:text-white/40',
                 ]
                   .filter(Boolean)
                   .join(' ')}
@@ -60,7 +60,7 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
                 <div
                   className={[
                     'h-8 w-px transition-colors duration-300',
-                    isCompleted ? 'bg-[#22C55E]/30' : 'bg-white/10',
+                    isCompleted ? 'bg-[#22C55E]/30' : 'bg-slate-200 dark:bg-white/10',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -74,9 +74,9 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
               <span
                 className={[
                   'text-sm font-medium leading-tight transition-colors duration-300',
-                  isActive && 'text-white',
+                  isActive && 'text-slate-900 dark:text-white',
                   isCompleted && 'text-[#22C55E]/80',
-                  isFuture && 'text-white/40',
+                  isFuture && 'text-slate-400 dark:text-white/40',
                 ]
                   .filter(Boolean)
                   .join(' ')}
