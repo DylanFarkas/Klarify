@@ -2,6 +2,13 @@
 
 html[data-agent-theme="light"],
 .agent-workspace[data-theme="light"] {
+  --grid-size: 52px;
+  --grid-line: rgb(15 23 42 / 0.06);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(0 91 191 / 0.14);
+  --grid-dot-opacity: 0.55;
+  --grid-vignette: rgb(248 250 252 / 0.85);
+  --grid-noise-opacity: 0.035;
   --background: #f8fafc;
   --surface: #ffffff;
   --surface-muted: #f1f5f9;
@@ -30,6 +37,13 @@ html[data-agent-theme="light"],
 
 html[data-agent-theme="dark"],
 .agent-workspace[data-theme="dark"] {
+  --grid-size: 52px;
+  --grid-line: rgb(255 255 255 / 0.045);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(77 159 255 / 0.18);
+  --grid-dot-opacity: 0.5;
+  --grid-vignette: rgb(11 15 26 / 0.75);
+  --grid-noise-opacity: 0.05;
   --background: #0b0f1a;
   --surface: #070a12;
   --surface-muted: rgb(255 255 255 / 0.03);
@@ -58,6 +72,13 @@ html[data-agent-theme="dark"],
 
 html[data-agent-theme="ocean"],
 .agent-workspace[data-theme="ocean"] {
+  --grid-size: 52px;
+  --grid-line: rgb(34 211 238 / 0.07);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(34 211 238 / 0.2);
+  --grid-dot-opacity: 0.48;
+  --grid-vignette: rgb(10 22 40 / 0.78);
+  --grid-noise-opacity: 0.05;
   --background: #0a1628;
   --surface: #061018;
   --surface-muted: rgb(34 211 238 / 0.05);
@@ -86,6 +107,13 @@ html[data-agent-theme="ocean"],
 
 html[data-agent-theme="forest"],
 .agent-workspace[data-theme="forest"] {
+  --grid-size: 52px;
+  --grid-line: rgb(52 211 153 / 0.07);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(52 211 153 / 0.2);
+  --grid-dot-opacity: 0.48;
+  --grid-vignette: rgb(10 26 18 / 0.78);
+  --grid-noise-opacity: 0.05;
   --background: #0a1a12;
   --surface: #051008;
   --surface-muted: rgb(52 211 153 / 0.05);
@@ -114,6 +142,13 @@ html[data-agent-theme="forest"],
 
 html[data-agent-theme="rose"],
 .agent-workspace[data-theme="rose"] {
+  --grid-size: 52px;
+  --grid-line: rgb(244 114 182 / 0.07);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(244 114 182 / 0.2);
+  --grid-dot-opacity: 0.48;
+  --grid-vignette: rgb(26 16 20 / 0.78);
+  --grid-noise-opacity: 0.05;
   --background: #1a1014;
   --surface: #120a0e;
   --surface-muted: rgb(244 114 182 / 0.05);

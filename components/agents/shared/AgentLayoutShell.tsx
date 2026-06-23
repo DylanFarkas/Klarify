@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AgentStepper } from './AgentStepper';
 import { AgentSidebarSettings } from './AgentSidebarSettings';
+import { WorkspaceGridBackground } from './WorkspaceGridBackground';
 
 interface AgentLayoutShellProps {
   children: React.ReactNode;
@@ -40,14 +41,16 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
       </aside>
 
       {/* ── Área principal ──────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="relative flex flex-1 flex-col min-w-0">
+        <WorkspaceGridBackground />
+
         {/* Configuración visible en móvil/tablet */}
-        <div className="border-b border-border bg-surface px-6 py-4 lg:hidden">
+        <div className="relative z-10 border-b border-border bg-surface px-6 py-4 lg:hidden">
           <AgentSidebarSettings className="mt-0 border-t-0 pt-0" />
         </div>
 
         {/* Contenido del agente */}
-        <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">
+        <main className="relative z-10 flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">
           {children}
         </main>
       </div>
