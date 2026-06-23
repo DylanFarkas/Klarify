@@ -92,7 +92,7 @@ export function WishItem({ wish, onEdit, onDelete, isApproved, index }: WishItem
         {/* Badge de origen */}
         <span
           className={[
-            'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]',
+            'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest',
             wish.source === 'auto'
               ? 'bg-primary/20 text-primary'
               : 'bg-purple-500/20 text-purple-400',
@@ -103,7 +103,7 @@ export function WishItem({ wish, onEdit, onDelete, isApproved, index }: WishItem
 
         {/* Badge de editado */}
         {wish.isEdited && (
-          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-amber-400">
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
             Editado
           </span>
         )}
