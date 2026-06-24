@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Agent1State, Wish, Agent1UploadResponse } from '@/lib/types/agent-1';
 import { WISH_ID_PREFIX, STORAGE_KEY_AGENT_1 } from '@/lib/constants/agent-1';
+import { STORAGE_KEY_AGENT_2_INPUT } from '@/lib/constants/agent-2';
 import { FileUploader } from '@/components/agents/agent-1/FileUploader';
 import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPanel';
 import { WishesList } from '@/components/agents/agent-1/WishesList';
@@ -228,7 +229,7 @@ export default function Agent1Page() {
   // ── Handler: Aprobar deseos ───────────────────────────────────
   const handleApprove = useCallback(() => {
     // Guardar en localStorage para que el Agente 2 lo consuma
-    localStorage.setItem('agent_2_input', JSON.stringify({
+    localStorage.setItem(STORAGE_KEY_AGENT_2_INPUT, JSON.stringify({
       transcription: state.transcription,
       wishes: state.wishes
     }));
