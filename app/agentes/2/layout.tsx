@@ -8,7 +8,7 @@ import { AgentLayout } from '@/components/agents/shared/AgentLayout';
 export const metadata: Metadata = {
   title: 'Agente 2 — Backlog Inicial | Klarify',
   description:
-    'Clasifica y analiza los deseos del cliente extraídos por el Agente 1 para generar un backlog inicial.',
+    'Transforma deseos aprobados en épicas e historias de usuario estructuradas.',
 };
 
 export default function Agent2Layout({
