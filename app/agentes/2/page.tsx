@@ -30,7 +30,7 @@ export default function Agent2Page() {
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-foreground md:text-3xl tracking-[-0.03em]">
-          Agente 2: Análisis de Necesidades
+          Agente 2: Backlog Inicial
         </h1>
         <p className="text-base text-muted">
           Esta es una página de prueba. Aquí es donde el Agente 2 recibirá los deseos procesados y los usará como contexto para generar las historias de usuario.

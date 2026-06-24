@@ -54,11 +54,10 @@ export interface AgentStep {
 /** Definición de los 6 agentes del pipeline de Klarify */
 export const AGENT_STEPS: AgentStep[] = [
   { number: 1, name: 'Ingesta de Contexto', path: '/agentes/1', description: 'Carga y transcripción de reuniones' },
-  { number: 2, name: 'Análisis de Necesidades', path: '/agentes/2', description: 'Clasificación y análisis de deseos' },
-  { number: 3, name: 'Generación de HU', path: '/agentes/3', description: 'Historias de usuario automatizadas' },
-  { number: 4, name: 'Priorización', path: '/agentes/4', description: 'Ordenamiento por valor y esfuerzo' },
-  { number: 5, name: 'Refinamiento', path: '/agentes/5', description: 'Criterios de aceptación y detalles' },
-  { number: 6, name: 'Backlog Final', path: '/agentes/6', description: 'Backlog ejecutable y exportable' },
+  { number: 2, name: 'Backlog Inicial', path: '/agentes/2', description: 'Clasificación y análisis de deseos' },
+  { number: 3, name: 'Priorización', path: '/agentes/3', description: 'Ordenamiento por valor y esfuerzo' },
+  { number: 4, name: 'Refinamiento', path: '/agentes/4', description: 'Criterios de aceptación y detalles' },
+  { number: 5, name: 'Backlog Final', path: '/agentes/5', description: 'Backlog ejecutable y exportable' },
 ];
 
 // ---------------------------------------------------------------------------

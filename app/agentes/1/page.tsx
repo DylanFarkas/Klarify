@@ -420,7 +420,7 @@ export default function Agent1Page() {
                     ¡Deseos aprobados exitosamente!
                   </p>
                   <p className="text-xs text-success/75">
-                    {state.wishes.length} deseos listos. Siguiente paso → Agente 2: Análisis de Necesidades.
+                    {state.wishes.length} deseos listos. Siguiente paso → Agente 2: Backlog Inicial.
                   </p>
                 </div>
               </div>

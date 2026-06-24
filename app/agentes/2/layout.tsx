@@ -6,9 +6,9 @@ import type { Metadata } from 'next';
 import { AgentLayout } from '@/components/agents/shared/AgentLayout';
 
 export const metadata: Metadata = {
-  title: 'Agente 2 — Análisis de Necesidades | Klarify',
+  title: 'Agente 2 — Backlog Inicial | Klarify',
   description:
-    'Analiza los deseos del cliente extraídos por el Agente 1 para generar historias de usuario.',
+    'Clasifica y analiza los deseos del cliente extraídos por el Agente 1 para generar un backlog inicial.',
 };
 
 export default function Agent2Layout({
@@ -17,7 +17,7 @@ export default function Agent2Layout({
   children: React.ReactNode;
 }>) {
   return (
-    <AgentLayout currentStep={2} agentTitle="Análisis de Necesidades">
+    <AgentLayout currentStep={2} agentTitle="Backlog Inicial">
       {children}
     </AgentLayout>
   );
