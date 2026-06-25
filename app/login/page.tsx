@@ -2,13 +2,15 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar/Navbar";
 
 export default function LoginPage() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signInWithGoogle, signInWithGithub, authError, clearAuthError } = useAuth();
   const router = useRouter();
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
@@ -20,16 +22,27 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
+      clearAuthError();
+      setIsGoogleLoading(true);
       await signInWithGoogle();
       // El useEffect de arriba se encargará de redirigir
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
-  const handleGithubLogin = () => {
-    // Por ahora solo mostraremos una alerta, ya que no está configurado en Firebase aún.
-    alert("Inicio de sesión con GitHub próximamente...");
+  const handleGithubLogin = async () => {
+    try {
+      clearAuthError();
+      setIsGithubLoading(true);
+      await signInWithGithub();
+    } catch (error) {
+      console.error("Error al iniciar sesión con GitHub:", error);
+    } finally {
+      setIsGithubLoading(false);
+    }
   };
 
   if (loading) {
@@ -55,8 +68,15 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-4">
+            {authError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                {authError}
+              </p>
+            )}
+
             <button
               onClick={handleGoogleLogin}
+              disabled={isGoogleLoading || isGithubLoading}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -82,6 +102,7 @@ export default function LoginPage() {
 
             <button
               onClick={handleGithubLogin}
+              disabled={isGoogleLoading || isGithubLoading}
               className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#24292F] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#24292F]/90 focus:outline-none focus:ring-2 focus:ring-[#24292F]/50"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
