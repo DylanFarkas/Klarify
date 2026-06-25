@@ -58,21 +58,45 @@ function RepoSkeleton() {
 }
 
 export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { reposListMaxHeight?: string }) {
-  const { user, isGithubConnected, githubUsername, linkGithub, authError } = useAuth();
+  const { user, isGithubConnected, githubUsername, linkGithub, disconnectGithub, refreshGithubStatus, authError, clearAuthError } = useAuth();
   const [repos, setRepos] = useState<GithubRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
   const [reposExpanded, setReposExpanded] = useState(false);
   const [reposLoaded, setReposLoaded] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+
+  const isGithubLinkedInAuth =
+    user?.providerData.some((p) => p.providerId === 'github.com') ?? false;
+  const showDisconnect = isGithubConnected || isGithubLinkedInAuth;
 
   const handleConnect = async () => {
     setLinking(true);
     setReposError(null);
+    clearAuthError();
     try {
       await linkGithub();
     } finally {
       setLinking(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    clearAuthError();
+    try {
+      await disconnectGithub();
+      setConfirmDisconnect(false);
+      setRepos([]);
+      setReposLoaded(false);
+      setReposExpanded(false);
+      setReposError(null);
+    } catch {
+      // authError is set in context
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -94,6 +118,9 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
       };
 
       if (!response.ok) {
+        if (response.status === 401 && data.error === 'GitHub no conectado') {
+          await refreshGithubStatus();
+        }
         throw new Error(data.error ?? 'No se pudieron cargar los repositorios');
       }
 
@@ -104,7 +131,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
     } finally {
       setLoadingRepos(false);
     }
-  }, [user]);
+  }, [user, refreshGithubStatus]);
 
   const toggleRepos = async () => {
     const next = !reposExpanded;
@@ -146,30 +173,68 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
       {/* Body */}
       <div className="px-3.5 py-3.5">
         {!isGithubConnected ? (
-          <button
-            type="button"
-            onClick={handleConnect}
-            disabled={linking}
-            className={[
-              'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5',
-              'bg-[#24292F] text-sm font-semibold text-white shadow-sm',
-              'transition-all hover:bg-[#1b1f23] hover:shadow',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-            ].join(' ')}
-          >
-            {linking ? (
-              <>
-                <Spinner className="h-4 w-4 text-white" />
-                Conectando...
-              </>
-            ) : (
-              <>
-                <GitHubIcon className="h-4 w-4" />
-                Conectar cuenta
-              </>
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={handleConnect}
+              disabled={linking || disconnecting}
+              className={[
+                'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5',
+                'bg-[#24292F] text-sm font-semibold text-white shadow-sm',
+                'transition-all hover:bg-[#1b1f23] hover:shadow',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              ].join(' ')}
+            >
+              {linking ? (
+                <>
+                  <Spinner className="h-4 w-4 text-white" />
+                  Conectando...
+                </>
+              ) : (
+                <>
+                  <GitHubIcon className="h-4 w-4" />
+                  Conectar cuenta
+                </>
+              )}
+            </button>
+            {showDisconnect && (
+              <div className="rounded-lg border border-border/60 bg-elevated/50 px-3 py-2.5">
+                <p className="text-[11px] text-subtle">
+                  GitHub sigue vinculado en tu cuenta de Klarify pero sin token activo. Desconéctalo
+                  para volver a conectar.
+                </p>
+                {!confirmDisconnect ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDisconnect(true)}
+                    className="mt-2 text-xs font-medium text-red-500 hover:underline"
+                  >
+                    Desconectar GitHub
+                  </button>
+                ) : (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={disconnecting}
+                      className="rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/15 disabled:opacity-60"
+                    >
+                      {disconnecting ? 'Desconectando...' : 'Confirmar desconexión'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDisconnect(false)}
+                      disabled={disconnecting}
+                      className="text-xs text-subtle hover:text-foreground"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
         ) : (
           <div className="space-y-3">
             {/* Perfil conectado */}
@@ -318,6 +383,42 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                 </div>
               )}
             </div>
+
+            {!confirmDisconnect ? (
+              <button
+                type="button"
+                onClick={() => setConfirmDisconnect(true)}
+                disabled={disconnecting}
+                className="w-full rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/5 disabled:opacity-60 cursor-pointer"
+              >
+                Desconectar GitHub
+              </button>
+            ) : (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5">
+                <p className="text-[11px] leading-relaxed text-subtle">
+                  Se eliminará el acceso a tus repositorios. Podrás volver a conectar GitHub cuando
+                  quieras.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/15 disabled:opacity-60 cursor-pointer"
+                  >
+                    {disconnecting ? 'Desconectando...' : 'Confirmar desconexión'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDisconnect(false)}
+                    disabled={disconnecting}
+                    className="text-xs text-subtle hover:text-foreground cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

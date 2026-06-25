@@ -61,6 +61,19 @@ export async function getGithubIntegration(
   return github ?? null;
 }
 
+export async function removeGithubIntegration(uid: string): Promise<void> {
+  const docRef = adminDb.collection("users").doc(uid);
+  const doc = await docRef.get();
+
+  if (!doc.exists || !doc.data()?.github) {
+    return;
+  }
+
+  await docRef.update({
+    github: FieldValue.delete(),
+  });
+}
+
 export async function fetchGithubRepos(accessToken: string): Promise<GithubRepoSummary[]> {
   const response = await fetch(
     "https://api.github.com/user/repos?per_page=20&sort=updated",

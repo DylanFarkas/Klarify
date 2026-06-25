@@ -6,7 +6,6 @@ import {
   useEffect,
   useState,
   useCallback,
-  useMemo,
   type ReactNode,
 } from "react";
 import { auth, createGithubProvider } from "@/lib/firebase";
@@ -18,6 +17,8 @@ import {
   GithubAuthProvider,
   linkWithPopup,
   linkWithCredential,
+  reauthenticateWithPopup,
+  unlink,
   signOut as firebaseSignOut,
   type AuthError,
   type UserCredential,
@@ -31,6 +32,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
   linkGithub: () => Promise<void>;
+  disconnectGithub: () => Promise<void>;
+  refreshGithubStatus: () => Promise<void>;
   signOut: () => Promise<void>;
   authError: string | null;
   clearAuthError: () => void;
@@ -44,6 +47,8 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signInWithGithub: async () => {},
   linkGithub: async () => {},
+  disconnectGithub: async () => {},
+  refreshGithubStatus: async () => {},
   signOut: async () => {},
   authError: null,
   clearAuthError: () => {},
@@ -72,7 +77,27 @@ async function persistGithubToken(user: User, accessToken: string): Promise<stri
 function getGithubUsernameFromUser(user: User | null): string | null {
   if (!user) return null;
   const githubProvider = user.providerData.find((p) => p.providerId === "github.com");
-  return githubProvider?.displayName ?? null;
+  return githubProvider?.displayName ?? githubProvider?.email ?? null;
+}
+
+async function fetchGithubIntegrationStatus(user: User): Promise<{
+  connected: boolean;
+  username: string | null;
+}> {
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/github/connect", {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+
+  if (!response.ok) {
+    return { connected: false, username: getGithubUsernameFromUser(user) };
+  }
+
+  const data = (await response.json()) as { connected?: boolean; username?: string };
+  return {
+    connected: data.connected === true,
+    username: data.username ?? getGithubUsernameFromUser(user),
+  };
 }
 
 function mapAuthError(error: unknown): string {
@@ -80,51 +105,64 @@ function mapAuthError(error: unknown): string {
   switch (authError.code) {
     case "auth/popup-closed-by-user":
       return "Se cerró la ventana de inicio de sesión.";
+    case "auth/popup-blocked":
+      return "El navegador bloqueó la ventana de inicio de sesión. Permite popups para este sitio e inténtalo de nuevo.";
     case "auth/account-exists-with-different-credential":
-      return "Ya existe una cuenta con este email. Inicia sesión con tu proveedor original para vincular GitHub.";
+      return "Ya existe una cuenta de Klarify con este email. Inicia sesión con tu proveedor original para vincular GitHub.";
     case "auth/credential-already-in-use":
-      return "Esta cuenta de GitHub ya está vinculada a otro usuario.";
     case "auth/email-already-in-use":
-      return "Este email ya está en uso con otro proveedor.";
+      return "Esta cuenta de GitHub ya está vinculada a otro usuario de Klarify.";
+    case "auth/requires-recent-login":
+      return "Por seguridad, cierra sesión, vuelve a entrar e intenta desconectar GitHub de nuevo.";
     default:
       return "No se pudo completar la autenticación. Inténtalo de nuevo.";
   }
+}
+
+function isGithubLinkedInAuth(user: User | null): boolean {
+  return user?.providerData.some((p) => p.providerId === "github.com") ?? false;
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [githubUsername, setGithubUsername] = useState<string | null>(null);
+  const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const isGithubConnected = useMemo(
-    () => user?.providerData.some((p) => p.providerId === "github.com") ?? false,
-    [user]
-  );
+  const refreshGithubStatus = useCallback(async () => {
+    if (!user) {
+      setGithubUsername(null);
+      setIsGithubConnected(false);
+      return;
+    }
+
+    try {
+      const status = await fetchGithubIntegrationStatus(user);
+      setIsGithubConnected(status.connected);
+      setGithubUsername(status.username);
+    } catch {
+      setIsGithubConnected(false);
+      setGithubUsername(getGithubUsernameFromUser(user));
+    }
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
-      if (currentUser?.providerData.some((p) => p.providerId === "github.com")) {
+      if (currentUser) {
         try {
-          const idToken = await currentUser.getIdToken();
-          const response = await fetch("/api/github/connect", {
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-          if (response.ok) {
-            const data = (await response.json()) as { username?: string };
-            if (data.username) {
-              setGithubUsername(data.username);
-            }
-          } else {
-            setGithubUsername(getGithubUsernameFromUser(currentUser));
-          }
+          const status = await fetchGithubIntegrationStatus(currentUser);
+          setIsGithubConnected(status.connected);
+          setGithubUsername(status.username);
         } catch {
+          setIsGithubConnected(false);
           setGithubUsername(getGithubUsernameFromUser(currentUser));
         }
       } else {
         setGithubUsername(null);
+        setIsGithubConnected(false);
       }
 
       setLoading(false);
@@ -145,6 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const username = await persistGithubToken(result.user, accessToken);
     setGithubUsername(username);
+    setIsGithubConnected(true);
   }, []);
 
   const handleAccountExistsError = useCallback(async (error: AuthError) => {
@@ -205,7 +244,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setAuthError(null);
       const provider = createGithubProvider();
-      const result = await linkWithPopup(user, provider);
+      const isLinkedInAuth = isGithubLinkedInAuth(user);
+
+      const result = isLinkedInAuth
+        ? await reauthenticateWithPopup(user, provider)
+        : await linkWithPopup(user, provider);
+
       await handleGithubResult(result);
     } catch (error) {
       console.error("Error linking GitHub", error);
@@ -213,10 +257,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const disconnectGithub = async () => {
+    if (!user) {
+      setAuthError("Debes iniciar sesión para desconectar GitHub.");
+      return;
+    }
+
+    try {
+      setAuthError(null);
+
+      if (isGithubLinkedInAuth(user)) {
+        await unlink(user, "github.com");
+      }
+
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/github/connect", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "No se pudo desconectar GitHub");
+      }
+
+      setGithubUsername(null);
+      setIsGithubConnected(false);
+    } catch (error) {
+      console.error("Error disconnecting GitHub", error);
+      if (error instanceof Error && !(error as AuthError).code) {
+        setAuthError(error.message);
+      } else {
+        setAuthError(mapAuthError(error));
+      }
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
       setGithubUsername(null);
+      setIsGithubConnected(false);
     } catch (error) {
       console.error("Error signing out", error);
     }
@@ -232,6 +314,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signInWithGoogle,
         signInWithGithub,
         linkGithub,
+        disconnectGithub,
+        refreshGithubStatus,
         signOut,
         authError,
         clearAuthError,

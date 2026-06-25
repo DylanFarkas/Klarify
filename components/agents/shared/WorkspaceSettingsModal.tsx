@@ -68,7 +68,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
   if (!isOpen || !mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-100 flex items-end justify-center p-0 sm:items-center sm:p-4">
       {/* Backdrop */}
       <button
         type="button"
@@ -113,7 +113,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="rounded-lg p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
               aria-label="Cerrar"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -144,7 +144,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
                   {tab.icon}
                   {tab.label}
                   {showBadge && (
-                    <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                    <span className="absolute right-2 top-3 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
                   )}
                 </button>
               );

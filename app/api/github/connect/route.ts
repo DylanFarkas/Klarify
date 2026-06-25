@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyRequestUser } from "@/lib/firebase-admin";
-import { getGithubIntegration, saveGithubToken } from "@/lib/github-integration";
+import { getGithubIntegration, removeGithubIntegration, saveGithubToken } from "@/lib/github-integration";
 
 export async function GET(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
     const integration = await getGithubIntegration(uid);
 
-    if (!integration) {
+    if (!integration?.accessToken) {
       return NextResponse.json({ connected: false });
     }
 
@@ -54,5 +54,22 @@ export async function POST(request: NextRequest) {
 
     console.error("POST /api/github/connect error:", error);
     return NextResponse.json({ error: "Error al conectar GitHub" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const uid = await verifyRequestUser(request);
+    await removeGithubIntegration(uid);
+    return NextResponse.json({ disconnected: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+
+    if (message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    console.error("DELETE /api/github/connect error:", error);
+    return NextResponse.json({ error: "Error al desconectar GitHub" }, { status: 500 });
   }
 }
