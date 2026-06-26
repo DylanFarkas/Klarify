@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { fetchWorkspace } from "@/lib/api-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +19,19 @@ export function Navbar() {
     const handleLogout = async () => {
         await signOut();
         router.push("/");
+    };
+
+    const goToMyAgent = async () => {
+        if (!user) {
+            router.push("/login");
+            return;
+        }
+        try {
+            const { preferences } = await fetchWorkspace(user);
+            router.push(`/agentes/${preferences.lastAgent || "1"}`);
+        } catch {
+            router.push("/agentes/1");
+        }
     };
 
     useEffect(() => {
@@ -67,10 +81,7 @@ export function Navbar() {
                         user ? (
                             <>
                                 <button 
-                                    onClick={() => {
-                                        const lastAgent = localStorage.getItem("lastAgent") || "1";
-                                        router.push(`/agentes/${lastAgent}`);
-                                    }}
+                                    onClick={goToMyAgent}
                                     className="text-sm font-bold text-[#005bbf] hover:underline"
                                 >
                                     Ir a mi Agente

@@ -8,7 +8,7 @@
  *   4. HITL: editar/añadir/eliminar deseos (CA3)
  *   5. Aprobar y continuar al Agente 2
  *
- * Estado persistido en localStorage para no perder trabajo al refrescar.
+ * Estado persistido en Firestore (workspace del usuario) para no perder trabajo.
  */
 
 'use client';
@@ -16,8 +16,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Agent1State, Wish, Agent1UploadResponse } from '@/lib/types/agent-1';
-import { WISH_ID_PREFIX, STORAGE_KEY_AGENT_1 } from '@/lib/constants/agent-1';
-import { STORAGE_KEY_AGENT_2_INPUT } from '@/lib/constants/agent-2';
+import { WISH_ID_PREFIX } from '@/lib/constants/agent-1';
+import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { authFetch } from '@/lib/api-client';
 import { FileUploader } from '@/components/agents/agent-1/FileUploader';
 import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPanel';
 import { WishesList } from '@/components/agents/agent-1/WishesList';
@@ -51,52 +53,57 @@ const INITIAL_STATE: Agent1State = {
 
 export default function Agent1Page() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { workspace, isLoading, sessionVersion, saveAgent1, approveAgent1, resetAgent1 } = useWorkspace();
   const [state, setState] = useState<Agent1State>(INITIAL_STATE);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
-  // ── Hidratar desde localStorage ───────────────────────────────
+  // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_AGENT_1);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<Agent1State>;
-        setState((prev) => ({
-          ...prev,
-          transcription: parsed.transcription || null,
-          wishes: parsed.wishes || [],
-          file: parsed.file || null,
-          // Si hay datos guardados, ir a review; si fue aprobado, mantenerlo
-          status: parsed.status === 'approved'
-            ? 'approved'
-            : parsed.wishes && parsed.wishes.length > 0
-              ? 'review'
-              : 'idle',
-        }));
-      }
-    } catch {
-      // localStorage corrupto — usar estado inicial
-    }
-    setIsHydrated(true);
-  }, []);
+    if (isLoading || !workspace) return;
 
-  // ── Persistir en localStorage ─────────────────────────────────
+    const a1 = workspace.agent1;
+    setState({
+      file: a1.file ?? null,
+      transcription: a1.transcription ?? null,
+      wishes: a1.wishes ?? [],
+      status: a1.status === 'approved'
+        ? 'approved'
+        : a1.wishes && a1.wishes.length > 0
+          ? 'review'
+          : 'idle',
+      error: null,
+    });
+    setIsHydrated(true);
+  }, [isLoading, workspace, sessionVersion]);
+
+  // ── Redirigir si ya fue aprobado (evita pantalla intermedia) ──
+  useEffect(() => {
+    if (!isHydrated || isLoading || !workspace) return;
+    if (workspace.agent1.status === 'approved') {
+      router.replace('/agentes/2');
+    }
+  }, [isHydrated, isLoading, workspace, router]);
+
+  // ── Persistir en Firestore (debounced) ────────────────────────
   useEffect(() => {
     if (!isHydrated) return;
     if (state.transcription || state.wishes.length > 0) {
-      localStorage.setItem(
-        STORAGE_KEY_AGENT_1,
-        JSON.stringify({
-          transcription: state.transcription,
-          wishes: state.wishes,
-          file: state.file,
-          status: state.status,
-        })
-      );
+      saveAgent1({
+        file: state.file,
+        transcription: state.transcription,
+        wishes: state.wishes,
+        status: state.status,
+        error: null,
+      });
     }
-  }, [state.transcription, state.wishes, state.file, state.status, isHydrated]);
+  }, [state.transcription, state.wishes, state.file, state.status, isHydrated, saveAgent1]);
 
   // ── Handler: Upload de archivo ────────────────────────────────
   const handleFileUpload = useCallback(async (file: File) => {
+    if (!user) return;
+
     setState((prev) => ({
       ...prev,
       file: {
@@ -114,7 +121,7 @@ export default function Agent1Page() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/agentes/1/upload', {
+      const response = await authFetch('/api/agentes/1/upload', user, {
         method: 'POST',
         body: formData,
       });
@@ -139,7 +146,7 @@ export default function Agent1Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al procesar.',
       }));
     }
-  }, []);
+  }, [user]);
 
   // ── Handler: Transcripción en vivo completada ─────────────────
   const handleLiveTranscriptionComplete = useCallback((text: string) => {
@@ -158,6 +165,8 @@ export default function Agent1Page() {
 
   // ── Handler: Analizar texto editado ───────────────────────────
   const handleAnalyzeText = useCallback(async (finalText: string) => {
+    if (!user) return;
+
     setState((prev) => ({
       ...prev,
       status: 'extracting',
@@ -168,7 +177,7 @@ export default function Agent1Page() {
       const formData = new FormData();
       formData.append('text', finalText);
 
-      const response = await fetch('/api/agentes/1/upload', {
+      const response = await authFetch('/api/agentes/1/upload', user, {
         method: 'POST',
         body: formData,
       });
@@ -193,7 +202,7 @@ export default function Agent1Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al analizar.',
       }));
     }
-  }, []);
+  }, [user]);
 
   // ── Handlers HITL: CRUD de deseos (CA3) ───────────────────────
 
@@ -227,23 +236,31 @@ export default function Agent1Page() {
   }, []);
 
   // ── Handler: Aprobar deseos ───────────────────────────────────
-  const handleApprove = useCallback(() => {
-    // Guardar en localStorage para que el Agente 2 lo consuma
-    localStorage.setItem(STORAGE_KEY_AGENT_2_INPUT, JSON.stringify({
-      transcription: state.transcription,
-      wishes: state.wishes
-    }));
-    setState((prev) => ({ ...prev, status: 'approved' }));
-  }, [state.transcription, state.wishes]);
+  const handleApprove = useCallback(async () => {
+    setIsApproving(true);
+    try {
+      await approveAgent1({
+        transcription: state.transcription,
+        wishes: state.wishes,
+      });
+      router.push('/agentes/2');
+    } finally {
+      setIsApproving(false);
+    }
+  }, [state.transcription, state.wishes, approveAgent1, router]);
 
   // ── Handler: Reset / Subir otro archivo ───────────────────────
-  const handleReset = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY_AGENT_1);
+  const handleReset = useCallback(async () => {
+    await resetAgent1();
     setState(INITIAL_STATE);
-  }, []);
+  }, [resetAgent1]);
+
+  const isRedirecting =
+    isApproving ||
+    (isHydrated && workspace?.agent1.status === 'approved');
 
   // ── Evitar flash de contenido antes de hidratar ───────────────
-  if (!isHydrated) {
+  if (isLoading || !isHydrated || isRedirecting) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
@@ -349,7 +366,7 @@ export default function Agent1Page() {
       )}
 
       {/* ── Resultados: Transcripción + Deseos en paralelo (CA2) ── */}
-      {(state.status === 'review' || state.status === 'approved') && (
+      {state.status === 'review' && (
         <>
           {/* Info del archivo procesado */}
           {state.file && (
@@ -377,72 +394,33 @@ export default function Agent1Page() {
               onEdit={handleEditWish}
               onDelete={handleDeleteWish}
               onAdd={handleAddWish}
-              isApproved={state.status === 'approved'}
+              isApproved={false}
             />
           </div>
 
           {/* ── Barra de acciones ─────────────────────────────── */}
-          {state.status === 'review' && (
-            <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-border bg-surface-muted px-6 py-5 sm:flex-row">
-              <button
-                onClick={handleReset}
-                className={[
-                  'inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3',
-                  'text-sm font-medium text-muted',
-                  'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
-                  'transition-all cursor-pointer',
-                ].join(' ')}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-                </svg>
-                Subir otro archivo
-              </button>
+          <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-border bg-surface-muted px-6 py-5 sm:flex-row">
+            <button
+              onClick={handleReset}
+              className={[
+                'inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3',
+                'text-sm font-medium text-muted',
+                'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
+                'transition-all cursor-pointer',
+              ].join(' ')}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+              </svg>
+              Subir otro archivo
+            </button>
 
-              <ApproveButton
-                onClick={handleApprove}
-                disabled={state.wishes.length === 0}
-                label="Aprobar Deseos y Continuar"
-              />
-            </div>
-          )}
-
-          {/* ── Mensaje de aprobación ─────────────────────────── */}
-          {state.status === 'approved' && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-success/30 bg-success/10 px-6 py-5 animate-[fadeIn_0.3s_ease-out] sm:flex-row sm:items-center">
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-success/30 bg-success/20">
-                  <svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-success">
-                    ¡Deseos aprobados exitosamente!
-                  </p>
-                  <p className="text-xs text-success/75">
-                    {state.wishes.length} deseos listos. Siguiente paso → Agente 2: Backlog Inicial.
-                  </p>
-                </div>
-              </div>
-
-              {/* Botones de acción final */}
-              <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
-                <button
-                  onClick={handleReset}
-                  className="rounded-xl px-4 py-2.5 text-xs font-medium text-muted transition-all hover:bg-surface-hover hover:text-foreground cursor-pointer"
-                >
-                  Nueva sesión
-                </button>
-                <button
-                  onClick={() => router.push('/agentes/2')}
-                  className="rounded-xl bg-success px-5 py-2.5 text-sm font-bold text-black shadow-[0_4px_16px_color-mix(in_srgb,var(--success)_35%,transparent)] transition-all hover:opacity-90 cursor-pointer"
-                >
-                  Continuar al Agente 2 →
-                </button>
-              </div>
-            </div>
-          )}
+            <ApproveButton
+              onClick={handleApprove}
+              disabled={state.wishes.length === 0 || isApproving}
+              label="Aprobar Deseos y Continuar"
+            />
+          </div>
         </>
       )}
     </div>

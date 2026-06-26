@@ -8,7 +8,7 @@
  *   4. Regenerar con merge (preserva ediciones manuales)
  *   5. Aprobar y continuar al Agente 3
  *
- * Estado persistido en localStorage para no perder trabajo al refrescar.
+ * Estado persistido en Firestore (workspace del usuario) para no perder trabajo.
  */
 
 'use client';
@@ -16,11 +16,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
-import {
-  STORAGE_KEY_AGENT_2_INPUT,
-  STORAGE_KEY_AGENT_2,
-  STORAGE_KEY_AGENT_3_INPUT,
-} from '@/lib/constants/agent-2';
+import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { authFetch } from '@/lib/api-client';
+import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-service';
 import { EmptyBacklogState } from '@/components/agents/agent-2/EmptyBacklogState';
 import { WishesSummaryPanel } from '@/components/agents/agent-2/WishesSummaryPanel';
 import { BacklogView } from '@/components/agents/agent-2/BacklogView';
@@ -50,8 +49,9 @@ const INITIAL_STATE: Agent2State = {
  * - Unedited stories are replaced by the new story at the same position.
  * - If new epic has more stories, excess are appended.
  * - If new epic has fewer stories, edited stories beyond count are appended.
- * - Epic-level edits (title/description) are preserved if isEdited === true.
- * - Orphaned stories (epic removed in new gen) are appended to first remaining epic.
+ * - Epic-level edits (title/description) are preserved if isEdited or source === 'manual'.
+ * - Manual epics removed by new generation are re-appended in full.
+ * - Orphaned stories (auto epic removed in new gen) are appended to first remaining epic.
  */
 function mergeBacklogs(oldEpics: Epic[], newEpics: Epic[]): Epic[] {
   // Step 1: Merge matched epics by index
@@ -63,40 +63,45 @@ function mergeBacklogs(oldEpics: Epic[], newEpics: Epic[]): Epic[] {
     const newEpic = newEpics[i];
 
     if (oldEpic && newEpic) {
-      // Both exist — merge
+      const keepOldEpicMeta = oldEpic.isEdited || oldEpic.source === 'manual';
       const mergedStories = mergeStories(oldEpic.userStories, newEpic.userStories);
       merged.push({
         id: newEpic.id,
-        title: oldEpic.isEdited ? oldEpic.title : newEpic.title,
-        description: oldEpic.isEdited ? oldEpic.description : newEpic.description,
+        title: keepOldEpicMeta ? oldEpic.title : newEpic.title,
+        description: keepOldEpicMeta ? oldEpic.description : newEpic.description,
         userStories: mergedStories,
-        source: newEpic.source,
+        source: oldEpic.source === 'manual' ? 'manual' : newEpic.source,
         isEdited: oldEpic.isEdited,
-        createdAt: newEpic.createdAt,
+        createdAt: keepOldEpicMeta ? oldEpic.createdAt : newEpic.createdAt,
       });
     } else if (oldEpic && !newEpic) {
-      // Old epic removed in new generation — collect orphaned stories
-      // Handled in Step 2 below
+      // Old epic removed in new generation — handled in Step 2
     } else if (!oldEpic && newEpic) {
-      // New epic — keep as-is
       merged.push(newEpic);
     }
   }
 
-  // Step 2: Collect orphaned stories from removed epics
+  // Step 2: Preserve manual epics removed by regeneration; collect orphaned stories
   const orphanedStories: UserStory[] = [];
+  const manualEpicsToKeep: Epic[] = [];
+
   for (let i = 0; i < oldEpics.length; i++) {
     if (!newEpics[i]) {
-      // This epic was removed — all its stories are orphaned
-      for (const story of oldEpics[i].userStories) {
-        if (story.isEdited || story.source === 'manual') {
-          orphanedStories.push(story);
+      const oldEpic = oldEpics[i];
+      if (oldEpic.source === 'manual') {
+        manualEpicsToKeep.push(oldEpic);
+      } else {
+        for (const story of oldEpic.userStories) {
+          if (story.isEdited || story.source === 'manual') {
+            orphanedStories.push(story);
+          }
         }
       }
     }
   }
 
-  // Append orphaned stories to first remaining epic
+  merged.push(...manualEpicsToKeep);
+
   if (orphanedStories.length > 0 && merged.length > 0) {
     merged[0] = {
       ...merged[0],
@@ -115,8 +120,7 @@ function mergeStories(oldStories: UserStory[], newStories: UserStory[]): UserSto
     const oldStory = oldStories[i];
     const newStory = newStories[i];
 
-    if (oldStory && oldStory.isEdited) {
-      // Preserved — don't touch edited stories
+    if (oldStory && (oldStory.isEdited || oldStory.source === 'manual')) {
       result.push(oldStory);
     } else if (newStory) {
       // Replace with new
@@ -136,64 +140,67 @@ function mergeStories(oldStories: UserStory[], newStories: UserStory[]): UserSto
 
 export default function Agent2Page() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { workspace, isLoading, sessionVersion, saveAgent2, approveAgent2 } = useWorkspace();
   const [state, setState] = useState<Agent2State>(INITIAL_STATE);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // ── Hidratar desde localStorage ───────────────────────────────
+  // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
-    try {
-      // Priority 1: Restore persisted Agent 2 state
-      const saved = localStorage.getItem(STORAGE_KEY_AGENT_2);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<Agent2State>;
-        if (parsed.epics && parsed.epics.length > 0) {
-          setState({
-            input: parsed.input ?? null,
-            epics: parsed.epics,
-            status: parsed.status === 'approved' ? 'approved' : 'review',
-            error: parsed.error ?? null,
-          });
-          setIsHydrated(true);
-          return;
-        }
-      }
+    if (isLoading || !workspace) return;
 
-      // Priority 2: Load input from Agent 1
-      const inputRaw = localStorage.getItem(STORAGE_KEY_AGENT_2_INPUT);
-      if (inputRaw) {
-        const parsed = JSON.parse(inputRaw) as Agent2Input;
-        if (parsed.wishes && parsed.wishes.length > 0) {
-          setState((prev) => ({ ...prev, input: parsed }));
-        }
-      }
-    } catch {
-      // localStorage corrupto — usar estado inicial
+    const a2 = workspace.agent2;
+    const pipelineInput = workspace.pipeline.agent2Input;
+    const agent1Input: Agent2Input | null =
+      workspace.agent1.status === 'approved' && workspace.agent1.wishes.length > 0
+        ? {
+            transcription: workspace.agent1.transcription,
+            wishes: workspace.agent1.wishes,
+          }
+        : null;
+
+    // Prioridad 1: estado persistido del Agente 2 (con backlog generado)
+    if (a2.epics && a2.epics.length > 0) {
+      setState({
+        input: a2.input ?? pipelineInput ?? agent1Input ?? null,
+        epics: a2.epics,
+        status: a2.status === 'approved' ? 'approved' : 'review',
+        error: null,
+      });
+      setIsHydrated(true);
+      return;
     }
-    setIsHydrated(true);
-  }, []);
 
-  // ── Persistir en localStorage ─────────────────────────────────
+    // Prioridad 2: input aprobado por el Agente 1 (pipeline o fallback agent1)
+    const resolvedInput = pipelineInput ?? agent1Input;
+    if (resolvedInput && resolvedInput.wishes.length > 0) {
+      setState((prev) => ({ ...prev, input: resolvedInput }));
+    } else if (a2.input) {
+      setState((prev) => ({ ...prev, input: a2.input }));
+    }
+
+    setIsHydrated(true);
+  }, [isLoading, workspace, sessionVersion]);
+
+  // ── Persistir en Firestore (debounced) ────────────────────────
   useEffect(() => {
     if (!isHydrated) return;
-    localStorage.setItem(
-      STORAGE_KEY_AGENT_2,
-      JSON.stringify({
-        input: state.input,
-        epics: state.epics,
-        status: state.status,
-        error: state.error,
-      })
-    );
-  }, [state.epics, state.status, state.input, state.error, isHydrated]);
+    saveAgent2({
+      input: state.input,
+      epics: state.epics,
+      status: state.status,
+      error: state.error,
+    });
+  }, [state.epics, state.status, state.input, state.error, isHydrated, saveAgent2]);
 
   // ── Handler: Generar backlog ──────────────────────────────────
   const handleGenerate = useCallback(async () => {
-    if (!state.input) return;
+    if (!state.input || !user) return;
 
     setState((prev) => ({ ...prev, status: 'generating', error: null }));
 
     try {
-      const response = await fetch('/api/agentes/2/generate', {
+      const response = await authFetch('/api/agentes/2/generate', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state.input),
@@ -220,11 +227,11 @@ export default function Agent2Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al generar el backlog.',
       }));
     }
-  }, [state.input]);
+  }, [state.input, user]);
 
   // ── Handler: Regenerar backlog (merge) ────────────────────────
   const handleRegenerate = useCallback(async () => {
-    if (!state.input) return;
+    if (!state.input || !user) return;
 
     const confirmed = window.confirm(
       'Se generará un nuevo backlog. Los cambios manuales y las historias que hayas editado se conservarán.'
@@ -234,7 +241,7 @@ export default function Agent2Page() {
     setState((prev) => ({ ...prev, status: 'generating', error: null }));
 
     try {
-      const response = await fetch('/api/agentes/2/generate', {
+      const response = await authFetch('/api/agentes/2/generate', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state.input),
@@ -261,7 +268,7 @@ export default function Agent2Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al regenerar.',
       }));
     }
-  }, [state.input, state.epics]);
+  }, [state.input, state.epics, user]);
 
   // ── Handler: Editar épica ─────────────────────────────────────
   const handleEditEpic = useCallback((id: string, updates: Partial<Epic>) => {
@@ -305,24 +312,32 @@ export default function Agent2Page() {
     }));
   }, []);
 
+  // ── Handler: Añadir épica ─────────────────────────────────────
+  const handleAddEpic = useCallback(
+    (epic: Omit<Epic, 'id' | 'source' | 'isEdited' | 'createdAt' | 'userStories'>) => {
+      setState((prev) => {
+        const newEpic: Epic = {
+          ...epic,
+          id: generateEpicId(prev.epics),
+          userStories: [],
+          source: 'manual',
+          isEdited: false,
+          createdAt: Date.now(),
+        };
+        return { ...prev, epics: [...prev.epics, newEpic] };
+      });
+    },
+    []
+  );
+
   // ── Handler: Añadir historia de usuario ───────────────────────
   const handleAddStory = useCallback(
     (epicId: string, story: Omit<UserStory, 'id' | 'source' | 'isEdited' | 'createdAt'>) => {
       setState((prev) => {
-        // Find max HU ID across all epics to generate next sequential ID
         const allStories = prev.epics.flatMap((e) => e.userStories);
-        let maxNum = 0;
-        for (const s of allStories) {
-          const match = s.id.match(/^HU-(\d+)$/);
-          if (match) {
-            maxNum = Math.max(maxNum, parseInt(match[1], 10));
-          }
-        }
-        const newId = `HU-${String(maxNum + 1).padStart(3, '0')}`;
-
         const newStory: UserStory = {
           ...story,
-          id: newId,
+          id: generateUserStoryId(allStories),
           source: 'manual',
           isEdited: false,
           createdAt: Date.now(),
@@ -342,18 +357,16 @@ export default function Agent2Page() {
   );
 
   // ── Handler: Aprobar backlog ──────────────────────────────────
-  const handleApprove = useCallback(() => {
+  const handleApprove = useCallback(async () => {
     const sourceWishIds = state.input?.wishes.map((w) => w.id) ?? [];
-    localStorage.setItem(
-      STORAGE_KEY_AGENT_3_INPUT,
-      JSON.stringify({
-        epics: state.epics,
-        sourceWishIds,
-        approvedAt: Date.now(),
-      })
-    );
+    // Escribe el pipeline en Firestore para que el Agente 3 lo consuma
+    await approveAgent2({
+      epics: state.epics,
+      sourceWishIds,
+      approvedAt: Date.now(),
+    });
     setState((prev) => ({ ...prev, status: 'approved' }));
-  }, [state.epics, state.input]);
+  }, [state.epics, state.input, approveAgent2]);
 
   // ── Validación de aprobación ──────────────────────────────────
   const isApprovable =
@@ -365,13 +378,12 @@ export default function Agent2Page() {
         epic.userStories.every(
           (story) =>
             story.title.trim() !== '' &&
-            story.description.trim() !== '' &&
-            story.acceptanceCriteria.length > 0
+            story.description.trim() !== ''
         )
     );
 
   // ── Evitar flash de contenido antes de hidratar ───────────────
-  if (!isHydrated) {
+  if (isLoading || !isHydrated) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
@@ -448,6 +460,7 @@ export default function Agent2Page() {
               onEditStory={handleEditStory}
               onDeleteStory={handleDeleteStory}
               onAddStory={handleAddStory}
+              onAddEpic={handleAddEpic}
               isApproved={state.status === 'approved'}
             />
           </div>
@@ -497,16 +510,7 @@ export default function Agent2Page() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
-                <button
-                  onClick={() => {
-                    localStorage.removeItem(STORAGE_KEY_AGENT_2);
-                    setState(INITIAL_STATE);
-                  }}
-                  className="rounded-xl px-4 py-2.5 text-xs font-medium text-muted transition-all hover:bg-surface-hover hover:text-foreground cursor-pointer"
-                >
-                  Nueva sesión
-                </button>
+              <div className="flex shrink-0 items-center sm:ml-auto">
                 <button
                   onClick={() => router.push('/agentes/3')}
                   className="rounded-xl bg-success px-5 py-2.5 text-sm font-bold text-black shadow-[0_4px_16px_color-mix(in_srgb,var(--success)_35%,transparent)] transition-all hover:opacity-90 cursor-pointer"

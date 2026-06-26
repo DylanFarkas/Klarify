@@ -8,9 +8,12 @@
 import { type NextRequest } from 'next/server';
 import { validateAgent2Input, generateBacklog } from '@/lib/services/agent-2-service';
 import type { Agent2Input, Agent2GenerateResponse, Agent2ErrorResponse } from '@/lib/types/agent-2';
+import { verifyRequestUser } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
+    await verifyRequestUser(request);
+
     const body = await request.json() as Agent2Input;
     
     // Validar input
@@ -30,6 +33,10 @@ export async function POST(request: NextRequest) {
     return Response.json(response, { status: 200 });
 
   } catch (error) {
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+      return Response.json({ error: 'No autorizado', code: 'PROCESSING_ERROR' } satisfies Agent2ErrorResponse, { status: 401 });
+    }
+
     console.error('[Agent 2 Generate] Error:', error);
     return Response.json(
       {

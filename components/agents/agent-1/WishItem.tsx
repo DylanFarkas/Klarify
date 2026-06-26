@@ -31,13 +31,21 @@ export function WishItem({ wish, onEdit, onDelete, isApproved, index }: WishItem
   const [isDeleting, setIsDeleting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Autofocar textarea al entrar en modo edición
+  // Autofocar textarea solo al entrar en modo edición (no en cada tecla)
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(editText.length, editText.length);
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
     }
-  }, [isEditing, editText.length]);
+  }, [isEditing]);
+
+  // Sincronizar texto local cuando el deseo cambia externamente (ej. Firestore)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditText(wish.text);
+    }
+  }, [wish.text, isEditing]);
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleSave = () => {

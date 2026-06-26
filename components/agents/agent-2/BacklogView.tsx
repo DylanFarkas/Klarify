@@ -4,11 +4,12 @@
  * Renderiza la lista de Épicas colapsables (EpicAccordion) en un
  * contenedor scrollable. Patrón replicado del container de WishesList.tsx.
  *
- * Cumple CA2 (vista jerárquica colapsable del backlog).
+ * Cumple CA2 (vista jerárquica colapsable del backlog) y CA3 (añadir épica manual).
  */
 
 'use client';
 
+import { useState } from 'react';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import { EpicAccordion } from './EpicAccordion';
 
@@ -25,6 +26,8 @@ interface BacklogViewProps {
   onDeleteStory: (id: string) => void;
   /** Callback para añadir una nueva HU a una épica */
   onAddStory: (epicId: string, story: Omit<UserStory, 'id' | 'source' | 'isEdited' | 'createdAt'>) => void;
+  /** Callback para añadir una nueva épica */
+  onAddEpic: (epic: Omit<Epic, 'id' | 'source' | 'isEdited' | 'createdAt' | 'userStories'>) => void;
   /** Si el backlog ya fue aprobado (deshabilita edición) */
   isApproved: boolean;
 }
@@ -36,8 +39,13 @@ export function BacklogView({
   onEditStory,
   onDeleteStory,
   onAddStory,
+  onAddEpic,
   isApproved,
 }: BacklogViewProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+
   // Stats globales
   const totalStories = epics.reduce((sum, e) => sum + e.userStories.length, 0);
   const autoStories = epics.reduce(
@@ -45,6 +53,27 @@ export function BacklogView({
     0
   );
   const manualStories = totalStories - autoStories;
+  const manualEpics = epics.filter((e) => e.source === 'manual').length;
+  const autoEpics = epics.length - manualEpics;
+
+  const handleAdd = () => {
+    const trimmedTitle = newTitle.trim();
+    const trimmedDesc = newDescription.trim();
+    if (!trimmedTitle) return;
+
+    onAddEpic({ title: trimmedTitle, description: trimmedDesc });
+    setNewTitle('');
+    setNewDescription('');
+    setIsAdding(false);
+  };
+
+  const handleCancelAdd = () => {
+    setNewTitle('');
+    setNewDescription('');
+    setIsAdding(false);
+  };
+
+  const isAddDisabled = !newTitle.trim();
 
   return (
     <section
@@ -102,6 +131,81 @@ export function BacklogView({
                 index={index}
               />
             ))}
+
+            {!isApproved && (
+              isAdding ? (
+                <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4 animate-[fadeIn_0.2s_ease-out]">
+                  <label className="mb-2 block text-xs font-bold text-muted">
+                    Nueva Épica
+                  </label>
+
+                  <div className="flex flex-col gap-3">
+                    <input
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Título de la épica..."
+                      className={[
+                        'w-full rounded-lg border border-input-border bg-surface px-3 py-2',
+                        'text-sm font-semibold text-foreground placeholder:text-placeholder',
+                        'outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30',
+                        'transition-all duration-200',
+                      ].join(' ')}
+                    />
+
+                    <textarea
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      rows={2}
+                      placeholder="Descripción de la épica..."
+                      className={[
+                        'w-full resize-none rounded-lg border border-input-border bg-surface px-3 py-2',
+                        'text-sm text-foreground placeholder:text-placeholder',
+                        'outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30',
+                        'transition-all duration-200',
+                      ].join(' ')}
+                    />
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={handleCancelAdd}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleAdd}
+                        disabled={isAddDisabled}
+                        className={[
+                          'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold transition-all cursor-pointer',
+                          !isAddDisabled
+                            ? 'bg-primary text-white hover:bg-primary-hover'
+                            : 'bg-disabled text-disabled-text cursor-not-allowed',
+                        ].join(' ')}
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Añadir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAdding(true)}
+                  className={[
+                    'flex items-center gap-1.5 self-start rounded-lg border border-dashed border-border px-3 py-1.5',
+                    'text-xs font-medium text-muted transition-all cursor-pointer',
+                    'hover:border-primary/40 hover:bg-primary/5 hover:text-primary',
+                  ].join(' ')}
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Añadir Épica
+                </button>
+              )
+            )}
           </div>
         )}
       </div>
@@ -109,12 +213,20 @@ export function BacklogView({
       {/* ── Footer con stats ───────────────────────────────────── */}
       {epics.length > 0 && (
         <div className="border-t border-border px-6 py-3">
-          <div className="flex items-center gap-4 text-xs text-subtle">
-            <span>{autoStories} generadas por IA</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
+            <span>{autoEpics} épica{autoEpics !== 1 ? 's' : ''} por IA</span>
+            {manualEpics > 0 && (
+              <>
+                <span>·</span>
+                <span>{manualEpics} épica{manualEpics !== 1 ? 's' : ''} manual{manualEpics !== 1 ? 'es' : ''}</span>
+              </>
+            )}
+            <span>·</span>
+            <span>{autoStories} HU{autoStories !== 1 ? 's' : ''} por IA</span>
             {manualStories > 0 && (
               <>
                 <span>·</span>
-                <span>{manualStories} añadidas manualmente</span>
+                <span>{manualStories} HU{manualStories !== 1 ? 's' : ''} manual{manualStories !== 1 ? 'es' : ''}</span>
               </>
             )}
           </div>

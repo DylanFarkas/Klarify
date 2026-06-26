@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { fetchWorkspace } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 
 const titleStart = "Transforma ideas en ";
@@ -16,12 +17,16 @@ export function HeroLanding() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const handleStartClick = () => {
+  const handleStartClick = async () => {
     if (!user) {
       router.push("/login");
-    } else {
-      const lastAgent = localStorage.getItem("lastAgent") || "1";
-      router.push(`/agentes/${lastAgent}`);
+      return;
+    }
+    try {
+      const { preferences } = await fetchWorkspace(user);
+      router.push(`/agentes/${preferences.lastAgent || "1"}`);
+    } catch {
+      router.push("/agentes/1");
     }
   };
 
