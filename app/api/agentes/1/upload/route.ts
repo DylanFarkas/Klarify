@@ -11,9 +11,13 @@
 import { type NextRequest } from 'next/server';
 import { validateFile, processFile, processText, extractWishes } from '@/lib/services/agent-1-service';
 import type { Agent1UploadResponse, Agent1ErrorResponse } from '@/lib/types/agent-1';
+import { verifyRequestUser } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
+    // 0. Verificar sesión
+    await verifyRequestUser(request);
+
     // 1. Parsear FormData
     const formData = await request.formData();
     const file = formData.get('file');
@@ -51,6 +55,10 @@ export async function POST(request: NextRequest) {
     return Response.json(response, { status: 200 });
 
   } catch (error) {
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+      return Response.json({ error: 'No autorizado', code: 'PROCESSING_ERROR' } satisfies Agent1ErrorResponse, { status: 401 });
+    }
+
     console.error('[Agent 1 Upload] Error:', error);
     return Response.json(
       {

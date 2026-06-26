@@ -1,7 +1,9 @@
 import { AgentThemeProvider } from '@/context/AgentThemeContext';
 import { AgentThemeScript } from '@/components/agents/shared/AgentThemeScript';
+import { AgentAuthGuard } from '@/components/agents/shared/AgentAuthGuard';
+import { WorkspaceProvider } from '@/context/WorkspaceContext';
 
-/** Layout compartido de /agentes — envuelve todas las rutas de agentes con el provider de temas */
+/** Layout compartido de /agentes — exige sesión, workspace y temas */
 export default function AgentesLayout({
   children,
 }: Readonly<{
@@ -10,7 +12,11 @@ export default function AgentesLayout({
   return (
     <>
       <AgentThemeScript />
-      <AgentThemeProvider>{children}</AgentThemeProvider>
+      <AgentThemeProvider>
+        <AgentAuthGuard>
+          <WorkspaceProvider>{children}</WorkspaceProvider>
+        </AgentAuthGuard>
+      </AgentThemeProvider>
     </>
   );
 }

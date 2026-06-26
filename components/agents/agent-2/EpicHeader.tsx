@@ -29,13 +29,14 @@ export function EpicHeader({ epic, onEdit, isApproved }: EpicHeaderProps) {
   const [editDescription, setEditDescription] = useState(epic.description);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  // Autofocar título al entrar en modo edición
+  // Autofocar título solo al entrar en modo edición (no en cada tecla)
   useEffect(() => {
     if (isEditing && titleRef.current) {
       titleRef.current.focus();
-      titleRef.current.setSelectionRange(editTitle.length, editTitle.length);
+      const len = titleRef.current.value.length;
+      titleRef.current.setSelectionRange(len, len);
     }
-  }, [isEditing, editTitle.length]);
+  }, [isEditing]);
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleSave = () => {

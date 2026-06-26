@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AgentStepper } from './AgentStepper';
 import { AgentSidebarSettings } from './AgentSidebarSettings';
+import { NewSessionButton } from './NewSessionButton';
 import { WorkspaceGridBackground } from './WorkspaceGridBackground';
 
 interface AgentLayoutShellProps {
@@ -32,6 +33,11 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
         {/* Configuración */}
         <AgentSidebarSettings />
 
+        {/* Nueva sesión */}
+        <div className="mt-2">
+          <NewSessionButton />
+        </div>
+
         {/* Spacer + branding inferior */}
         <div className="mt-auto pt-8 border-t border-border">
           <p className="text-xs text-subtle">
@@ -44,9 +50,10 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
       <div className="relative flex flex-1 flex-col min-w-0">
         <WorkspaceGridBackground />
 
-        {/* Configuración visible en móvil/tablet */}
+        {/* Configuración + nueva sesión (móvil/tablet) */}
         <div className="relative z-10 border-b border-border bg-surface px-6 py-4 lg:hidden">
           <AgentSidebarSettings className="mt-0 border-t-0 pt-0" />
+          <NewSessionButton className="mt-2" />
         </div>
 
         {/* Contenido del agente */}

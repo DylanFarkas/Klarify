@@ -36,19 +36,20 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
   const [isDeleting, setIsDeleting] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  // Autofocar título al entrar en modo edición
+  // Autofocar título solo al entrar en modo edición (no en cada tecla)
   useEffect(() => {
     if (isEditing && titleRef.current) {
       titleRef.current.focus();
-      titleRef.current.setSelectionRange(editTitle.length, editTitle.length);
+      const len = titleRef.current.value.length;
+      titleRef.current.setSelectionRange(len, len);
     }
-  }, [isEditing, editTitle.length]);
+  }, [isEditing]);
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleSave = () => {
     const trimmedTitle = editTitle.trim();
     const trimmedDesc = editDescription.trim();
-    if (!trimmedTitle || !trimmedDesc || editCriteria.length === 0) return;
+    if (!trimmedTitle || !trimmedDesc) return;
 
     const hasChanges =
       trimmedTitle !== story.title ||
@@ -87,7 +88,7 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
     }
   };
 
-  const isSaveDisabled = !editTitle.trim() || !editDescription.trim() || editCriteria.length === 0;
+  const isSaveDisabled = !editTitle.trim() || !editDescription.trim();
 
   return (
     <article

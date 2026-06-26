@@ -10,7 +10,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MAX_ACCEPTANCE_CRITERIA, MIN_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
+import { MAX_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
 
 interface AcceptanceCriteriaEditorProps {
   /** Lista actual de criterios de aceptación */
@@ -36,13 +36,14 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
     }
   }, [isAdding]);
 
-  // Autofocar input de editar
+  // Autofocar input solo al entrar en modo edición (no en cada tecla)
   useEffect(() => {
     if (editingIndex !== null && editInputRef.current) {
       editInputRef.current.focus();
-      editInputRef.current.setSelectionRange(editingText.length, editingText.length);
+      const len = editInputRef.current.value.length;
+      editInputRef.current.setSelectionRange(len, len);
     }
-  }, [editingIndex, editingText.length]);
+  }, [editingIndex]);
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleAdd = () => {
@@ -170,13 +171,7 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
                   </button>
                   <button
                     onClick={() => handleDelete(index)}
-                    disabled={criteria.length <= MIN_ACCEPTANCE_CRITERIA}
-                    className={[
-                      'rounded p-1 transition-all cursor-pointer',
-                      criteria.length <= MIN_ACCEPTANCE_CRITERIA
-                        ? 'text-disabled cursor-not-allowed'
-                        : 'text-muted hover:text-red-400 hover:bg-red-500/10',
-                    ].join(' ')}
+                    className="rounded p-1 text-muted transition-all cursor-pointer hover:text-red-400 hover:bg-red-500/10"
                     aria-label="Eliminar criterio"
                   >
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar/Navbar";
+import { fetchWorkspace } from "@/lib/api-client";
 
 export default function LoginPage() {
   const { user, loading, signInWithGoogle, signInWithGithub, authError, clearAuthError } = useAuth();
@@ -13,11 +14,21 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      // Intentar obtener el último agente visitado o usar el 1 por defecto
-      const lastAgent = localStorage.getItem("lastAgent") || "1";
-      router.push(`/agentes/${lastAgent}`);
-    }
+    if (loading || !user) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { preferences } = await fetchWorkspace(user);
+        if (!cancelled) router.push(`/agentes/${preferences.lastAgent || "1"}`);
+      } catch {
+        if (!cancelled) router.push("/agentes/1");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading, router]);
 
   const handleGoogleLogin = async () => {
