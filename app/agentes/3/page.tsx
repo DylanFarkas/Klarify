@@ -1,9 +1,8 @@
 /**
- * @fileoverview Página del Agente 3 — Priorización (scaffold).
+ * @fileoverview Página del Agente 3 — Estimación en Story Points (scaffold).
  *
  * Shell visual alineado con el resto del workspace. Sin lógica de negocio:
- * muestra el input `Agent3Input` que el Agente 2 deja en el pipeline para
- * que otro desarrollador pueda implementar la priorización.
+ * documenta el alcance mínimo del agente y muestra el input `Agent3Input` del pipeline.
  */
 
 'use client';
@@ -50,11 +49,29 @@ export default function Agent3Page() {
           </span>
         </div>
         <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Priorización
+          Estimación en Story Points
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-muted">
-          Ordena épicas e historias de usuario por valor y esfuerzo para definir
-          qué entra primero en el roadmap del producto.
+          Como Scrum Master, el agente sugiere una estimación en Story Points para
+          cada historia de usuario del backlog aprobado, basándose en su complejidad
+          técnica. El equipo revisa y ajusta antes de consolidar.
+        </p>
+      </div>
+
+      {/* ── Alcance (pendiente de implementar) ────────────────── */}
+      <div className="rounded-2xl border border-dashed border-border bg-surface-muted/50 px-6 py-5">
+        <p className="text-sm font-medium text-foreground">Pendiente de implementación</p>
+        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted">
+          <li>
+            Sugerir Story Points (escala Fibonacci) por historia según complejidad técnica.
+          </li>
+          <li>
+            <span className="font-medium text-foreground">CA1 (HITL):</span> el usuario puede
+            sobrescribir la estimación sugerida antes de guardar en Firestore.
+          </li>
+        </ul>
+        <p className="mt-4 text-xs text-muted">
+          Entrada: <code className="font-mono">workspace.pipeline.agent3Input</code>.
         </p>
       </div>
 

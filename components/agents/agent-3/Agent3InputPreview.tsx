@@ -43,10 +43,9 @@ export function Agent3InputPreview({ input }: Agent3InputPreviewProps) {
       {/* Contrato de datos */}
       <div className="rounded-2xl border border-border bg-surface">
         <div className="border-b border-border px-6 py-4">
-          <h3 className="text-sm font-bold text-foreground">Contrato de entrada — Agent3Input</h3>
+          <h3 className="text-sm font-bold text-foreground">Datos de entrada — Agent3Input</h3>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Leído desde <code className="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[11px]">workspace.pipeline.agent3Input</code>
-            {' '}· Aprobado el {approvedDate}
+            Aprobado el {approvedDate} por el Agente 2
           </p>
         </div>
 
@@ -77,15 +76,6 @@ export function Agent3InputPreview({ input }: Agent3InputPreviewProps) {
             {JSON.stringify(input, null, 2)}
           </pre>
         </div>
-      </div>
-
-      {/* Aviso de scaffold */}
-      <div className="rounded-2xl border border-dashed border-border bg-surface-muted/50 px-6 py-5">
-        <p className="text-sm font-medium text-foreground">Pendiente de implementación</p>
-        <p className="mt-1 text-sm leading-relaxed text-muted">
-          La lógica de priorización (matriz valor/esfuerzo, ordenamiento, HITL, etc.) se implementará aquí.
-          Usa el JSON anterior como referencia del payload que recibirás al hidratar el estado del agente.
-        </p>
       </div>
     </div>
   );
