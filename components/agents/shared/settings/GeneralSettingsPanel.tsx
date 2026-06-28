@@ -1,7 +1,7 @@
 'use client';
 
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
-import { SettingsToggle } from '@/components/agents/shared/SettingsToggle';
+import { SettingsToggle } from '@/components/agents/shared/settings/SettingsToggle';
 
 export function GeneralSettingsPanel() {
   const { showModelReasoning, setShowModelReasoning } = useWorkspaceSettings();

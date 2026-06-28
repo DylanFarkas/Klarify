@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Navbar } from "@/components/landing/Navbar/Navbar";
-import { NewSessionButton } from "@/components/agents/shared/NewSessionButton";
+import { NewSessionButton } from '@/components/agents/shared/layout/NewSessionButton';
 import { use } from "react";
 import { saveLastAgent } from "@/lib/api-client";
 

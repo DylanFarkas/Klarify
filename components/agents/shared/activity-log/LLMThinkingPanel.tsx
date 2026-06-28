@@ -7,8 +7,8 @@
 
 import type { AgentActivityEntry } from '@/lib/types/agent-activity';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
-import { AgentActivityLog } from '@/components/agents/shared/AgentActivityLog';
-import { ReasoningLoader } from '@/components/agents/shared/AgentActivityLog/ReasoningLoader';
+import { AgentActivityLog } from '@/components/agents/shared/activity-log/AgentActivityLog';
+import { ReasoningLoader } from '@/components/agents/shared/activity-log/AgentActivityLog/ReasoningLoader';
 
 interface LLMThinkingPanelProps {
   title: string;

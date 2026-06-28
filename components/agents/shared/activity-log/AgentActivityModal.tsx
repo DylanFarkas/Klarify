@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AgentActivityEntry } from '@/lib/types/agent-activity';
-import { AgentActivityLog } from '@/components/agents/shared/AgentActivityLog';
+import { AgentActivityLog } from '@/components/agents/shared/activity-log/AgentActivityLog';
 import { summarizeAgentActivity } from '@/lib/utils/agent-activity-summary';
 
 const IS_DEV = process.env.NODE_ENV === 'development';

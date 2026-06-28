@@ -32,9 +32,9 @@ import { FileUploader } from '@/components/agents/agent-1/FileUploader';
 import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPanel';
 import { WishesList } from '@/components/agents/agent-1/WishesList';
 import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/ClarifyingQuestionsPanel';
-import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
-import { LLMThinkingPanel } from '@/components/agents/shared/LLMThinkingPanel';
-import { ApproveButton } from '@/components/agents/shared/ApproveButton';
+import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
+import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
+import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 // ---------------------------------------------------------------------------

@@ -24,9 +24,9 @@ import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-serv
 import { EmptyBacklogState } from '@/components/agents/agent-2/EmptyBacklogState';
 import { WishesSummaryPanel } from '@/components/agents/agent-2/WishesSummaryPanel';
 import { BacklogView } from '@/components/agents/agent-2/BacklogView';
-import { ApproveButton } from '@/components/agents/shared/ApproveButton';
-import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
-import { LLMThinkingPanel } from '@/components/agents/shared/LLMThinkingPanel';
+import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
+import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
+import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
 import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/context/AuthContext';
-import { ThemeSettingsPanel } from '@/components/agents/shared/ThemeSettingsPanel';
-import { GitHubConnectionPanel } from '@/components/agents/shared/GitHubConnectionPanel';
-import { GeneralSettingsPanel } from '@/components/agents/shared/GeneralSettingsPanel';
+import { ThemeSettingsPanel } from '@/components/agents/shared/settings/ThemeSettingsPanel';
+import { GitHubConnectionPanel } from '@/components/agents/shared/settings/GitHubConnectionPanel';
+import { GeneralSettingsPanel } from '@/components/agents/shared/settings/GeneralSettingsPanel';
 
 type SettingsTab = 'appearance' | 'integrations' | 'general';
 
