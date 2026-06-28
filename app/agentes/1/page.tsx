@@ -27,12 +27,12 @@ import { WISH_ID_PREFIX } from '@/lib/constants/agent-1';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { authFetch } from '@/lib/api-client';
-import { consumeLlmStream } from '@/lib/utils/llm-stream';
+import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { FileUploader } from '@/components/agents/agent-1/FileUploader';
 import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPanel';
 import { WishesList } from '@/components/agents/agent-1/WishesList';
 import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/ClarifyingQuestionsPanel';
-import { Agent1LoadingPanel } from '@/components/agents/agent-1/Agent1LoadingPanel';
+import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
 import { ApproveButton } from '@/components/agents/shared/ApproveButton';
 
 // ---------------------------------------------------------------------------
@@ -80,9 +80,12 @@ export default function Agent1Page() {
   const { user } = useAuth();
   const { workspace, isLoading, sessionVersion, saveAgent1, approveAgent1, resetAgent1 } = useWorkspace();
   const [state, setState] = useState<Agent1State>(INITIAL_STATE);
-  const [thinkingText, setThinkingText] = useState('');
+  const { entries, reset, consumeStream } = useAgentActivity();
   const [isHydrated, setIsHydrated] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+
+  const isAgentWorking = state.status === 'assessing' || state.status === 'extracting';
+  const activityModalOpen = isAgentWorking;
 
   // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
@@ -148,7 +151,7 @@ export default function Agent1Page() {
         wishes: [],
         error: null,
       }));
-      setThinkingText('');
+      reset();
 
       try {
         const response = await authFetch('/api/agentes/1/analyze', user, {
@@ -162,10 +165,7 @@ export default function Agent1Page() {
           throw new Error(errorData.error || 'Error al analizar el contexto');
         }
 
-        const data = await consumeLlmStream<Agent1AnalyzeResponse>(
-          response,
-          (text) => setThinkingText((prev) => prev + text)
-        );
+        const data = await consumeStream<Agent1AnalyzeResponse>(response);
 
         if (data.discovery.isSufficient && data.wishes) {
           setState((prev) => ({
@@ -177,7 +177,6 @@ export default function Agent1Page() {
             status: 'review',
             error: null,
           }));
-          setThinkingText('');
         } else {
           setState((prev) => ({
             ...prev,
@@ -191,7 +190,6 @@ export default function Agent1Page() {
             status: 'clarifying',
             error: null,
           }));
-          setThinkingText('');
         }
       } catch (error) {
         setState((prev) => ({
@@ -201,7 +199,7 @@ export default function Agent1Page() {
         }));
       }
     },
-    [user]
+    [user, reset, consumeStream]
   );
 
   // ── Handler: Upload de archivo ────────────────────────────────
@@ -297,7 +295,7 @@ export default function Agent1Page() {
     if (!user || !state.transcription || !state.discovery) return;
 
     setState((prev) => ({ ...prev, status: 'extracting', error: null }));
-    setThinkingText('');
+    reset();
 
     try {
       const response = await authFetch('/api/agentes/1/extract', user, {
@@ -316,10 +314,7 @@ export default function Agent1Page() {
         throw new Error(errorData.error || 'Error al extraer deseos');
       }
 
-      const data = await consumeLlmStream<Agent1ExtractResponse>(
-        response,
-        (text) => setThinkingText((prev) => prev + text)
-      );
+      const data = await consumeStream<Agent1ExtractResponse>(response);
 
       setState((prev) => ({
         ...prev,
@@ -331,7 +326,6 @@ export default function Agent1Page() {
         status: 'review',
         error: null,
       }));
-      setThinkingText('');
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -339,14 +333,14 @@ export default function Agent1Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al extraer.',
       }));
     }
-  }, [user, state.transcription, state.discovery]);
+  }, [user, state.transcription, state.discovery, reset, consumeStream]);
 
   // ── Handler: Saltar clarificación ───────────────────────────────
   const handleSkipClarification = useCallback(async () => {
     if (!user || !state.transcription || !state.discovery) return;
 
     setState((prev) => ({ ...prev, status: 'extracting', error: null }));
-    setThinkingText('');
+    reset();
 
     try {
       const response = await authFetch('/api/agentes/1/extract', user, {
@@ -365,10 +359,7 @@ export default function Agent1Page() {
         throw new Error(errorData.error || 'Error al extraer deseos');
       }
 
-      const data = await consumeLlmStream<Agent1ExtractResponse>(
-        response,
-        (text) => setThinkingText((prev) => prev + text)
-      );
+      const data = await consumeStream<Agent1ExtractResponse>(response);
 
       setState((prev) => ({
         ...prev,
@@ -380,7 +371,6 @@ export default function Agent1Page() {
         status: 'review',
         error: null,
       }));
-      setThinkingText('');
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -388,7 +378,7 @@ export default function Agent1Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al extraer.',
       }));
     }
-  }, [user, state.transcription, state.discovery]);
+  }, [user, state.transcription, state.discovery, reset, consumeStream]);
 
   // ── Handlers HITL: CRUD de deseos ─────────────────────────────
 
@@ -488,24 +478,6 @@ export default function Agent1Page() {
           onTranscriptionComplete={handleLiveTranscriptionComplete}
           isProcessing={state.status === 'transcribing'}
           error={state.error}
-        />
-      )}
-
-      {/* Assessing */}
-      {state.status === 'assessing' && (
-        <Agent1LoadingPanel
-          title="Analizando tu idea..."
-          description="Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas."
-          thinkingText={thinkingText}
-        />
-      )}
-
-      {/* Extracting */}
-      {state.status === 'extracting' && (
-        <Agent1LoadingPanel
-          title="Preparando tus requerimientos..."
-          description="Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto."
-          thinkingText={thinkingText}
         />
       )}
 
@@ -635,6 +607,22 @@ export default function Agent1Page() {
           </div>
         </>
       )}
+
+      <AgentActivityModal
+        open={activityModalOpen}
+        isActive={isAgentWorking}
+        title={
+          state.status === 'extracting'
+            ? 'Preparando tus requerimientos...'
+            : 'Analizando tu idea...'
+        }
+        description={
+          state.status === 'extracting'
+            ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
+            : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
+        }
+        entries={entries}
+      />
     </div>
   );
 }

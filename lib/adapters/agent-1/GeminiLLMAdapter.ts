@@ -238,6 +238,7 @@ ${contextBlock}
         temperature,
         thinkingConfig: {
           includeThoughts: true,
+          thinkingBudget: 1024,
         },
       },
     });

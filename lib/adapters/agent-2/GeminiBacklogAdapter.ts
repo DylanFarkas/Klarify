@@ -157,6 +157,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
         temperature: 0.2,
         thinkingConfig: {
           includeThoughts: true,
+          thinkingBudget: 1024,
         },
       },
     });

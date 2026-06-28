@@ -3,7 +3,7 @@
  *
  * Evalúa si el contexto del usuario es suficiente para un backlog.
  * Si lo es, extrae deseos directamente en la misma request.
- * Emite pensamientos del LLM en tiempo real vía NDJSON stream.
+ * Emite actividad del agente en tiempo real vía NDJSON stream.
  */
 
 import { type NextRequest } from 'next/server';
@@ -17,7 +17,44 @@ import type {
   Agent1ErrorResponse,
 } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
-import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
+import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
+import {
+  AgentStreamEmitter,
+  createNdjsonStream,
+  ndjsonStreamResponse,
+} from '@/lib/utils/llm-stream';
+
+async function runExtraction(
+  emitter: AgentStreamEmitter,
+  body: Agent1AnalyzeRequest,
+  discovery: Awaited<ReturnType<typeof analyzeContextStream>>
+) {
+  return emitter.runPhase(
+    AGENT_ACTIVITY.PHASE_EXTRACT.id,
+    AGENT_ACTIVITY.PHASE_EXTRACT.label,
+    async () => {
+      await emitter.runAction(
+        AGENT_ACTIVITY.ACTION_BUILD_CONTEXT.id,
+        AGENT_ACTIVITY.ACTION_BUILD_CONTEXT.label,
+        async () => undefined,
+        { minVisibleMs: PREP_ACTION_MIN_VISIBLE_MS }
+      );
+
+      return emitter.runAction(
+        AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.id,
+        AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.label,
+        () =>
+          extractWishesFromContextStream(
+            body.transcription,
+            discovery,
+            emitter.bindThought(),
+            [],
+            false
+          )
+      );
+    }
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,20 +72,30 @@ export async function POST(request: NextRequest) {
     const { stream, send, close } = createNdjsonStream();
 
     void (async () => {
-      try {
-        const onThought = (text: string) => send({ type: 'thought', text });
+      const emitter = new AgentStreamEmitter(send);
 
-        const discovery = await analyzeContextStream(body.transcription, onThought);
+      try {
+        const discovery = await emitter.runPhase(
+          AGENT_ACTIVITY.PHASE_ASSESS.id,
+          AGENT_ACTIVITY.PHASE_ASSESS.label,
+          async () => {
+            await emitter.runAction(
+              AGENT_ACTIVITY.ACTION_READ_TRANSCRIPTION.id,
+              AGENT_ACTIVITY.ACTION_READ_TRANSCRIPTION.label,
+              async () => undefined,
+              { minVisibleMs: PREP_ACTION_MIN_VISIBLE_MS }
+            );
+
+            return emitter.runAction(
+              AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.id,
+              AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.label,
+              () => analyzeContextStream(body.transcription, emitter.bindThought())
+            );
+          }
+        );
 
         if (!discovery.isSufficient && discovery.questions.length === 0) {
-          onThought('\n\nExtrayendo requerimientos del contexto...\n');
-          const { wishes, enrichedContext } = await extractWishesFromContextStream(
-            body.transcription,
-            discovery,
-            onThought,
-            [],
-            false
-          );
+          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, isSufficient: true, completedAt: Date.now() },
@@ -60,14 +107,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (discovery.isSufficient) {
-          onThought('\n\nContexto suficiente. Extrayendo requerimientos...\n');
-          const { wishes, enrichedContext } = await extractWishesFromContextStream(
-            body.transcription,
-            discovery,
-            onThought,
-            [],
-            false
-          );
+          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, completedAt: Date.now() },

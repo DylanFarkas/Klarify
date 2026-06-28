@@ -1,16 +1,17 @@
 /**
- * @fileoverview Panel de carga con razonamiento del LLM en tiempo real.
+ * @fileoverview Panel de carga con log de actividad del agente en tiempo real.
  * Compartido entre agentes que consumen streams NDJSON del LLM.
  */
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import type { AgentActivityEntry } from '@/lib/types/agent-activity';
+import { AgentActivityLog } from '@/components/agents/shared/AgentActivityLog';
 
 interface LLMThinkingPanelProps {
   title: string;
   description: string;
-  thinkingText?: string;
+  entries?: AgentActivityEntry[];
   /** Línea contextual opcional (ej. "8 deseos · 3 épicas previas") */
   meta?: string;
 }
@@ -18,17 +19,10 @@ interface LLMThinkingPanelProps {
 export function LLMThinkingPanel({
   title,
   description,
-  thinkingText = '',
+  entries = [],
   meta,
 }: LLMThinkingPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const hasThinking = thinkingText.trim().length > 0;
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [thinkingText]);
+  const hasActivity = entries.length > 0;
 
   return (
     <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -50,27 +44,8 @@ export function LLMThinkingPanel({
       <div className="flex flex-col gap-6 px-6 py-8 md:px-8">
         <p className="max-w-2xl text-sm leading-relaxed text-muted">{description}</p>
 
-        {hasThinking ? (
-          <div className="w-full">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
-                Razonamiento del modelo
-              </span>
-            </div>
-            <div
-              ref={scrollRef}
-              className="max-h-56 overflow-y-auto rounded-xl border border-primary/20 bg-surface-muted px-4 py-3 text-left shadow-[inset_0_1px_0_color-mix(in_srgb,var(--primary)_8%,transparent)]"
-            >
-              <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground/80">
-                {thinkingText}
-                <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary align-middle" />
-              </pre>
-            </div>
-          </div>
+        {hasActivity ? (
+          <AgentActivityLog entries={entries} />
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-3">
@@ -78,9 +53,7 @@ export function LLMThinkingPanel({
               <div className="h-2.5 w-[85%] animate-pulse rounded-full bg-surface-muted" />
               <div className="h-2.5 w-[65%] animate-pulse rounded-full bg-surface-muted" />
             </div>
-            <p className="text-center text-xs text-muted">
-              Conectando con el modelo...
-            </p>
+            <p className="text-center text-xs text-muted">Conectando con el modelo...</p>
           </div>
         )}
       </div>

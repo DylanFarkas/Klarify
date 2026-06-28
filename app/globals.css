@@ -56,6 +56,77 @@
   }
 }
 
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Modal de actividad del agente (estética tecnológica) ──────────── */
+
+.agent-modal-shell {
+  padding: 1px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 55%, transparent) 0%,
+    color-mix(in srgb, var(--border-strong) 60%, transparent) 35%,
+    color-mix(in srgb, var(--primary) 30%, transparent) 70%,
+    color-mix(in srgb, var(--border-strong) 60%, transparent) 100%
+  );
+  background-size: 200% 200%;
+  animation: agentBorderFlow 6s ease infinite;
+  box-shadow:
+    0 24px 80px color-mix(in srgb, var(--foreground) 14%, transparent),
+    0 0 40px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+@keyframes agentBorderFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.agent-feed {
+  background-color: var(--surface);
+}
+
+.agent-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--surface) 70%, transparent) 50%,
+    transparent 100%
+  );
+  animation: agentProgressShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes agentProgressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-modal-shell { animation: none; }
+  .agent-progress-shimmer { animation: none; }
+}
+
+@keyframes activitySlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Animaciones del workspace de agentes */
 @keyframes fadeIn {
   from {

@@ -3,7 +3,7 @@
  *
  * Extrae deseos a partir del contexto enriquecido con las respuestas
  * del usuario a las preguntas de discovery (o saltando el paso).
- * Emite pensamientos del LLM en tiempo real vía NDJSON stream.
+ * Emite actividad del agente en tiempo real vía NDJSON stream.
  */
 
 import { type NextRequest } from 'next/server';
@@ -17,7 +17,12 @@ import type {
   Agent1ErrorResponse,
 } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
-import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
+import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
+import {
+  AgentStreamEmitter,
+  createNdjsonStream,
+  ndjsonStreamResponse,
+} from '@/lib/utils/llm-stream';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,15 +57,33 @@ export async function POST(request: NextRequest) {
     const { stream, send, close } = createNdjsonStream();
 
     void (async () => {
-      try {
-        const onThought = (text: string) => send({ type: 'thought', text });
+      const emitter = new AgentStreamEmitter(send);
 
-        const { wishes, enrichedContext } = await extractWishesFromContextStream(
-          body.transcription,
-          body.discovery,
-          onThought,
-          answers,
-          skipped
+      try {
+        const { wishes, enrichedContext } = await emitter.runPhase(
+          AGENT_ACTIVITY.PHASE_EXTRACT.id,
+          AGENT_ACTIVITY.PHASE_EXTRACT.label,
+          async () => {
+            await emitter.runAction(
+              AGENT_ACTIVITY.ACTION_MERGE_CLARIFICATIONS.id,
+              AGENT_ACTIVITY.ACTION_MERGE_CLARIFICATIONS.label,
+              async () => undefined,
+              { minVisibleMs: PREP_ACTION_MIN_VISIBLE_MS }
+            );
+
+            return emitter.runAction(
+              AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.id,
+              AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.label,
+              () =>
+                extractWishesFromContextStream(
+                  body.transcription,
+                  body.discovery,
+                  emitter.bindThought(),
+                  answers,
+                  skipped
+                )
+            );
+          }
         );
 
         const response: Agent1ExtractResponse = { wishes, enrichedContext };

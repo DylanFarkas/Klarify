@@ -19,13 +19,13 @@ import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agen
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { authFetch } from '@/lib/api-client';
-import { consumeLlmStream } from '@/lib/utils/llm-stream';
+import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-service';
 import { EmptyBacklogState } from '@/components/agents/agent-2/EmptyBacklogState';
 import { WishesSummaryPanel } from '@/components/agents/agent-2/WishesSummaryPanel';
 import { BacklogView } from '@/components/agents/agent-2/BacklogView';
 import { ApproveButton } from '@/components/agents/shared/ApproveButton';
-import { LLMThinkingPanel } from '@/components/agents/shared/LLMThinkingPanel';
+import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
 import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
 
 // ---------------------------------------------------------------------------
@@ -146,8 +146,11 @@ export default function Agent2Page() {
   const { user } = useAuth();
   const { workspace, isLoading, sessionVersion, saveAgent2, approveAgent2 } = useWorkspace();
   const [state, setState] = useState<Agent2State>(INITIAL_STATE);
-  const [thinkingText, setThinkingText] = useState('');
+  const { entries, reset, consumeStream } = useAgentActivity();
   const [isHydrated, setIsHydrated] = useState(false);
+
+  const isAgentWorking = state.status === 'generating';
+  const activityModalOpen = isAgentWorking;
 
   // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
@@ -202,7 +205,7 @@ export default function Agent2Page() {
     if (!state.input || !user) return;
 
     setState((prev) => ({ ...prev, status: 'generating', error: null }));
-    setThinkingText('');
+    reset();
 
     try {
       const response = await authFetch('/api/agentes/2/generate', user, {
@@ -216,10 +219,7 @@ export default function Agent2Page() {
         throw new Error(errorData.error || 'Error al generar el backlog');
       }
 
-      const data = await consumeLlmStream<Agent2GenerateResponse>(
-        response,
-        (text) => setThinkingText((prev) => prev + text)
-      );
+      const data = await consumeStream<Agent2GenerateResponse>(response);
       const clonedEpics = JSON.parse(JSON.stringify(data.epics)) as Epic[];
 
       setState((prev) => ({
@@ -227,7 +227,6 @@ export default function Agent2Page() {
         epics: clonedEpics,
         status: 'review',
       }));
-      setThinkingText('');
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -235,7 +234,7 @@ export default function Agent2Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al generar el backlog.',
       }));
     }
-  }, [state.input, user]);
+  }, [state.input, user, reset, consumeStream]);
 
   // ── Handler: Regenerar backlog (merge) ────────────────────────
   const handleRegenerate = useCallback(async () => {
@@ -247,7 +246,7 @@ export default function Agent2Page() {
     if (!confirmed) return;
 
     setState((prev) => ({ ...prev, status: 'generating', error: null }));
-    setThinkingText('');
+    reset();
 
     try {
       const response = await authFetch('/api/agentes/2/generate', user, {
@@ -261,10 +260,7 @@ export default function Agent2Page() {
         throw new Error(errorData.error || 'Error al regenerar el backlog');
       }
 
-      const data = await consumeLlmStream<Agent2GenerateResponse>(
-        response,
-        (text) => setThinkingText((prev) => prev + text)
-      );
+      const data = await consumeStream<Agent2GenerateResponse>(response);
       const newEpics = JSON.parse(JSON.stringify(data.epics)) as Epic[];
       const mergedEpics = mergeBacklogs(state.epics, newEpics);
 
@@ -273,7 +269,6 @@ export default function Agent2Page() {
         epics: mergedEpics,
         status: 'review',
       }));
-      setThinkingText('');
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -281,7 +276,7 @@ export default function Agent2Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al regenerar.',
       }));
     }
-  }, [state.input, state.epics, user]);
+  }, [state.input, state.epics, user, reset, consumeStream]);
 
   // ── Handler: Editar épica ─────────────────────────────────────
   const handleEditEpic = useCallback((id: string, updates: Partial<Epic>) => {
@@ -450,28 +445,6 @@ export default function Agent2Page() {
         />
       )}
 
-      {/* ── Estado: generating ─────────────────────────────────── */}
-      {state.status === 'generating' && (
-        <LLMThinkingPanel
-          title={state.epics.length > 0 ? 'Regenerando tu backlog...' : 'Creando tu backlog...'}
-          description={
-            state.epics.length > 0
-              ? 'Estamos generando una nueva versión del backlog. Tus ediciones manuales se conservarán al finalizar.'
-              : 'Estamos transformando tus deseos aprobados en épicas e historias de usuario estructuradas.'
-          }
-          meta={
-            state.input
-              ? `${state.input.wishes.length} deseo${state.input.wishes.length !== 1 ? 's' : ''}${
-                  state.epics.length > 0
-                    ? ` · ${state.epics.length} épica${state.epics.length !== 1 ? 's' : ''} previas`
-                    : ''
-                }`
-              : undefined
-          }
-          thinkingText={thinkingText}
-        />
-      )}
-
       {/* ── Estado: review / approved ──────────────────────────── */}
       {showReview && (
         <>
@@ -547,6 +520,27 @@ export default function Agent2Page() {
           )}
         </>
       )}
+
+      <AgentActivityModal
+        open={activityModalOpen}
+        isActive={isAgentWorking}
+        title={state.epics.length > 0 ? 'Regenerando tu backlog...' : 'Creando tu backlog...'}
+        description={
+          state.epics.length > 0
+            ? 'Estamos generando una nueva versión del backlog. Tus ediciones manuales se conservarán al finalizar.'
+            : 'Estamos transformando tus deseos aprobados en épicas e historias de usuario estructuradas.'
+        }
+        meta={
+          state.input
+            ? `${state.input.wishes.length} deseo${state.input.wishes.length !== 1 ? 's' : ''}${
+                state.epics.length > 0
+                  ? ` · ${state.epics.length} épica${state.epics.length !== 1 ? 's' : ''} previas`
+                  : ''
+              }`
+            : undefined
+        }
+        entries={entries}
+      />
     </div>
   );
 }
