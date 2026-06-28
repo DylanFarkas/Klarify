@@ -5,8 +5,9 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeSettingsPanel } from '@/components/agents/shared/ThemeSettingsPanel';
 import { GitHubConnectionPanel } from '@/components/agents/shared/GitHubConnectionPanel';
+import { GeneralSettingsPanel } from '@/components/agents/shared/GeneralSettingsPanel';
 
-type SettingsTab = 'appearance' | 'integrations';
+type SettingsTab = 'appearance' | 'integrations' | 'general';
 
 interface WorkspaceSettingsModalProps {
   isOpen: boolean;
@@ -29,6 +30,15 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
     icon: (
       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+  {
+    id: 'general',
+    label: 'Configuraciones generales',
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
       </svg>
     ),
   },
@@ -123,7 +133,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
           </div>
 
           {/* Tabs */}
-          <div className="mt-4 flex gap-1 rounded-xl bg-elevated p-1" role="tablist">
+          <div className="mt-4 flex gap-1 overflow-x-auto rounded-xl bg-elevated p-1" role="tablist">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.id;
               const showBadge = tab.id === 'integrations' && isGithubConnected;
@@ -135,7 +145,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
                   aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
                   className={[
-                    'relative flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all',
+                    'relative flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] font-semibold transition-all sm:gap-2 sm:px-3 sm:text-xs',
                     isActive
                       ? 'bg-surface text-foreground shadow-sm ring-1 ring-border/60'
                       : 'text-subtle hover:text-foreground',
@@ -167,6 +177,8 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
               <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
             </div>
           )}
+
+          {activeTab === 'general' && <GeneralSettingsPanel />}
         </div>
 
         {/* Footer */}

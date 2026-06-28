@@ -26,7 +26,9 @@ import { WishesSummaryPanel } from '@/components/agents/agent-2/WishesSummaryPan
 import { BacklogView } from '@/components/agents/agent-2/BacklogView';
 import { ApproveButton } from '@/components/agents/shared/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
+import { LLMThinkingPanel } from '@/components/agents/shared/LLMThinkingPanel';
 import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
+import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 // ---------------------------------------------------------------------------
 // Estado inicial
@@ -149,8 +151,9 @@ export default function Agent2Page() {
   const { entries, reset, consumeStream } = useAgentActivity();
   const [isHydrated, setIsHydrated] = useState(false);
 
+  const { showModelReasoning } = useWorkspaceSettings();
   const isAgentWorking = state.status === 'generating';
-  const activityModalOpen = isAgentWorking;
+  const activityModalOpen = isAgentWorking && showModelReasoning;
 
   // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
@@ -521,26 +524,48 @@ export default function Agent2Page() {
         </>
       )}
 
-      <AgentActivityModal
-        open={activityModalOpen}
-        isActive={isAgentWorking}
-        title={state.epics.length > 0 ? 'Regenerando tu backlog...' : 'Creando tu backlog...'}
-        description={
-          state.epics.length > 0
-            ? 'Estamos generando una nueva versión del backlog. Tus ediciones manuales se conservarán al finalizar.'
-            : 'Estamos transformando tus deseos aprobados en épicas e historias de usuario estructuradas.'
-        }
-        meta={
-          state.input
-            ? `${state.input.wishes.length} deseo${state.input.wishes.length !== 1 ? 's' : ''}${
-                state.epics.length > 0
-                  ? ` · ${state.epics.length} épica${state.epics.length !== 1 ? 's' : ''} previas`
-                  : ''
-              }`
-            : undefined
-        }
-        entries={entries}
-      />
+      {isAgentWorking && !showModelReasoning && (
+        <LLMThinkingPanel
+          title={state.epics.length > 0 ? 'Regenerando tu backlog...' : 'Creando tu backlog...'}
+          description={
+            state.epics.length > 0
+              ? 'Estamos generando una nueva versión del backlog. Tus ediciones manuales se conservarán al finalizar.'
+              : 'Estamos transformando tus deseos aprobados en épicas e historias de usuario estructuradas.'
+          }
+          meta={
+            state.input
+              ? `${state.input.wishes.length} deseo${state.input.wishes.length !== 1 ? 's' : ''}${
+                  state.epics.length > 0
+                    ? ` · ${state.epics.length} épica${state.epics.length !== 1 ? 's' : ''} previas`
+                    : ''
+                }`
+              : undefined
+          }
+        />
+      )}
+
+      {showModelReasoning && (
+        <AgentActivityModal
+          open={activityModalOpen}
+          isActive={isAgentWorking}
+          title={state.epics.length > 0 ? 'Regenerando tu backlog...' : 'Creando tu backlog...'}
+          description={
+            state.epics.length > 0
+              ? 'Estamos generando una nueva versión del backlog. Tus ediciones manuales se conservarán al finalizar.'
+              : 'Estamos transformando tus deseos aprobados en épicas e historias de usuario estructuradas.'
+          }
+          meta={
+            state.input
+              ? `${state.input.wishes.length} deseo${state.input.wishes.length !== 1 ? 's' : ''}${
+                  state.epics.length > 0
+                    ? ` · ${state.epics.length} épica${state.epics.length !== 1 ? 's' : ''} previas`
+                    : ''
+                }`
+              : undefined
+          }
+          entries={entries}
+        />
+      )}
     </div>
   );
 }

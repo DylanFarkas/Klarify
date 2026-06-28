@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import type { ActivityPhaseGroup } from '@/lib/utils/agent-activity-groups';
 import { ActionLine } from './ActionLine';
 import { DoneStepsSummary } from './DoneStepsSummary';
+import { ReasoningLoader } from './ReasoningLoader';
 import { ThoughtBlock } from './ThoughtBlock';
 
 interface PhaseTimelineProps {
@@ -12,6 +14,7 @@ interface PhaseTimelineProps {
 }
 
 export function PhaseTimeline({ group, variant = 'default' }: PhaseTimelineProps) {
+  const { showModelReasoning } = useWorkspaceSettings();
   const { timeline } = group;
   const isLive = variant === 'live';
 
@@ -30,13 +33,28 @@ export function PhaseTimeline({ group, variant = 'default' }: PhaseTimelineProps
     };
   }, [timeline]);
 
-  if (timeline.length === 0) return null;
+  if (timeline.length === 0) {
+    if (!showModelReasoning && isLive) {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col pl-3">
+          <ReasoningLoader fillAvailable />
+        </div>
+      );
+    }
+    return null;
+  }
 
   const collapseDone = isLive && doneActions.length > 0 && (activeAction || activeThought);
 
   const showThought =
+    showModelReasoning &&
     activeThought &&
     (activeThought.text.trim().length > 0 || !activeAction || activeThought.endedAt !== undefined);
+
+  const isThinking =
+    activeThought !== undefined && activeThought.endedAt === undefined;
+
+  const showReasoningLoader = !showModelReasoning && isThinking;
 
   return (
     <div
@@ -75,6 +93,10 @@ export function PhaseTimeline({ group, variant = 'default' }: PhaseTimelineProps
             nestable
             fillAvailable={isLive}
           />
+        )}
+
+        {showReasoningLoader && (
+          <ReasoningLoader compact={!isLive} fillAvailable={isLive} />
         )}
 
         {activeAction && (

@@ -6,7 +6,9 @@
 'use client';
 
 import type { AgentActivityEntry } from '@/lib/types/agent-activity';
+import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { AgentActivityLog } from '@/components/agents/shared/AgentActivityLog';
+import { ReasoningLoader } from '@/components/agents/shared/AgentActivityLog/ReasoningLoader';
 
 interface LLMThinkingPanelProps {
   title: string;
@@ -22,7 +24,12 @@ export function LLMThinkingPanel({
   entries = [],
   meta,
 }: LLMThinkingPanelProps) {
+  const { showModelReasoning } = useWorkspaceSettings();
   const hasActivity = entries.length > 0;
+  const hasOpenThought = entries.some(
+    (entry) => entry.kind === 'thought' && entry.endedAt === undefined
+  );
+  const showReasoningLoader = !showModelReasoning && (!hasActivity || hasOpenThought);
 
   return (
     <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -44,7 +51,9 @@ export function LLMThinkingPanel({
       <div className="flex flex-col gap-6 px-6 py-8 md:px-8">
         <p className="max-w-2xl text-sm leading-relaxed text-muted">{description}</p>
 
-        {hasActivity ? (
+        {showReasoningLoader ? (
+          <ReasoningLoader />
+        ) : hasActivity ? (
           <AgentActivityLog entries={entries} />
         ) : (
           <div className="space-y-4">

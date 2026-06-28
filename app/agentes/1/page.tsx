@@ -33,7 +33,9 @@ import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPan
 import { WishesList } from '@/components/agents/agent-1/WishesList';
 import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/ClarifyingQuestionsPanel';
 import { AgentActivityModal } from '@/components/agents/shared/AgentActivityModal';
+import { LLMThinkingPanel } from '@/components/agents/shared/LLMThinkingPanel';
 import { ApproveButton } from '@/components/agents/shared/ApproveButton';
+import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 // ---------------------------------------------------------------------------
 // Utilidades locales
@@ -84,8 +86,9 @@ export default function Agent1Page() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
+  const { showModelReasoning } = useWorkspaceSettings();
   const isAgentWorking = state.status === 'assessing' || state.status === 'extracting';
-  const activityModalOpen = isAgentWorking;
+  const activityModalOpen = isAgentWorking && showModelReasoning;
 
   // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
@@ -608,21 +611,38 @@ export default function Agent1Page() {
         </>
       )}
 
-      <AgentActivityModal
-        open={activityModalOpen}
-        isActive={isAgentWorking}
-        title={
-          state.status === 'extracting'
-            ? 'Preparando tus requerimientos...'
-            : 'Analizando tu idea...'
-        }
-        description={
-          state.status === 'extracting'
-            ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
-            : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
-        }
-        entries={entries}
-      />
+      {isAgentWorking && !showModelReasoning && (
+        <LLMThinkingPanel
+          title={
+            state.status === 'extracting'
+              ? 'Preparando tus requerimientos...'
+              : 'Analizando tu idea...'
+          }
+          description={
+            state.status === 'extracting'
+              ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
+              : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
+          }
+        />
+      )}
+
+      {showModelReasoning && (
+        <AgentActivityModal
+          open={activityModalOpen}
+          isActive={isAgentWorking}
+          title={
+            state.status === 'extracting'
+              ? 'Preparando tus requerimientos...'
+              : 'Analizando tu idea...'
+          }
+          description={
+            state.status === 'extracting'
+              ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
+              : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
+          }
+          entries={entries}
+        />
+      )}
     </div>
   );
 }
