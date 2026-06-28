@@ -9,12 +9,18 @@
  * El resto de la app no necesita cambios.
  */
 
-import type { TranscriptionResult, Wish } from '@/lib/types/agent-1';
+import type {
+  ClarificationAnswer,
+  ContextDiscovery,
+  TranscriptionResult,
+  Wish,
+} from '@/lib/types/agent-1';
 import {
   WISH_ID_PREFIX,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
+  OTHER_OPTION_ID,
 } from '@/lib/constants/agent-1';
 
 import { IASRAdapter } from '@/lib/adapters/agent-1/IASRAdapter';
@@ -23,6 +29,7 @@ import { MockASRAdapter } from '@/lib/adapters/agent-1/MockASRAdapter';
 import { MockLLMAdapter } from '@/lib/adapters/agent-1/MockLLMAdapter';
 import { OpenAIASRAdapter } from '@/lib/adapters/agent-1/OpenAIASRAdapter';
 import { GeminiLLMAdapter } from '@/lib/adapters/agent-1/GeminiLLMAdapter';
+import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 // ---------------------------------------------------------------------------
 // Adaptadores
@@ -54,6 +61,85 @@ export function generateWishId(existingWishes: Wish[] = []): string {
   }, 0);
 
   return `${WISH_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
+}
+
+/**
+ * Construye el contexto enriquecido fusionando la transcripción original
+ * con las respuestas del usuario a las preguntas de discovery.
+ */
+export function buildEnrichedContext(
+  transcription: TranscriptionResult,
+  discovery: ContextDiscovery,
+  answers: ClarificationAnswer[],
+  skipped: boolean
+): string {
+  const parts: string[] = [transcription.fullText.trim()];
+
+  if (skipped) {
+    parts.push('\n\n[NOTA: El usuario optó por continuar sin responder las preguntas de clarificación.]');
+    return parts.join('');
+  }
+
+  if (answers.length === 0 || discovery.questions.length === 0) {
+    return parts.join('');
+  }
+
+  parts.push('\n\n--- CONTEXTO ADICIONAL (respuestas del cliente) ---');
+
+  for (const question of discovery.questions) {
+    const answer = answers.find((a) => a.questionId === question.id);
+    if (!answer) continue;
+
+    let responseText: string;
+    if (answer.selectedOptionId === OTHER_OPTION_ID) {
+      responseText = answer.customText?.trim() ?? '';
+    } else {
+      const option = question.options.find((o) => o.id === answer.selectedOptionId);
+      responseText = option?.label ?? '';
+    }
+
+    if (responseText) {
+      parts.push(`\nP: ${question.question}\nR: ${responseText}`);
+    }
+  }
+
+  return parts.join('');
+}
+
+export interface ClarificationValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Valida que todas las preguntas tengan respuesta válida cuando no se saltó el paso.
+ */
+export function validateClarificationAnswers(
+  discovery: ContextDiscovery,
+  answers: ClarificationAnswer[],
+  skipped: boolean
+): ClarificationValidationResult {
+  if (skipped) {
+    return { valid: true };
+  }
+
+  for (const question of discovery.questions) {
+    const answer = answers.find((a) => a.questionId === question.id);
+    if (!answer?.selectedOptionId) {
+      return {
+        valid: false,
+        error: `Falta responder: "${question.question}"`,
+      };
+    }
+    if (answer.selectedOptionId === OTHER_OPTION_ID && !answer.customText?.trim()) {
+      return {
+        valid: false,
+        error: `Debes escribir tu respuesta para: "${question.question}"`,
+      };
+    }
+  }
+
+  return { valid: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -143,10 +229,49 @@ export function processText(text: string): TranscriptionResult {
 }
 
 /**
- * Extrae deseos/necesidades del cliente a partir de la transcripción.
+ * Evalúa si el contexto del usuario es suficiente para generar un backlog.
  */
-export async function extractWishes(
+export async function analyzeContext(
   transcription: TranscriptionResult
-): Promise<Wish[]> {
-  return llmAdapter.extractWishes(transcription);
+): Promise<ContextDiscovery> {
+  return llmAdapter.analyzeContext(transcription);
+}
+
+/**
+ * Evalúa el contexto emitiendo pensamientos del LLM en tiempo real.
+ */
+export async function analyzeContextStream(
+  transcription: TranscriptionResult,
+  onThought: LLMThoughtCallback
+): Promise<ContextDiscovery> {
+  return llmAdapter.analyzeContextStream(transcription, onThought);
+}
+
+/**
+ * Extrae deseos/necesidades del cliente a partir del contexto enriquecido.
+ */
+export async function extractWishesFromContext(
+  transcription: TranscriptionResult,
+  discovery: ContextDiscovery,
+  answers: ClarificationAnswer[] = [],
+  skipped = false
+): Promise<{ wishes: Wish[]; enrichedContext: string }> {
+  const enrichedContext = buildEnrichedContext(transcription, discovery, answers, skipped);
+  const wishes = await llmAdapter.extractWishes(transcription, enrichedContext);
+  return { wishes, enrichedContext };
+}
+
+/**
+ * Extrae deseos emitiendo pensamientos del LLM en tiempo real.
+ */
+export async function extractWishesFromContextStream(
+  transcription: TranscriptionResult,
+  discovery: ContextDiscovery,
+  onThought: LLMThoughtCallback,
+  answers: ClarificationAnswer[] = [],
+  skipped = false
+): Promise<{ wishes: Wish[]; enrichedContext: string }> {
+  const enrichedContext = buildEnrichedContext(transcription, discovery, answers, skipped);
+  const wishes = await llmAdapter.extractWishesStream(transcription, enrichedContext, onThought);
+  return { wishes, enrichedContext };
 }

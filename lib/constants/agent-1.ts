@@ -70,6 +70,40 @@ export const TRANSCRIPTION_DELAY_MS = 3500;
 /** Delay de simulación para extracción de deseos (ms) */
 export const EXTRACTION_DELAY_MS = 2000;
 
+/** Delay de simulación para evaluación de contexto (ms) */
+export const ASSESSMENT_DELAY_MS = 1500;
+
+// ---------------------------------------------------------------------------
+// Discovery — preguntas de clarificación
+// ---------------------------------------------------------------------------
+
+/** Máximo de preguntas de clarificación por ronda (MVP) */
+export const MAX_CLARIFY_QUESTIONS = 5;
+
+/** Mínimo de opciones por pregunta (sin contar "Otra opción") */
+export const MIN_OPTIONS_PER_QUESTION = 3;
+
+/** Máximo de opciones por pregunta (sin contar "Otra opción") */
+export const MAX_OPTIONS_PER_QUESTION = 4;
+
+/** ID reservado para la opción "Otra opción" en la UI */
+export const OTHER_OPTION_ID = 'other';
+
+/** Etiqueta de la opción libre en la UI */
+export const OTHER_OPTION_LABEL = 'Otra opción';
+
+/** Umbral de caracteres para considerar contexto vago en mock (desarrollo) */
+export const VAGUE_CONTEXT_CHAR_THRESHOLD = 80;
+
+/** Dimensiones evaluadas para determinar si el contexto es suficiente */
+export const CONTEXT_EVALUATION_DIMENSIONS = [
+  'platform',
+  'users',
+  'scope',
+  'business',
+  'constraints',
+] as const;
+
 // ---------------------------------------------------------------------------
 // localStorage keys
 // ---------------------------------------------------------------------------

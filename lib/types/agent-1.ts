@@ -14,7 +14,9 @@ export type Agent1Status =
   | 'idle'          // Esperando que el usuario cargue un archivo
   | 'uploading'     // Archivo siendo enviado al servidor
   | 'transcribing'  // Transcripción en progreso
-  | 'editing_transcription' // Usuario editando el texto en vivo antes de extraer deseos
+  | 'editing_transcription' // Usuario editando el texto en vivo antes de analizar contexto
+  | 'assessing'     // LLM evaluando si el contexto es suficiente
+  | 'clarifying'    // Usuario respondiendo preguntas de discovery
   | 'extracting'    // Extracción de deseos en progreso
   | 'review'        // Usuario revisando transcripción + deseos
   | 'approved';     // Deseos aprobados, listo para Agente 2
@@ -86,6 +88,50 @@ export interface Wish {
 }
 
 // ---------------------------------------------------------------------------
+// Discovery — evaluación de contexto y preguntas de clarificación
+// ---------------------------------------------------------------------------
+
+/** Categoría de una pregunta de clarificación */
+export type ClarifyingCategory =
+  | 'platform'
+  | 'users'
+  | 'scope'
+  | 'business'
+  | 'constraints';
+
+/** Opción seleccionable propuesta por la IA */
+export interface ClarifyingOption {
+  id: string;
+  label: string;
+}
+
+/** Pregunta de clarificación con opciones MCQ */
+export interface ClarifyingQuestion {
+  id: string;
+  question: string;
+  category: ClarifyingCategory;
+  options: ClarifyingOption[];
+}
+
+/** Respuesta del usuario a una pregunta de clarificación */
+export interface ClarificationAnswer {
+  questionId: string;
+  selectedOptionId: string | 'other';
+  customText?: string;
+}
+
+/** Resultado de la evaluación de contexto y preguntas generadas */
+export interface ContextDiscovery {
+  isSufficient: boolean;
+  summary: string;
+  gaps: string[];
+  questions: ClarifyingQuestion[];
+  answers: ClarificationAnswer[];
+  skipped: boolean;
+  completedAt?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Estado completo del Agente 1
 // ---------------------------------------------------------------------------
 
@@ -95,6 +141,10 @@ export interface Agent1State {
   file: UploadedFile | null;
   /** Resultado de la transcripción */
   transcription: TranscriptionResult | null;
+  /** Evaluación de contexto y preguntas de discovery */
+  discovery: ContextDiscovery | null;
+  /** Contexto original + respuestas del usuario fusionadas */
+  enrichedContext: string | null;
   /** Lista de deseos del cliente (editables por HITL) */
   wishes: Wish[];
   /** Etapa actual del flujo */
@@ -110,11 +160,36 @@ export interface Agent1State {
 /** Respuesta del endpoint POST /api/agentes/1/upload */
 export interface Agent1UploadResponse {
   transcription: TranscriptionResult;
+}
+
+/** Request del endpoint POST /api/agentes/1/analyze */
+export interface Agent1AnalyzeRequest {
+  transcription: TranscriptionResult;
+}
+
+/** Respuesta del endpoint POST /api/agentes/1/analyze */
+export interface Agent1AnalyzeResponse {
+  discovery: ContextDiscovery;
+  wishes?: Wish[];
+  enrichedContext?: string;
+}
+
+/** Request del endpoint POST /api/agentes/1/extract */
+export interface Agent1ExtractRequest {
+  transcription: TranscriptionResult;
+  discovery: ContextDiscovery;
+  answers?: ClarificationAnswer[];
+  skipped?: boolean;
+}
+
+/** Respuesta del endpoint POST /api/agentes/1/extract */
+export interface Agent1ExtractResponse {
   wishes: Wish[];
+  enrichedContext: string;
 }
 
 /** Respuesta de error de la API */
 export interface Agent1ErrorResponse {
   error: string;
-  code: 'INVALID_TYPE' | 'FILE_TOO_LARGE' | 'PROCESSING_ERROR';
+  code: 'INVALID_TYPE' | 'FILE_TOO_LARGE' | 'PROCESSING_ERROR' | 'VALIDATION_ERROR';
 }

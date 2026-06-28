@@ -49,6 +49,8 @@ export function createEmptyWorkspace(): UserWorkspace {
     agent1: {
       file: null,
       transcription: null,
+      discovery: null,
+      enrichedContext: null,
       wishes: [],
       status: 'idle',
       error: null,
