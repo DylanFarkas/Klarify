@@ -2,23 +2,19 @@
  * @fileoverview API Route — POST /api/agentes/1/upload
  *
  * Recibe un archivo vía FormData, lo valida (tipo + tamaño),
- * y devuelve la transcripción + deseos extraídos.
- *
- * Actualmente usa el servicio mock. Cuando se integre el backend real,
- * solo cambian las funciones en `lib/services/agent-1-service.ts`.
+ * y devuelve únicamente la transcripción. La evaluación de contexto
+ * y extracción de deseos ocurren en /analyze y /extract.
  */
 
 import { type NextRequest } from 'next/server';
-import { validateFile, processFile, processText, extractWishes } from '@/lib/services/agent-1-service';
+import { validateFile, processFile, processText } from '@/lib/services/agent-1-service';
 import type { Agent1UploadResponse, Agent1ErrorResponse } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
-    // 0. Verificar sesión
     await verifyRequestUser(request);
 
-    // 1. Parsear FormData
     const formData = await request.formData();
     const file = formData.get('file');
     const text = formData.get('text');
@@ -26,11 +22,8 @@ export async function POST(request: NextRequest) {
     let transcription;
 
     if (text && typeof text === 'string') {
-      // Flujo de texto directo (SpeechRecognition)
       transcription = processText(text);
     } else if (file && file instanceof File) {
-      // Flujo de archivo de audio subido
-      // 2. Validar archivo (tipo + tamaño según CA1)
       const validation = validateFile(file.name, file.size, file.type);
       if (!validation.valid) {
         return Response.json(
@@ -38,7 +31,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      // 3a. Procesar archivo: transcripción con OpenAI Whisper
       transcription = await processFile(file);
     } else {
       return Response.json(
@@ -47,13 +39,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3b. Procesar: extracción de deseos con Gemini
-    const wishes = await extractWishes(transcription);
-
-    // 4. Respuesta exitosa
-    const response: Agent1UploadResponse = { transcription, wishes };
+    const response: Agent1UploadResponse = { transcription };
     return Response.json(response, { status: 200 });
-
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') {
       return Response.json({ error: 'No autorizado', code: 'PROCESSING_ERROR' } satisfies Agent1ErrorResponse, { status: 401 });

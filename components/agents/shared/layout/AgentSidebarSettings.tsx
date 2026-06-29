@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { WorkspaceSettingsModal } from '@/components/agents/shared/WorkspaceSettingsModal';
+import { WorkspaceSettingsModal } from '@/components/agents/shared/settings/WorkspaceSettingsModal';
 
 interface AgentSidebarSettingsProps {
   /** Clases extra para adaptar el componente en distintos layouts (ej. móvil) */

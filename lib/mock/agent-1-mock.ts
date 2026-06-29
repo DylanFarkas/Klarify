@@ -8,7 +8,7 @@
  * de gestión de proyectos para su equipo de desarrollo.
  */
 
-import type { TranscriptionResult, Wish } from '@/lib/types/agent-1';
+import type { TranscriptionResult, Wish, ContextDiscovery } from '@/lib/types/agent-1';
 
 // ---------------------------------------------------------------------------
 // Transcripción mock — Reunión con cliente sobre gestión de proyectos
@@ -193,3 +193,73 @@ export const MOCK_WISHES: Omit<Wish, 'id'>[] = [
     createdAt: Date.now(),
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Discovery mock — preguntas para contexto vago
+// ---------------------------------------------------------------------------
+
+export const MOCK_DISCOVERY_INSUFFICIENT: ContextDiscovery = {
+  isSufficient: false,
+  summary:
+    'Entendemos que quieres crear una aplicación, pero aún faltan detalles clave sobre plataforma, usuarios y alcance funcional para armar un backlog sólido.',
+  gaps: [
+    'Plataforma no definida (web, móvil o ambas)',
+    'Usuarios y roles no especificados',
+    'Alcance funcional muy general',
+    'Modelo de negocio o monetización sin definir',
+  ],
+  questions: [
+    {
+      id: 'q-1',
+      question: '¿En qué plataforma debe funcionar la aplicación?',
+      category: 'platform',
+      options: [
+        { id: 'opt-1', label: 'Solo web (navegador)' },
+        { id: 'opt-2', label: 'Solo móvil (iOS/Android)' },
+        { id: 'opt-3', label: 'Web + móvil' },
+      ],
+    },
+    {
+      id: 'q-2',
+      question: '¿Quiénes serán los usuarios principales?',
+      category: 'users',
+      options: [
+        { id: 'opt-1', label: 'Solo clientes finales (B2C)' },
+        { id: 'opt-2', label: 'Empresas y sus empleados (B2B)' },
+        { id: 'opt-3', label: 'Clientes y administradores internos' },
+      ],
+    },
+    {
+      id: 'q-3',
+      question: '¿Cuál es el alcance funcional inicial (MVP)?',
+      category: 'scope',
+      options: [
+        { id: 'opt-1', label: 'Catálogo + carrito + checkout básico' },
+        { id: 'opt-2', label: 'Catálogo + pagos + panel de administración' },
+        { id: 'opt-3', label: 'Marketplace con vendedores y compradores' },
+      ],
+    },
+    {
+      id: 'q-4',
+      question: '¿Cómo se procesarán los pagos?',
+      category: 'business',
+      options: [
+        { id: 'opt-1', label: 'Pasarela online (tarjeta, PayPal, etc.)' },
+        { id: 'opt-2', label: 'Pago contra entrega / transferencia' },
+        { id: 'opt-3', label: 'Aún no definido' },
+      ],
+    },
+  ],
+  answers: [],
+  skipped: false,
+};
+
+export const MOCK_DISCOVERY_SUFFICIENT: ContextDiscovery = {
+  isSufficient: true,
+  summary:
+    'El contexto incluye requisitos detallados sobre funcionalidades, integraciones y restricciones técnicas suficientes para generar un backlog.',
+  gaps: [],
+  questions: [],
+  answers: [],
+  skipped: false,
+};

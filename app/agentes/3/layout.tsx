@@ -3,7 +3,7 @@
  */
 
 import type { Metadata } from 'next';
-import { AgentLayout } from '@/components/agents/shared/AgentLayout';
+import { AgentLayout } from '@/components/agents/shared/layout/AgentLayout';
 
 export const metadata: Metadata = {
   title: 'Agente 3 — Estimación | Klarify',

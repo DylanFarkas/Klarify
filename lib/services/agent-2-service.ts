@@ -11,6 +11,7 @@ import { IBacklogLLMAdapter } from '@/lib/adapters/agent-2/IBacklogLLMAdapter';
 import { MockBacklogAdapter } from '@/lib/adapters/agent-2/MockBacklogAdapter';
 import { GeminiBacklogAdapter } from '@/lib/adapters/agent-2/GeminiBacklogAdapter';
 import { EPIC_ID_PREFIX, USER_STORY_ID_PREFIX } from '@/lib/constants/agent-2';
+import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 const backlogAdapter: IBacklogLLMAdapter = process.env.GEMINI_API_KEY
   ? new GeminiBacklogAdapter()
@@ -55,4 +56,15 @@ export async function generateBacklog(
   transcription?: TranscriptionResult | null
 ): Promise<Epic[]> {
   return backlogAdapter.generateBacklog(wishes, transcription);
+}
+
+/**
+ * Genera backlog emitiendo pensamientos del LLM en tiempo real.
+ */
+export async function generateBacklogStream(
+  wishes: Wish[],
+  onThought: LLMThoughtCallback,
+  transcription?: TranscriptionResult | null
+): Promise<Epic[]> {
+  return backlogAdapter.generateBacklogStream(wishes, onThought, transcription);
 }

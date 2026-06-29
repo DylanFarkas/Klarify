@@ -360,7 +360,8 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                   {isDragging ? 'Suelta el archivo aquí' : 'Arrastra tu archivo aquí o selecciona un método'}
                 </h3>
                 <p className="mx-auto mb-8 max-w-md text-sm text-muted">
-                  Aceptamos archivos {ALLOWED_EXTENSIONS.join(', ')}. Tamaño máximo: {MAX_FILE_SIZE_LABEL}.
+                  Primero analizamos tu contexto y, si hace falta, te hacemos unas preguntas rápidas.
+                  Aceptamos {ALLOWED_EXTENSIONS.join(', ')}. Tamaño máximo: {MAX_FILE_SIZE_LABEL}.
                 </p>
 
                 <button

@@ -20,6 +20,8 @@ import type {
 const EMPTY_AGENT1: Agent1State = {
   file: null,
   transcription: null,
+  discovery: null,
+  enrichedContext: null,
   wishes: [],
   status: 'idle',
   error: null,

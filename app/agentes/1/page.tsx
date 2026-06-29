@@ -2,34 +2,45 @@
  * @fileoverview Página principal del Agente 1 — Ingesta de Contexto y Extracción.
  *
  * Orquesta el flujo completo del agente:
- *   1. Upload de archivo (drag & drop)
- *   2. Procesamiento (transcripción + extracción)
- *   3. Review (transcripción + deseos en paralelo — CA2)
- *   4. HITL: editar/añadir/eliminar deseos (CA3)
- *   5. Aprobar y continuar al Agente 2
- *
- * Estado persistido en Firestore (workspace del usuario) para no perder trabajo.
+ *   1. Upload de archivo (drag & drop) o texto
+ *   2. Transcripción
+ *   3. Evaluación de contexto (discovery)
+ *   4. Preguntas de clarificación (si hace falta)
+ *   5. Extracción de deseos
+ *   6. Review HITL + aprobación → Agente 2
  */
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Agent1State, Wish, Agent1UploadResponse } from '@/lib/types/agent-1';
+import type {
+  Agent1State,
+  Agent1AnalyzeResponse,
+  Agent1ExtractResponse,
+  Agent1UploadResponse,
+  ClarificationAnswer,
+  TranscriptionResult,
+  Wish,
+} from '@/lib/types/agent-1';
 import { WISH_ID_PREFIX } from '@/lib/constants/agent-1';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { authFetch } from '@/lib/api-client';
+import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { FileUploader } from '@/components/agents/agent-1/FileUploader';
 import { TranscriptionPanel } from '@/components/agents/agent-1/TranscriptionPanel';
 import { WishesList } from '@/components/agents/agent-1/WishesList';
-import { ApproveButton } from '@/components/agents/shared/ApproveButton';
+import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/ClarifyingQuestionsPanel';
+import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
+import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
+import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
+import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 // ---------------------------------------------------------------------------
 // Utilidades locales
 // ---------------------------------------------------------------------------
 
-/** Genera el siguiente ID de deseo (DESEO-001, DESEO-002, ...) */
 function nextWishId(wishes: Wish[]): string {
   const maxNum = wishes.reduce((max, w) => {
     const num = parseInt(w.id.replace(`${WISH_ID_PREFIX}-`, ''), 10);
@@ -38,10 +49,25 @@ function nextWishId(wishes: Wish[]): string {
   return `${WISH_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
 }
 
-/** Estado inicial del agente */
+function resolveHydratedStatus(a1: Agent1State): Agent1State['status'] {
+  if (a1.status === 'approved') return 'approved';
+  if (a1.wishes && a1.wishes.length > 0) return 'review';
+  if (
+    a1.discovery?.questions &&
+    a1.discovery.questions.length > 0 &&
+    !a1.discovery.completedAt
+  ) {
+    return 'clarifying';
+  }
+  if (a1.transcription?.fullText) return 'editing_transcription';
+  return 'idle';
+}
+
 const INITIAL_STATE: Agent1State = {
   file: null,
   transcription: null,
+  discovery: null,
+  enrichedContext: null,
   wishes: [],
   status: 'idle',
   error: null,
@@ -56,8 +82,13 @@ export default function Agent1Page() {
   const { user } = useAuth();
   const { workspace, isLoading, sessionVersion, saveAgent1, approveAgent1, resetAgent1 } = useWorkspace();
   const [state, setState] = useState<Agent1State>(INITIAL_STATE);
+  const { entries, reset, consumeStream } = useAgentActivity();
   const [isHydrated, setIsHydrated] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+
+  const { showModelReasoning } = useWorkspaceSettings();
+  const isAgentWorking = state.status === 'assessing' || state.status === 'extracting';
+  const activityModalOpen = isAgentWorking && showModelReasoning;
 
   // ── Hidratar desde el workspace (Firestore) ───────────────────
   useEffect(() => {
@@ -67,18 +98,16 @@ export default function Agent1Page() {
     setState({
       file: a1.file ?? null,
       transcription: a1.transcription ?? null,
+      discovery: a1.discovery ?? null,
+      enrichedContext: a1.enrichedContext ?? null,
       wishes: a1.wishes ?? [],
-      status: a1.status === 'approved'
-        ? 'approved'
-        : a1.wishes && a1.wishes.length > 0
-          ? 'review'
-          : 'idle',
+      status: resolveHydratedStatus(a1),
       error: null,
     });
     setIsHydrated(true);
   }, [isLoading, workspace, sessionVersion]);
 
-  // ── Redirigir si ya fue aprobado (evita pantalla intermedia) ──
+  // ── Redirigir si ya fue aprobado ──────────────────────────────
   useEffect(() => {
     if (!isHydrated || isLoading || !workspace) return;
     if (workspace.agent1.status === 'approved') {
@@ -89,64 +118,137 @@ export default function Agent1Page() {
   // ── Persistir en Firestore (debounced) ────────────────────────
   useEffect(() => {
     if (!isHydrated) return;
-    if (state.transcription || state.wishes.length > 0) {
+    if (state.transcription || state.discovery || state.wishes.length > 0) {
       saveAgent1({
         file: state.file,
         transcription: state.transcription,
+        discovery: state.discovery,
+        enrichedContext: state.enrichedContext,
         wishes: state.wishes,
         status: state.status,
         error: null,
       });
     }
-  }, [state.transcription, state.wishes, state.file, state.status, isHydrated, saveAgent1]);
+  }, [
+    state.transcription,
+    state.discovery,
+    state.enrichedContext,
+    state.wishes,
+    state.file,
+    state.status,
+    isHydrated,
+    saveAgent1,
+  ]);
+
+  // ── Evaluar contexto tras transcripción ───────────────────────
+  const handleAnalyzeContext = useCallback(
+    async (transcription: TranscriptionResult) => {
+      if (!user) return;
+
+      setState((prev) => ({
+        ...prev,
+        transcription,
+        status: 'assessing',
+        discovery: null,
+        enrichedContext: null,
+        wishes: [],
+        error: null,
+      }));
+      reset();
+
+      try {
+        const response = await authFetch('/api/agentes/1/analyze', user, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcription }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al analizar el contexto');
+        }
+
+        const data = await consumeStream<Agent1AnalyzeResponse>(response);
+
+        if (data.discovery.isSufficient && data.wishes) {
+          setState((prev) => ({
+            ...prev,
+            transcription,
+            discovery: data.discovery,
+            enrichedContext: data.enrichedContext ?? null,
+            wishes: data.wishes ?? [],
+            status: 'review',
+            error: null,
+          }));
+        } else {
+          setState((prev) => ({
+            ...prev,
+            transcription,
+            discovery: {
+              ...data.discovery,
+              answers: data.discovery.answers ?? [],
+            },
+            enrichedContext: null,
+            wishes: [],
+            status: 'clarifying',
+            error: null,
+          }));
+        }
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          status: 'editing_transcription',
+          error: error instanceof Error ? error.message : 'Error desconocido al analizar.',
+        }));
+      }
+    },
+    [user, reset, consumeStream]
+  );
 
   // ── Handler: Upload de archivo ────────────────────────────────
-  const handleFileUpload = useCallback(async (file: File) => {
-    if (!user) return;
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      if (!user) return;
 
-    setState((prev) => ({
-      ...prev,
-      file: {
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-      },
-      status: 'transcribing',
-      error: null,
-    }));
+      setState((prev) => ({
+        ...prev,
+        file: {
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        },
+        status: 'transcribing',
+        error: null,
+      }));
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const response = await authFetch('/api/agentes/1/upload', user, {
-        method: 'POST',
-        body: formData,
-      });
+        const response = await authFetch('/api/agentes/1/upload', user, {
+          method: 'POST',
+          body: formData,
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al procesar el archivo');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al procesar el archivo');
+        }
+
+        const data: Agent1UploadResponse = await response.json();
+        await handleAnalyzeContext(data.transcription);
+      } catch (error) {
+        setState((prev) => ({
+          ...prev,
+          status: 'idle',
+          error: error instanceof Error ? error.message : 'Error desconocido al procesar.',
+        }));
       }
-
-      const data: Agent1UploadResponse = await response.json();
-
-      setState((prev) => ({
-        ...prev,
-        transcription: data.transcription,
-        wishes: data.wishes,
-        status: 'review',
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        status: 'idle',
-        error: error instanceof Error ? error.message : 'Error desconocido al procesar.',
-      }));
-    }
-  }, [user]);
+    },
+    [user, handleAnalyzeContext]
+  );
 
   // ── Handler: Transcripción en vivo completada ─────────────────
   const handleLiveTranscriptionComplete = useCallback((text: string) => {
@@ -157,54 +259,131 @@ export default function Agent1Page() {
         fullText: text,
         language: 'es',
         duration: 0,
-        segments: [{ start: 0, end: 0, text, confidence: 1 }]
+        segments: [{ start: 0, end: 0, text, confidence: 1 }],
       },
       error: null,
     }));
   }, []);
 
-  // ── Handler: Analizar texto editado ───────────────────────────
-  const handleAnalyzeText = useCallback(async (finalText: string) => {
-    if (!user) return;
+  // ── Handler: Analizar contexto desde texto editado ──────────────
+  const handleAnalyzeText = useCallback(
+    async (finalText: string) => {
+      if (!user || !finalText.trim()) return;
 
+      const transcription: TranscriptionResult = {
+        fullText: finalText.trim(),
+        language: 'es',
+        duration: 0,
+        segments: [{ start: 0, end: 0, text: finalText.trim(), confidence: 1 }],
+      };
+
+      await handleAnalyzeContext(transcription);
+    },
+    [user, handleAnalyzeContext]
+  );
+
+  // ── Handler: Cambio de respuestas en clarificación ──────────────
+  const handleAnswersChange = useCallback((answers: ClarificationAnswer[]) => {
     setState((prev) => ({
       ...prev,
-      status: 'extracting',
+      discovery: prev.discovery
+        ? { ...prev.discovery, answers }
+        : null,
       error: null,
     }));
+  }, []);
+
+  // ── Handler: Enviar respuestas y extraer deseos ─────────────────
+  const handleSubmitAnswers = useCallback(async () => {
+    if (!user || !state.transcription || !state.discovery) return;
+
+    setState((prev) => ({ ...prev, status: 'extracting', error: null }));
+    reset();
 
     try {
-      const formData = new FormData();
-      formData.append('text', finalText);
-
-      const response = await authFetch('/api/agentes/1/upload', user, {
+      const response = await authFetch('/api/agentes/1/extract', user, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcription: state.transcription,
+          discovery: state.discovery,
+          answers: state.discovery.answers,
+          skipped: false,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al procesar el texto');
+        throw new Error(errorData.error || 'Error al extraer deseos');
       }
 
-      const data: Agent1UploadResponse = await response.json();
+      const data = await consumeStream<Agent1ExtractResponse>(response);
 
       setState((prev) => ({
         ...prev,
-        transcription: data.transcription,
+        discovery: prev.discovery
+          ? { ...prev.discovery, completedAt: Date.now(), skipped: false }
+          : null,
+        enrichedContext: data.enrichedContext,
         wishes: data.wishes,
         status: 'review',
+        error: null,
       }));
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        status: 'editing_transcription',
-        error: error instanceof Error ? error.message : 'Error desconocido al analizar.',
+        status: 'clarifying',
+        error: error instanceof Error ? error.message : 'Error desconocido al extraer.',
       }));
     }
-  }, [user]);
+  }, [user, state.transcription, state.discovery, reset, consumeStream]);
 
-  // ── Handlers HITL: CRUD de deseos (CA3) ───────────────────────
+  // ── Handler: Saltar clarificación ───────────────────────────────
+  const handleSkipClarification = useCallback(async () => {
+    if (!user || !state.transcription || !state.discovery) return;
+
+    setState((prev) => ({ ...prev, status: 'extracting', error: null }));
+    reset();
+
+    try {
+      const response = await authFetch('/api/agentes/1/extract', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcription: state.transcription,
+          discovery: state.discovery,
+          answers: [],
+          skipped: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al extraer deseos');
+      }
+
+      const data = await consumeStream<Agent1ExtractResponse>(response);
+
+      setState((prev) => ({
+        ...prev,
+        discovery: prev.discovery
+          ? { ...prev.discovery, completedAt: Date.now(), skipped: true, answers: [] }
+          : null,
+        enrichedContext: data.enrichedContext,
+        wishes: data.wishes,
+        status: 'review',
+        error: null,
+      }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        status: 'clarifying',
+        error: error instanceof Error ? error.message : 'Error desconocido al extraer.',
+      }));
+    }
+  }, [user, state.transcription, state.discovery, reset, consumeStream]);
+
+  // ── Handlers HITL: CRUD de deseos ─────────────────────────────
 
   const handleEditWish = useCallback((id: string, newText: string) => {
     setState((prev) => ({
@@ -239,17 +418,24 @@ export default function Agent1Page() {
   const handleApprove = useCallback(async () => {
     setIsApproving(true);
     try {
+      const enrichedTranscription = state.transcription
+        ? {
+            ...state.transcription,
+            fullText: state.enrichedContext ?? state.transcription.fullText,
+          }
+        : null;
+
       await approveAgent1({
-        transcription: state.transcription,
+        transcription: enrichedTranscription,
         wishes: state.wishes,
       });
       router.push('/agentes/2');
     } finally {
       setIsApproving(false);
     }
-  }, [state.transcription, state.wishes, approveAgent1, router]);
+  }, [state.transcription, state.enrichedContext, state.wishes, approveAgent1, router]);
 
-  // ── Handler: Reset / Subir otro archivo ───────────────────────
+  // ── Handler: Reset ────────────────────────────────────────────
   const handleReset = useCallback(async () => {
     await resetAgent1();
     setState(INITIAL_STATE);
@@ -259,7 +445,6 @@ export default function Agent1Page() {
     isApproving ||
     (isHydrated && workspace?.agent1.status === 'approved');
 
-  // ── Evitar flash de contenido antes de hidratar ───────────────
   if (isLoading || !isHydrated || isRedirecting) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -268,10 +453,9 @@ export default function Agent1Page() {
     );
   }
 
-  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-      {/* ── Hero Header ───────────────────────────────────────── */}
+      {/* Hero */}
       <div className="mb-2">
         <div className="mb-3 flex items-center gap-3 text-primary">
           <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest">
@@ -282,22 +466,25 @@ export default function Agent1Page() {
           Ingesta de Contexto
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-muted">
-          Carga el audio o los documentos de tu reunión con el cliente para que
-          la IA transcriba y extraiga sus necesidades de forma automática.
+          Comparte tu idea o la transcripción de una reunión. Analizamos el contexto,
+          te hacemos unas preguntas rápidas si hace falta, y extraemos los requerimientos
+          listos para revisar.
         </p>
       </div>
 
-      {/* ── Sección de Upload ─────────────────────────────────── */}
-      {(state.status === 'idle' || state.status === 'uploading' || state.status === 'transcribing' || state.status === 'extracting') && (
+      {/* Upload */}
+      {(state.status === 'idle' ||
+        state.status === 'uploading' ||
+        state.status === 'transcribing') && (
         <FileUploader
           onFileSelect={handleFileUpload}
           onTranscriptionComplete={handleLiveTranscriptionComplete}
-          isProcessing={state.status === 'transcribing' || state.status === 'extracting'}
+          isProcessing={state.status === 'transcribing'}
           error={state.error}
         />
       )}
 
-      {/* ── Sección de Edición de Transcripción (HITL Pre-análisis) ── */}
+      {/* Edición de transcripción */}
       {state.status === 'editing_transcription' && (
         <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <div className="border-b border-border bg-primary/5 px-6 py-5 md:px-8">
@@ -313,8 +500,8 @@ export default function Agent1Page() {
                 </h2>
                 <p className="mt-1 text-sm leading-relaxed text-muted">
                   {state.transcription?.fullText
-                    ? 'Asegúrate de que la transcripción sea correcta antes de enviarla a Gemini para extraer los requerimientos. Puedes añadir detalles o corregir palabras mal interpretadas.'
-                    : 'Escribe aquí el texto, apuntes o requerimientos que tengas de tu reunión. Cuando estés listo, envíalos a Gemini para procesarlos.'}
+                    ? 'Corrige la transcripción si hace falta. Luego analizamos el contexto y te guiamos con preguntas puntuales si es necesario.'
+                    : 'Describe tu proyecto o pega apuntes de una reunión. Cuando estés listo, analizamos el contexto.'}
                 </p>
               </div>
             </div>
@@ -323,23 +510,22 @@ export default function Agent1Page() {
           <div className="flex flex-col gap-5 p-6 md:p-8">
             <textarea
               className="min-h-[220px] w-full resize-y rounded-xl border border-input-border bg-input p-5 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-primary focus:ring-2 focus:ring-primary/20"
-              placeholder={state.transcription?.fullText ? '' : 'Ejemplo: Necesito una aplicación móvil que tenga inicio de sesión con Google...'}
+              placeholder="Ejemplo: Quiero una app para vender zapatos online con catálogo, carrito y pagos..."
               value={state.transcription?.fullText || ''}
-              onChange={(e) => setState(prev => ({
-                ...prev,
-                transcription: {
-                  ...prev.transcription!,
-                  fullText: e.target.value,
-                  segments: [{ start: 0, end: 0, text: e.target.value, confidence: 1 }]
-                }
-              }))}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  transcription: {
+                    ...prev.transcription!,
+                    fullText: e.target.value,
+                    segments: [{ start: 0, end: 0, text: e.target.value, confidence: 1 }],
+                  },
+                }))
+              }
             />
 
             {state.error && (
               <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3">
-                <svg className="mt-0.5 h-5 w-5 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                </svg>
                 <p className="text-sm text-danger">{state.error}</p>
               </div>
             )}
@@ -353,22 +539,32 @@ export default function Agent1Page() {
               </button>
               <button
                 onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)] transition-all hover:bg-primary-hover hover:shadow-[0_6px_28px_color-mix(in_srgb,var(--primary)_45%,transparent)] cursor-pointer"
+                disabled={!state.transcription?.fullText?.trim()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)] transition-all hover:bg-primary-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                Analizar texto con Gemini
+                Analizar contexto
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Resultados: Transcripción + Deseos en paralelo (CA2) ── */}
+      {/* Clarificación */}
+      {state.status === 'clarifying' && state.discovery && (
+        <ClarifyingQuestionsPanel
+          discovery={state.discovery}
+          answers={state.discovery.answers}
+          onAnswerChange={handleAnswersChange}
+          onSubmit={handleSubmitAnswers}
+          onSkip={handleSkipClarification}
+          isProcessing={false}
+          error={state.error}
+        />
+      )}
+
+      {/* Review */}
       {state.status === 'review' && (
         <>
-          {/* Info del archivo procesado */}
           {state.file && (
             <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface-muted px-5 py-4 shadow-sm">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-lg">
@@ -376,9 +572,7 @@ export default function Agent1Page() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">{state.file.name}</p>
-                <p className="text-xs text-muted">
-                  Procesado exitosamente
-                </p>
+                <p className="text-xs text-muted">Procesado exitosamente</p>
               </div>
               <span className="shrink-0 rounded-full border border-success/30 bg-success/15 px-3 py-1 text-xs font-bold text-success">
                 ✓ Listo
@@ -386,9 +580,11 @@ export default function Agent1Page() {
             </div>
           )}
 
-          {/* Grid de transcripción + deseos */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <TranscriptionPanel transcription={state.transcription} />
+            <TranscriptionPanel
+              transcription={state.transcription}
+              discovery={state.discovery}
+            />
             <WishesList
               wishes={state.wishes}
               onEdit={handleEditWish}
@@ -398,20 +594,11 @@ export default function Agent1Page() {
             />
           </div>
 
-          {/* ── Barra de acciones ─────────────────────────────── */}
           <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-border bg-surface-muted px-6 py-5 sm:flex-row">
             <button
               onClick={handleReset}
-              className={[
-                'inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3',
-                'text-sm font-medium text-muted',
-                'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
-                'transition-all cursor-pointer',
-              ].join(' ')}
+              className="inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium text-muted hover:border-border-strong hover:bg-surface-hover hover:text-foreground transition-all cursor-pointer"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
               Subir otro archivo
             </button>
 
@@ -422,6 +609,39 @@ export default function Agent1Page() {
             />
           </div>
         </>
+      )}
+
+      {isAgentWorking && !showModelReasoning && (
+        <LLMThinkingPanel
+          title={
+            state.status === 'extracting'
+              ? 'Preparando tus requerimientos...'
+              : 'Analizando tu idea...'
+          }
+          description={
+            state.status === 'extracting'
+              ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
+              : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
+          }
+        />
+      )}
+
+      {showModelReasoning && (
+        <AgentActivityModal
+          open={activityModalOpen}
+          isActive={isAgentWorking}
+          title={
+            state.status === 'extracting'
+              ? 'Preparando tus requerimientos...'
+              : 'Analizando tu idea...'
+          }
+          description={
+            state.status === 'extracting'
+              ? 'Estamos extrayendo y organizando los deseos de tu proyecto a partir del contexto.'
+              : 'Estamos evaluando si tenemos suficiente contexto para armar tu backlog, o si necesitamos hacerte unas preguntas rápidas.'
+          }
+          entries={entries}
+        />
       )}
     </div>
   );
