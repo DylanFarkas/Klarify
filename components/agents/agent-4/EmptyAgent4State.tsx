@@ -1,14 +1,14 @@
 /**
- * @fileoverview EmptyEstimationState — Estado vacío del Agente 3.
+ * @fileoverview EmptyAgent4State — Estado vacío del Agente 4.
  *
- * Se muestra cuando no hay input del Agente 2 (pipeline.agent3Input).
+ * Se muestra cuando no hay input del Agente 3 (pipeline.agent4Input).
  */
 
 'use client';
 
 import Link from 'next/link';
 
-export function EmptyPrioritizationState() {
+export function EmptyAgent4State() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center animate-[fadeIn_0.3s_ease-out]">
       <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-surface-muted">
@@ -18,14 +18,14 @@ export function EmptyPrioritizationState() {
       </div>
 
       <h3 className="mb-2 text-lg font-bold text-foreground">
-        No hay datos del Agente 2
+        No hay datos del Agente 3
       </h3>
       <p className="mb-8 max-w-sm text-sm leading-relaxed text-muted">
-        Para estimar el backlog, primero debes completar el Agente 2 y aprobar tus épicas e historias de usuario.
+        Para priorizar el backlog, primero debes completar el Agente 3 y consolidar las estimaciones en Story Points.
       </p>
 
       <Link
-        href="/agentes/2"
+        href="/agentes/3"
         className={[
           'inline-flex items-center gap-2 rounded-xl px-6 py-3',
           'text-sm font-bold text-white',
@@ -38,7 +38,7 @@ export function EmptyPrioritizationState() {
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
         </svg>
-        Volver al Agente 2
+        Volver al Agente 3
       </Link>
     </div>
   );

@@ -20,29 +20,13 @@ import {
 // Forzar a Next.js a no cachear la ruta para evaluar variables de entorno en cada petición
 export const dynamic = 'force-dynamic';
 
-// Interfaces de tipado local requeridas por el contrato de la API y el Servicio
-export interface UserStory {
-  id: string;
-  title: string;
-  description: string;
-}
+import type {
+  Agent3EstimationResponse,
+  Agent3SuggestionItem,
+  LocalEpic,
+} from '@/lib/types/agent-3';
 
-export interface LocalEpic {
-  id: string;
-  title: string;
-  description?: string;
-  userStories?: UserStory[];
-}
-
-export interface Agent3SuggestionItem {
-  storyId: string;
-  suggestedPoints: number;
-  justification: string;
-}
-
-export interface Agent3EstimationResponse {
-  suggestions: Agent3SuggestionItem[];
-}
+export type { Agent3EstimationResponse, Agent3SuggestionItem, LocalEpic };
 
 export async function POST(request: NextRequest) {
   

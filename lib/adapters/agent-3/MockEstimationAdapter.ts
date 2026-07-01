@@ -4,7 +4,7 @@
  */
 
 import type { IEstimationAdapter } from './IEstimationAdapter';
-import type { LocalEpic, Agent3SuggestionItem } from '@/app/api/agentes/3/estimate/route';
+import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 export class MockEstimationAdapter implements IEstimationAdapter {
