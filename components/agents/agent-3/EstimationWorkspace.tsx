@@ -18,6 +18,7 @@ import type {
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 
 interface EstimationWorkspaceProps {
   input: Agent3Input;
@@ -30,8 +31,6 @@ interface EstimationWorkspaceProps {
   isApproved: boolean;
   isApproving: boolean;
 }
-
-const FIBONACCI_SCALE = [1, 2, 3, 5, 8, 13, 21];
 
 export function EstimationWorkspace({
   input,

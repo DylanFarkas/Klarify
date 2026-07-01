@@ -7,6 +7,11 @@
 import { GoogleGenAI } from '@google/genai';
 import type { IEstimationAdapter } from './IEstimationAdapter';
 import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
+import {
+  FIBONACCI_SCALE_LABEL,
+  GEMINI_ESTIMATION_PREFIX,
+  MAX_JUSTIFICATION_LENGTH,
+} from '@/lib/constants/agent-3';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 interface ContentPart {
@@ -87,9 +92,9 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
 }
 
 REGLAS CRÍTICAS:
-- 'suggestedPoints' debe ser un número entero que pertenezca ESTRICTAMENTE a la escala Fibonacci: 1, 2, 3, 5, 8, 13, 21.
+- 'suggestedPoints' debe ser un número entero que pertenezca ESTRICTAMENTE a la escala Fibonacci: ${FIBONACCI_SCALE_LABEL}.
 - Evalúa la complejidad basándote en persistencia de datos, seguridad, lógica frontend y backend de la historia de usuario.
-- La justificación debe ser clara, profesional y técnica (máximo 140 caracteres).`;
+- La justificación debe ser clara, profesional y técnica (máximo ${MAX_JUSTIFICATION_LENGTH} caracteres).`;
 
     const userPrompt = `Eres un Scrum Master y Arquitecto de Software experto en estimación ágil.
 A partir del siguiente backlog estructurado por el Agente 2, calcula los Story Points correspondientes para cada una de las historias de usuario.
@@ -154,7 +159,7 @@ ${JSON.stringify(epics, null, 2)}`;
       .map((sug) => ({
         storyId: sug.storyId.trim(),
         suggestedPoints: sug.suggestedPoints,
-        justification: `Agente 3 (Scrum Master): ${sug.justification.trim()}`,
+        justification: `${GEMINI_ESTIMATION_PREFIX} ${sug.justification.trim()}`,
       }));
   }
 }
