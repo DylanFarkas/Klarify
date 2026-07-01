@@ -22,7 +22,8 @@ import { authFetch, saveLastAgent } from '@/lib/api-client';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
-import type { UserWorkspace, WorkspaceResponse, Agent3Input } from '@/lib/types/workspace';
+import type { Agent3State } from '@/lib/types/agent-3';
+import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input } from '@/lib/types/workspace';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -36,10 +37,13 @@ export interface UseWorkspaceResult {
   refreshWorkspace: (options?: { silent?: boolean }) => Promise<void>;
   saveAgent1: (state: Agent1State) => void;
   saveAgent2: (state: Agent2State) => void;
+  saveAgent3: (state: Agent3State) => void;
   approveAgent1: (input: Agent2Input) => Promise<void>;
   approveAgent2: (input: Agent3Input) => Promise<void>;
+  approveAgent3: (input: Agent4Input) => Promise<void>;
   resetAgent1: () => Promise<void>;
   resetAgent2: () => Promise<void>;
+  resetAgent3: () => Promise<void>;
   /** Limpia todo el workspace en Firestore y redirige al Agente 1 */
   resetSession: () => Promise<void>;
 }
@@ -57,11 +61,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const agent1Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agent2Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const agent3Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPersistedAgent = useRef<string | null>(null);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
     if (agent2Timer.current) clearTimeout(agent2Timer.current);
+    if (agent3Timer.current) clearTimeout(agent3Timer.current);
   }, []);
 
   const fetchWorkspace = useCallback(async (options?: { silent?: boolean }) => {
@@ -151,6 +157,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const saveAgent3 = useCallback(
+    (state: Agent3State) => {
+      if (!user) return;
+      if (agent3Timer.current) clearTimeout(agent3Timer.current);
+      agent3Timer.current = setTimeout(() => {
+        void authFetch('/api/workspace', user, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent: 'agent3', data: state }),
+        }).catch(() => {
+          /* el siguiente guardado reintentará */
+        });
+      }, SAVE_DEBOUNCE_MS);
+    },
+    [user]
+  );
+
   const runAction = useCallback(
     async (action: string, payload?: unknown) => {
       if (!user) return;
@@ -202,8 +225,38 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
     [runAction]
   );
+
+  const approveAgent3 = useCallback(
+    async (input: Agent4Input) => {
+      if (agent3Timer.current) clearTimeout(agent3Timer.current);
+      await runAction('approveAgent3', input);
+      const agent3Input: Agent3Input = {
+        epics: input.epics,
+        sourceWishIds: input.sourceWishIds,
+        approvedAt: input.approvedAt,
+      };
+      setWorkspace((prev) =>
+        prev
+          ? {
+              ...prev,
+              agent3: {
+                ...prev.agent3,
+                input: agent3Input,
+                estimations: input.estimations,
+                status: 'approved',
+                error: null,
+              },
+              pipeline: { ...prev.pipeline, agent4Input: input },
+            }
+          : prev
+      );
+    },
+    [runAction]
+  );
+
   const resetAgent1 = useCallback(() => runAction('resetAgent1'), [runAction]);
   const resetAgent2 = useCallback(() => runAction('resetAgent2'), [runAction]);
+  const resetAgent3 = useCallback(() => runAction('resetAgent3'), [runAction]);
 
   const resetSession = useCallback(async () => {
     if (!user) return;
@@ -225,10 +278,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         refreshWorkspace: fetchWorkspace,
         saveAgent1,
         saveAgent2,
+        saveAgent3,
         approveAgent1,
         approveAgent2,
+        approveAgent3,
         resetAgent1,
         resetAgent2,
+        resetAgent3,
         resetSession,
       }}
     >

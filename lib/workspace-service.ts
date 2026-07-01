@@ -10,11 +10,13 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
+import type { Agent3State } from '@/lib/types/agent-3';
 import type {
   UserWorkspace,
   WorkspacePreferences,
   WorkspaceResponse,
   Agent3Input,
+  Agent4Input,
 } from '@/lib/types/workspace';
 
 const EMPTY_AGENT1: Agent1State = {
@@ -30,6 +32,13 @@ const EMPTY_AGENT1: Agent1State = {
 const EMPTY_AGENT2: Agent2State = {
   input: null,
   epics: [],
+  status: 'idle',
+  error: null,
+};
+
+const EMPTY_AGENT3: Agent3State = {
+  input: null,
+  estimations: {},
   status: 'idle',
   error: null,
 };
@@ -58,9 +67,15 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     workspace: {
       agent1: { ...EMPTY_AGENT1, ...(ws?.agent1 ?? {}) },
       agent2: { ...EMPTY_AGENT2, ...(ws?.agent2 ?? {}) },
+      agent3: {
+        ...EMPTY_AGENT3,
+        ...(ws?.agent3 ?? {}),
+        estimations: { ...EMPTY_AGENT3.estimations, ...(ws?.agent3?.estimations ?? {}) },
+      },
       pipeline: {
         agent2Input: ws?.pipeline?.agent2Input ?? null,
         agent3Input: ws?.pipeline?.agent3Input ?? null,
+        agent4Input: ws?.pipeline?.agent4Input ?? null,
       },
     },
     preferences: {
@@ -88,6 +103,19 @@ export async function saveAgent2State(uid: string, state: Agent2State): Promise<
     {
       workspace: {
         agent2: sanitize(state),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
+/** Guarda (merge) el estado del Agente 3. */
+export async function saveAgent3State(uid: string, state: Agent3State): Promise<void> {
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent3: sanitize(state),
         updatedAt: FieldValue.serverTimestamp(),
       },
     },
@@ -135,6 +163,35 @@ export async function approveAgent2(uid: string, agent3Input: Agent3Input): Prom
   );
 }
 
+/** Marca el Agente 3 como aprobado y escribe el input para el Agente 4. */
+export async function approveAgent3(uid: string, agent4Input: Agent4Input): Promise<void> {
+  const { workspace } = await getWorkspaceData(uid);
+  const agent3Input: Agent3Input = {
+    epics: agent4Input.epics,
+    sourceWishIds: agent4Input.sourceWishIds,
+    approvedAt: agent4Input.approvedAt,
+  };
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent3: sanitize({
+          ...workspace.agent3,
+          input: agent3Input,
+          estimations: agent4Input.estimations,
+          status: 'approved',
+          error: null,
+        }),
+        pipeline: {
+          ...workspace.pipeline,
+          agent4Input: sanitize(agent4Input),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
 /** Limpia el estado del Agente 1 (todos sus campos vuelven al estado inicial). */
 export async function resetAgent1(uid: string): Promise<void> {
   await userDoc(uid).set(
@@ -161,6 +218,19 @@ export async function resetAgent2(uid: string): Promise<void> {
   );
 }
 
+/** Limpia el estado del Agente 3 (todos sus campos vuelven al estado inicial). */
+export async function resetAgent3(uid: string): Promise<void> {
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent3: EMPTY_AGENT3,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
 /** Actualiza el último agente visitado (preferencia de navegación). */
 export async function saveLastAgent(uid: string, lastAgent: string): Promise<void> {
   await userDoc(uid).set(
@@ -171,14 +241,15 @@ export async function saveLastAgent(uid: string, lastAgent: string): Promise<voi
   );
 }
 
-/** Limpia todo el workspace (agentes 1 y 2 + pipeline). MVP: una sesión por usuario. */
+/** Limpia todo el workspace (agentes 1–3 + pipeline). MVP: una sesión por usuario. */
 export async function resetWorkspace(uid: string): Promise<void> {
   await userDoc(uid).set(
     {
       workspace: {
         agent1: EMPTY_AGENT1,
         agent2: EMPTY_AGENT2,
-        pipeline: { agent2Input: null, agent3Input: null },
+        agent3: EMPTY_AGENT3,
+        pipeline: { agent2Input: null, agent3Input: null, agent4Input: null },
         updatedAt: FieldValue.serverTimestamp(),
       },
       preferences: { lastAgent: '1' },

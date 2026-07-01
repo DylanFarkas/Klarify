@@ -2,12 +2,13 @@
  * @fileoverview Tipos del workspace persistido en Firestore.
  *
  * El workspace vive en `users/{uid}.workspace` y guarda el estado del
- * pipeline de agentes (1 y 2) además del puente entre ellos. Es el reemplazo
+ * pipeline de agentes además del puente entre ellos. Es el reemplazo
  * de las claves de localStorage que antes mantenían este estado en el navegador.
  */
 
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic } from '@/lib/types/agent-2';
+import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -16,18 +17,29 @@ export interface Agent3Input {
   approvedAt: number;
 }
 
+/** Input que el Agente 3 entrega al Agente 4 al consolidar estimaciones */
+export interface Agent4Input {
+  epics: Epic[];
+  estimations: Record<string, StoryEstimation>;
+  sourceWishIds: string[];
+  approvedAt: number;
+}
+
 /** Puente entre agentes (resultados aprobados que consume el siguiente paso) */
 export interface WorkspacePipeline {
   /** Escrito al aprobar el Agente 1, consumido por el Agente 2 */
   agent2Input: Agent2Input | null;
-  /** Escrito al aprobar el Agente 2, consumido por el futuro Agente 3 */
+  /** Escrito al aprobar el Agente 2, consumido por el Agente 3 */
   agent3Input: Agent3Input | null;
+  /** Escrito al aprobar el Agente 3, consumido por el Agente 4 */
+  agent4Input: Agent4Input | null;
 }
 
 /** Estado completo del workspace de un usuario (un único flujo activo) */
 export interface UserWorkspace {
   agent1: Agent1State;
   agent2: Agent2State;
+  agent3: Agent3State;
   pipeline: WorkspacePipeline;
 }
 
@@ -42,6 +54,13 @@ export interface WorkspaceResponse {
   workspace: UserWorkspace;
   preferences: WorkspacePreferences;
 }
+
+const EMPTY_AGENT3: Agent3State = {
+  input: null,
+  estimations: {},
+  status: 'idle',
+  error: null,
+};
 
 /** Estado vacío del workspace (tras nueva sesión). */
 export function createEmptyWorkspace(): UserWorkspace {
@@ -61,9 +80,11 @@ export function createEmptyWorkspace(): UserWorkspace {
       status: 'idle',
       error: null,
     },
+    agent3: { ...EMPTY_AGENT3 },
     pipeline: {
       agent2Input: null,
       agent3Input: null,
+      agent4Input: null,
     },
   };
 }

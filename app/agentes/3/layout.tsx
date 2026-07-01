@@ -1,5 +1,5 @@
 /**
- * @fileoverview Layout para la ruta /agentes/3 — Agente 3: Priorización.
+ * @fileoverview Layout para la ruta /agentes/3 — Agente 3: Estimación.
  */
 
 import type { Metadata } from 'next';
