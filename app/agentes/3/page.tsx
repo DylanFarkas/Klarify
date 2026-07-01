@@ -10,8 +10,8 @@
 import { useEffect, useState } from 'react';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import type { Agent3Input } from '@/lib/types/workspace';
-import { Agent3InputPreview } from '@/components/agents/agent-3/Agent3InputPreview';
 import { EmptyPrioritizationState } from '@/components/agents/agent-3/EmptyPrioritizationState';
+import { EstimationWorkspace } from '@/components/agents/agent-3/EstimationWorkspace';
 
 export default function Agent3Page() {
   const { workspace, isLoading, sessionVersion } = useWorkspace();
@@ -25,6 +25,15 @@ export default function Agent3Page() {
     setInput(pipelineInput);
     setIsHydrated(true);
   }, [isLoading, workspace, sessionVersion]);
+
+  useEffect(() => {
+    if (!isLoading && workspace) {
+      console.log('=== [DEBUG AGENTE 3] Objeto Workspace Completo ===');
+      console.log(workspace);
+      console.log('=== [DEBUG AGENTE 3] Pipeline Input (Agent 3) ===');
+      console.log(workspace.pipeline?.agent3Input);
+    }
+  }, [workspace, isLoading]);
 
   if (isLoading || !isHydrated) {
     return (
@@ -44,9 +53,9 @@ export default function Agent3Page() {
           <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
             Paso 03 / 06
           </span>
-          <span className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-muted">
+          {/*<span className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-muted">
             En desarrollo
-          </span>
+          </span>*/}
         </div>
         <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
           Estimación en Story Points
@@ -58,28 +67,21 @@ export default function Agent3Page() {
         </p>
       </div>
 
-      {/* ── Alcance (pendiente de implementar) ────────────────── */}
-      <div className="rounded-2xl border border-dashed border-border bg-surface-muted/50 px-6 py-5">
-        <p className="text-sm font-medium text-foreground">Pendiente de implementación</p>
-        <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted">
-          <li>
-            Sugerir Story Points (escala Fibonacci) por historia según complejidad técnica.
-          </li>
-          <li>
-            <span className="font-medium text-foreground">CA1 (HITL):</span> el usuario puede
-            sobrescribir la estimación sugerida antes de guardar en Firestore.
-          </li>
-        </ul>
-        <p className="mt-4 text-xs text-muted">
-          Entrada: <code className="font-mono">workspace.pipeline.agent3Input</code>.
-        </p>
-      </div>
-
+      {/* ── Área de Trabajo Principal (HITL Integration) ──────── */}
+      {hasInput && input ? (
+        <EstimationWorkspace 
+          input={input} 
+        />
+      ) : (
+        <EmptyPrioritizationState />
+      )}
+      
+      {/*Área de Trabajo Principal (HITL Integration) 
       {hasInput && input ? (
         <Agent3InputPreview input={input} />
       ) : (
         <EmptyPrioritizationState />
-      )}
+      )}*/}
     </div>
   );
 }
