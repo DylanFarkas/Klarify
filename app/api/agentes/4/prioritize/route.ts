@@ -9,6 +9,7 @@
 import { type NextRequest } from 'next/server';
 import { verifyRequestUser } from '@/lib/firebase-admin';
 import { PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
+import { FRAMEWORK_DESCRIPTIONS } from '@/lib/constants/agent-4';
 import type { Agent4Input } from '@/lib/types/workspace';
 import {
   validateAgent4Input,
@@ -70,9 +71,11 @@ export async function POST(request: NextRequest) {
             );
 
             // Acción 2: Generar priorizaciones reales o mockeadas
+            const selectedFramework = body.framework ?? 'moscow';
+            const frameworkLabel = FRAMEWORK_DESCRIPTIONS[selectedFramework].label;
             return emitter.runAction(
               'ACTION_PRIORITIZE_STORIES',
-              'Clasificando historias (MoSCoW)...',
+              `Clasificando historias (${frameworkLabel})...`,
               () =>
                 prioritizeBacklogStream(
                   agent4Input,
