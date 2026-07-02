@@ -10,11 +10,13 @@ import type {
   LocalEpicWithEstimation,
   Agent4SuggestionItem,
   PrioritizationFramework,
-  MoscowCategory,
+  FrameworkCategory,
 } from '@/lib/types/agent-4';
 import {
   GEMINI_PRIORITIZATION_PREFIX,
   MAX_PRIORITIZATION_JUSTIFICATION_LENGTH,
+  getFrameworkCategories,
+  FRAMEWORK_DESCRIPTIONS,
 } from '@/lib/constants/agent-4';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
@@ -31,7 +33,7 @@ interface RawPrioritizationResponse {
   }>;
 }
 
-const VALID_CATEGORIES: MoscowCategory[] = ['must', 'should', 'could', 'wont'];
+
 
 export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
   private ai: GoogleGenAI | null = null;
@@ -76,7 +78,7 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
         throw new Error('Respuesta vacía de Gemini al priorizar.');
       }
       console.log('📋 [GEMINI RESPONSE RAW]:', responseText);
-      const result = this.parsePrioritizationResponse(responseText);
+      const result = this.parsePrioritizationResponse(responseText, framework);
       console.log(
         `[GeminiPrioritizationAdapter] Priorización exitosa. Historias procesadas: ${result.length}`
       );
@@ -92,37 +94,35 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
 
   private buildPrompts(
     epics: LocalEpicWithEstimation[],
-    _framework: PrioritizationFramework
+    framework: PrioritizationFramework
   ): { systemInstruction: string; userPrompt: string } {
+    const validCategories = getFrameworkCategories(framework);
+    const frameworkInfo = FRAMEWORK_DESCRIPTIONS[framework];
+
     const systemInstruction = `Devuelve la respuesta estrictamente como un objeto JSON con la siguiente forma exacta. No incluyas markdown, bloques de código (\`\`\`json) ni ningún texto extra — solo el JSON puro.
 
 {
   "suggestions": [
     {
       "storyId": "ID-DE-LA-HISTORIA",
-      "suggestedCategory": "must",
+      "suggestedCategory": "${validCategories[0]}",
       "justification": "Explicación concisa del valor de negocio."
     }
   ]
 }
 
 REGLAS CRÍTICAS:
-- 'suggestedCategory' debe ser exactamente uno de: must, should, could, wont.
+- 'suggestedCategory' debe ser exactamente uno de: ${validCategories.join(', ')}.
 - Evalúa el valor de negocio, dependencias, riesgo y esfuerzo (Story Points) de cada historia.
-- Las historias con alto valor de negocio y bajo esfuerzo son 'must'.
-- Las historias con alto valor pero alto esfuerzo pueden ser 'should'.
-- Las historias con bajo valor y bajo esfuerzo pueden ser 'could'.
-- Las historias con bajo valor y alto esfuerzo son 'wont'.
 - La justificación debe ser clara y profesional (máximo ${MAX_PRIORITIZATION_JUSTIFICATION_LENGTH} caracteres).`;
 
-    const userPrompt = `Eres un Product Owner experto en priorización ágil.
-A partir del siguiente backlog estructurado y estimado en Story Points, clasifica cada historia de usuario en una categoría MoSCoW (Must Have, Should Have, Could Have, Won't Have).
+    const userPrompt = `Eres un Product Owner experto en priorización ágil usando la metodología ${frameworkInfo.label}.
 
-CONTEXTO:
-- 'must' = Crítico para el MVP, sin esto el producto no funciona
-- 'should' = Importante pero no bloqueante para el primer release
-- 'could' = Deseable, bajo esfuerzo, valor incremental
-- 'wont' = No se implementará en esta iteración
+METODOLOGÍA: ${frameworkInfo.label}
+DESCRIPCIÓN: ${frameworkInfo.summary}
+DETALLES: ${frameworkInfo.details}
+
+A partir del siguiente backlog estructurado y estimado en Story Points, clasifica cada historia de usuario en una de las siguientes categorías: ${validCategories.join(', ')}.
 
 BACKLOG A PRIORIZAR:
 ${JSON.stringify(epics, null, 2)}`;
@@ -170,7 +170,10 @@ ${JSON.stringify(epics, null, 2)}`;
     return outputText;
   }
 
-  private parsePrioritizationResponse(responseText: string): Agent4SuggestionItem[] {
+  private parsePrioritizationResponse(
+    responseText: string,
+    framework: PrioritizationFramework
+  ): Agent4SuggestionItem[] {
     const raw = JSON.parse(responseText) as RawPrioritizationResponse;
 
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.suggestions)) {
@@ -179,6 +182,8 @@ ${JSON.stringify(epics, null, 2)}`;
       );
     }
 
+    const validCategories = getFrameworkCategories(framework);
+
     return raw.suggestions
       .filter(
         (sug) =>
@@ -186,11 +191,11 @@ ${JSON.stringify(epics, null, 2)}`;
           typeof sug.storyId === 'string' &&
           typeof sug.suggestedCategory === 'string' &&
           typeof sug.justification === 'string' &&
-          VALID_CATEGORIES.includes(sug.suggestedCategory as MoscowCategory)
+          validCategories.includes(sug.suggestedCategory)
       )
       .map((sug) => ({
         storyId: sug.storyId.trim(),
-        suggestedCategory: sug.suggestedCategory as MoscowCategory,
+        suggestedCategory: sug.suggestedCategory as FrameworkCategory,
         justification: `${GEMINI_PRIORITIZATION_PREFIX} ${sug.justification.trim()}`,
       }));
   }

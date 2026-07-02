@@ -28,7 +28,7 @@ export const AGENT_ACTIVITY = {
   ACTION_READ_BACKLOG: { id: 'read-backlog', label: 'Leyendo backlog estimado' },
   ACTION_PRIORITIZE_STORIES: {
     id: 'prioritize-stories',
-    label: 'Clasificando historias (MoSCoW)',
+    label: 'Clasificando historias',
   },
 } as const;
 
