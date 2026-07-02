@@ -56,10 +56,10 @@ export const MOSCOW_SHORT_LABELS: Record<MoscowCategory, string> = {
 };
 
 export const MOSCOW_COLORS: Record<MoscowCategory, string> = {
-  must: 'bg-red-500/10 text-red-600 border-red-500/30',
-  should: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  could: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  wont: 'bg-muted text-muted-foreground border-border',
+  must: 'bg-red-500/15 text-red-700 border-red-500/35',
+  should: 'bg-amber-500/15 text-amber-700 border-amber-500/35',
+  could: 'bg-blue-500/15 text-blue-700 border-blue-500/35',
+  wont: 'bg-surface-muted text-muted border-border',
 };
 
 // ── WSJF ─────────────────────────────────────────────────────────────────────
@@ -81,10 +81,10 @@ export const WSJF_SHORT_LABELS: Record<WsjfCategory, string> = {
 };
 
 export const WSJF_COLORS: Record<WsjfCategory, string> = {
-  critical: 'bg-red-500/10 text-red-600 border-red-500/30',
-  high: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
-  medium: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  low: 'bg-muted text-muted-foreground border-border',
+  critical: 'bg-red-500/15 text-red-700 border-red-500/35',
+  high: 'bg-orange-500/15 text-orange-700 border-orange-500/35',
+  medium: 'bg-amber-500/15 text-amber-700 border-amber-500/35',
+  low: 'bg-surface-muted text-muted border-border',
 };
 
 // ── RICE ─────────────────────────────────────────────────────────────────────
@@ -106,10 +106,10 @@ export const RICE_SHORT_LABELS: Record<RiceCategory, string> = {
 };
 
 export const RICE_COLORS: Record<RiceCategory, string> = {
-  'quick-win': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
-  'major-project': 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  'fill-in': 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  'thankless': 'bg-muted text-muted-foreground border-border',
+  'quick-win': 'bg-emerald-500/15 text-emerald-700 border-emerald-500/35',
+  'major-project': 'bg-blue-500/15 text-blue-700 border-blue-500/35',
+  'fill-in': 'bg-amber-500/15 text-amber-700 border-amber-500/35',
+  'thankless': 'bg-surface-muted text-muted border-border',
 };
 
 // ── Value / Effort ───────────────────────────────────────────────────────────
@@ -136,10 +136,10 @@ export const VALUE_EFFORT_SHORT_LABELS: Record<ValueEffortCategory, string> = {
 };
 
 export const VALUE_EFFORT_COLORS: Record<ValueEffortCategory, string> = {
-  'high-value-low-effort': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
-  'high-value-high-effort': 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-  'low-value-low-effort': 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-  'low-value-high-effort': 'bg-muted text-muted-foreground border-border',
+  'high-value-low-effort': 'bg-emerald-500/15 text-emerald-700 border-emerald-500/35',
+  'high-value-high-effort': 'bg-blue-500/15 text-blue-700 border-blue-500/35',
+  'low-value-low-effort': 'bg-amber-500/15 text-amber-700 border-amber-500/35',
+  'low-value-high-effort': 'bg-surface-muted text-muted border-border',
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
