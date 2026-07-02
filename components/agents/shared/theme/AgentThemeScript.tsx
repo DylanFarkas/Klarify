@@ -5,14 +5,13 @@
  * sin provocar el warning de React 19 sobre <script> en componentes cliente.
  */
 
-import Script from 'next/script';
 import { getAgentThemeBootstrapScript } from '@/lib/constants/agent-theme';
 
 export function AgentThemeScript() {
   return (
-    <Script
+    <script
       id="klarify-agent-theme"
-      strategy="beforeInteractive"
+      suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: getAgentThemeBootstrapScript() }}
     />
   );
