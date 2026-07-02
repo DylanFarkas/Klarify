@@ -8,6 +8,7 @@
   --color-surface-hover: var(--surface-hover);
   --color-foreground: var(--foreground);
   --color-muted: var(--foreground-muted);
+  --color-muted-foreground: var(--foreground-muted);
   --color-subtle: var(--foreground-subtle);
   --color-body: var(--foreground-body);
   --color-border: var(--border);
