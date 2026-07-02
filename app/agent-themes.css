@@ -70,6 +70,41 @@ html[data-agent-theme="dark"],
   --code-bg: rgb(0 0 0 / 0.5);
 }
 
+html[data-agent-theme="carbon"],
+.agent-workspace[data-theme="carbon"] {
+  --grid-size: 52px;
+  --grid-line: rgb(255 255 255 / 0.04);
+  --grid-line-opacity: 1;
+  --grid-dot: rgb(62 207 142 / 0.18);
+  --grid-dot-opacity: 0.5;
+  --grid-vignette: rgb(28 28 28 / 0.75);
+  --grid-noise-opacity: 0.05;
+  --background: #1c1c1c;
+  --surface: #1e1e1e;
+  --surface-muted: rgb(255 255 255 / 0.04);
+  --surface-hover: rgb(62 207 142 / 0.06);
+  --foreground: #ffffff;
+  --foreground-muted: #9ca3af;
+  --foreground-subtle: rgb(156 163 175 / 0.7);
+  --foreground-body: rgb(255 255 255 / 0.88);
+  --border: #2e2e2e;
+  --border-strong: rgb(255 255 255 / 0.12);
+  --primary: #3ecf8e;
+  --primary-hover: #32b87d;
+  --input: rgb(0 0 0 / 0.3);
+  --input-border: #2e2e2e;
+  --danger: #fca5a5;
+  --success: #3ecf8e;
+  --disabled: rgb(255 255 255 / 0.1);
+  --disabled-text: rgb(255 255 255 / 0.3);
+  --elevated: rgb(255 255 255 / 0.04);
+  --icon-muted: rgb(62 207 142 / 0.35);
+  --placeholder: rgb(156 163 175 / 0.5);
+  --step-future-border: rgb(255 255 255 / 0.15);
+  --step-future-text: rgb(156 163 175 / 0.7);
+  --code-bg: rgb(0 0 0 / 0.5);
+}
+
 html[data-agent-theme="ocean"],
 .agent-workspace[data-theme="ocean"] {
   --grid-size: 52px;
