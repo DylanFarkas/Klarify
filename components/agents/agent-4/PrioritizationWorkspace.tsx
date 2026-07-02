@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch } from '@/lib/api-client';
 import type { Agent4Input } from '@/lib/types/workspace';
+import type { UserStory } from '@/lib/types/agent-2';
+import type { StoryEstimation } from '@/lib/types/agent-3';
 import type {
   Agent4PrioritizationResponse,
   Agent4Status,
@@ -18,9 +20,13 @@ import {
 } from '@/lib/constants/agent-4';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
+import { DetailModal } from '@/components/agents/shared/DetailModal';
+import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { CategorySelect, CategoryBadge } from './CategorySelect';
 import { FrameworkSelector } from './FrameworkSelector';
+import { EmptyPrioritizationStartState } from './EmptyPrioritizationStartState';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
 
 interface PrioritizationWorkspaceProps {
@@ -35,6 +41,7 @@ interface PrioritizationWorkspaceProps {
   isApprovable: boolean;
   isApproved: boolean;
   isApproving: boolean;
+  onError?: (message: string) => void;
 }
 
 function useCategoryDistribution(
@@ -60,6 +67,110 @@ function useCategoryDistribution(
   }, [priorities, framework]);
 }
 
+interface PrioritizationStoryRowProps {
+  story: UserStory;
+  epicTitle: string;
+  pri: StoryPrioritization | undefined;
+  est: StoryEstimation | undefined;
+  framework: PrioritizationFramework;
+  isAnalyzing: boolean;
+  isApproved: boolean;
+  onCategoryChange: (category: FrameworkCategory) => void;
+}
+
+function PrioritizationStoryRow({
+  story,
+  epicTitle,
+  pri,
+  est,
+  framework,
+  isAnalyzing,
+  isApproved,
+  onCategoryChange,
+}: PrioritizationStoryRowProps) {
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const hasCategory = pri?.category;
+
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[1fr_200px_200px]">
+        {/* Story info */}
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted">
+              {story.id}
+            </span>
+            <h5 className="truncate text-sm font-semibold text-foreground">
+              {story.title}
+            </h5>
+            {pri?.isModified && (
+              <span className="shrink-0 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600">
+                HITL
+              </span>
+            )}
+            <ViewDetailsButton
+              onClick={() => setIsDetailOpen(true)}
+              className="ml-auto shrink-0"
+            />
+          </div>
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted">
+            {story.description}
+          </p>
+          {est && (
+            <p className="text-[10px] text-muted">
+              Story Points: <span className="font-semibold text-foreground">{est.points}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Justification */}
+        <div className="rounded-lg border border-border/50 bg-surface-muted/40 p-3 min-h-[52px]">
+          {pri?.justification ? (
+            <p className="text-[11px] italic leading-relaxed text-muted">
+              &ldquo;{pri.justification}&rdquo;
+            </p>
+          ) : (
+            <p className="text-[11px] italic text-muted/50">
+              {isAnalyzing ? 'Analizando...' : 'Esperando clasificación del agente...'}
+            </p>
+          )}
+        </div>
+
+        {/* Category selector */}
+        <div className="flex flex-row items-center justify-between gap-3 lg:flex-col lg:items-end lg:justify-center">
+          <div className="flex flex-wrap items-center gap-2">
+            {hasCategory && (
+              <CategoryBadge framework={framework} category={pri.category} />
+            )}
+            <CategorySelect
+              framework={framework}
+              value={pri?.category ?? ''}
+              onChange={onCategoryChange}
+              disabled={isApproved || isAnalyzing}
+            />
+          </div>
+        </div>
+      </div>
+
+      <DetailModal
+        open={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        title={story.title}
+        subtitle={story.id}
+        eyebrow="Historia de usuario"
+      >
+        <UserStoryDetailContent
+          story={story}
+          epicTitle={epicTitle}
+          estimation={est}
+          prioritization={pri}
+          framework={framework}
+        />
+      </DetailModal>
+    </>
+  );
+}
+
 export function PrioritizationWorkspace({
   input,
   priorities,
@@ -72,6 +183,7 @@ export function PrioritizationWorkspace({
   isApprovable,
   isApproved,
   isApproving,
+  onError,
 }: PrioritizationWorkspaceProps) {
   const { user } = useAuth();
   const { entries, reset, consumeStream } = useAgentActivity();
@@ -89,7 +201,16 @@ export function PrioritizationWorkspace({
     () => allStories.filter((s) => priorities[s.id]?.category).length,
     [allStories, priorities]
   );
+  const totalPoints = useMemo(
+    () =>
+      allStories.reduce(
+        (sum, s) => sum + (input.estimations[s.id]?.points ?? 0),
+        0
+      ),
+    [allStories, input.estimations]
+  );
   const hasPriorities = Object.keys(priorities).length > 0;
+  const showIdleStart = !hasPriorities && !isAnalyzing && !isApproved;
   const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
   const categoryDistribution = useCategoryDistribution(priorities, framework);
 
@@ -133,11 +254,11 @@ export function PrioritizationWorkspace({
     } catch (error) {
       console.error('Error en la conexión con el Agente 4:', error);
       onStatusChange('idle');
-      alert(
-        error instanceof Error ? error.message : 'Error al procesar la priorización.'
-      );
+      const message =
+        error instanceof Error ? error.message : 'Error al procesar la priorización.';
+      onError?.(message);
     }
-  }, [input, user, framework, consumeStream, reset, onPrioritiesChange, onStatusChange]);
+  }, [input, user, framework, consumeStream, reset, onPrioritiesChange, onStatusChange, onError]);
 
   const handleCategoryChange = (storyId: string, category: FrameworkCategory) => {
     onPrioritiesChange({
@@ -178,6 +299,21 @@ export function PrioritizationWorkspace({
       )}
 
       {/* ════════════════════════════════════════════════
+          ESTADO INICIAL — como Agente 2 / 3
+         ════════════════════════════════════════════════ */}
+      {showIdleStart && (
+        <EmptyPrioritizationStartState
+          framework={framework}
+          onFrameworkChange={onFrameworkChange}
+          onPrioritize={handlePrioritizeWithAgent}
+          isPrioritizing={isAnalyzing}
+          epicCount={input.epics.length}
+          storyCount={totalStories}
+          totalPoints={totalPoints}
+        />
+      )}
+
+      {/* ════════════════════════════════════════════════
           DISTRIBUCIÓN POR CATEGORÍA
          ════════════════════════════════════════════════ */}
       {hasPriorities && categoryDistribution.length > 0 && (
@@ -197,9 +333,9 @@ export function PrioritizationWorkspace({
       )}
 
       {/* ════════════════════════════════════════════════
-          BARRA DE ACCIÓN PRINCIPAL
+          BARRA DE REVISIÓN (solo con prioridades)
          ════════════════════════════════════════════════ */}
-      {!isApproved && (
+      {hasPriorities && !isApproved && (
         <div className="relative overflow-hidden rounded-xl border border-border/80 bg-surface-muted/80 px-6 py-4">
           <div
             className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-primary/5 blur-3xl"
@@ -268,7 +404,7 @@ export function PrioritizationWorkspace({
           ANÁLISIS EN CURSO — OVERLAY SIMPLE
          ════════════════════════════════════════════════ */}
       {isAnalyzing && !showModelReasoning && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface-muted/60 px-6 py-14 animate-[fadeIn_0.25s_ease-out]">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface-muted/60 px-6 py-14 animate-[fadeIn_0.25s_ease-out]">
           <div className="mb-4 h-12 w-12 animate-spin rounded-full border-[3px] border-border border-t-primary" />
           <p className="text-sm font-semibold text-foreground">
             {hasPriorities ? 'Regenerando priorizaciones...' : 'Clasificando backlog...'}
@@ -282,6 +418,7 @@ export function PrioritizationWorkspace({
       {/* ════════════════════════════════════════════════
           LISTA DE ÉPICAS CON PRIORIDADES
          ════════════════════════════════════════════════ */}
+      {(hasPriorities || isApproved) && !isAnalyzing && (
       <div className="flex flex-col gap-6">
         {input.epics.map((epic, epicIdx) => {
           const epicStories = epic.userStories || [];
@@ -322,72 +459,19 @@ export function PrioritizationWorkspace({
               {/* Stories */}
               {epicStories.length > 0 && (
                 <div className="divide-y divide-border">
-                  {epicStories.map((story, storyIdx) => {
-                    const pri = priorities[story.id];
-                    const est = input.estimations[story.id];
-                    const hasCategory = pri?.category;
-
-                    return (
-                      <div
-                        key={story.id}
-                        className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[1fr_200px_200px]"
-                        style={{ animationDelay: `${(epicIdx * epicStories.length + storyIdx) * 40}ms` }}
-                      >
-                        {/* Story info */}
-                        <div className="min-w-0 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted">
-                              {story.id}
-                            </span>
-                            <h5 className="truncate text-sm font-semibold text-foreground">
-                              {story.title}
-                            </h5>
-                            {pri?.isModified && (
-                              <span className="shrink-0 rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600">
-                                HITL
-                              </span>
-                            )}
-                          </div>
-                          <p className="line-clamp-2 text-xs leading-relaxed text-muted">
-                            {story.description}
-                          </p>
-                          {est && (
-                            <p className="text-[10px] text-muted">
-                              Story Points: <span className="font-semibold text-foreground">{est.points}</span>
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Justification */}
-                        <div className="rounded-lg border border-border/50 bg-surface-muted/40 p-3 min-h-[52px]">
-                          {pri?.justification ? (
-                            <p className="text-[11px] italic leading-relaxed text-muted">
-                              &ldquo;{pri.justification}&rdquo;
-                            </p>
-                          ) : (
-                            <p className="text-[11px] italic text-muted/50">
-                              {isAnalyzing ? 'Analizando...' : 'Esperando clasificación del agente...'}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Category selector */}
-                        <div className="flex flex-row items-center justify-between gap-3 lg:flex-col lg:items-end lg:justify-center">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {hasCategory && (
-                              <CategoryBadge framework={framework} category={pri.category} />
-                            )}
-                            <CategorySelect
-                              framework={framework}
-                              value={pri?.category ?? ''}
-                              onChange={(cat) => handleCategoryChange(story.id, cat)}
-                              disabled={isApproved || isAnalyzing}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {epicStories.map((story) => (
+                    <PrioritizationStoryRow
+                      key={story.id}
+                      story={story}
+                      epicTitle={epic.title}
+                      pri={priorities[story.id]}
+                      est={input.estimations[story.id]}
+                      framework={framework}
+                      isAnalyzing={isAnalyzing}
+                      isApproved={isApproved}
+                      onCategoryChange={(cat) => handleCategoryChange(story.id, cat)}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -400,6 +484,7 @@ export function PrioritizationWorkspace({
           );
         })}
       </div>
+      )}
 
       {/* ════════════════════════════════════════════════
           STICKY ACTION BAR

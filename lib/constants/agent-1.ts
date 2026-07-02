@@ -57,7 +57,12 @@ export const AGENT_STEPS: AgentStep[] = [
   { number: 2, name: 'Backlog Inicial', path: '/agentes/2', description: 'Clasificación y análisis de deseos' },
   { number: 3, name: 'Estimación', path: '/agentes/3', description: 'Estimación de valor y esfuerzo' },
   { number: 4, name: 'Priorización', path: '/agentes/4', description: 'Priorización de épicas y historias de usuario' },
-  { number: 5, name: 'Backlog Final', path: '/agentes/5', description: 'Backlog ejecutable y exportable' },
+  {
+    number: 5,
+    name: 'Planificación de Sprints',
+    path: '/agentes/5',
+    description: 'Organiza HU priorizadas en sprints con objetivos, capacidad y cronograma',
+  },
 ];
 
 // ---------------------------------------------------------------------------

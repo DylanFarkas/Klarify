@@ -68,6 +68,90 @@
   }
 }
 
+/* ── Modal de detalle de historias ─────────────────────────────────── */
+
+.detail-modal-shell {
+  padding: 1px;
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--primary) 42%, transparent) 0%,
+    color-mix(in srgb, var(--border-strong) 50%, transparent) 40%,
+    color-mix(in srgb, var(--primary) 22%, transparent) 100%
+  );
+  box-shadow:
+    0 28px 90px color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 0 48px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.detail-modal-backdrop-in {
+  animation: detailBackdropIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.detail-modal-backdrop-out {
+  animation: detailBackdropOut 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.detail-modal-panel-in {
+  animation: detailPanelIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.detail-modal-panel-out {
+  animation: detailPanelOut 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.detail-section-in {
+  animation: detailSectionIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-modal-scroll {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+@keyframes detailBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes detailBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes detailPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes detailPanelOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(12px);
+  }
+}
+
+@keyframes detailSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Modal de actividad del agente (estética tecnológica) ──────────── */
 
 .agent-modal-shell {
@@ -248,6 +332,180 @@
   100% { transform: translate(var(--grid-size), var(--grid-size)); }
 }
 
+/* ── Hero de páginas de agentes — motivos por fase del pipeline ─────── */
+
+.agent-hero {
+  --hero-accent: color-mix(in srgb, var(--primary) 55%, transparent);
+  --hero-motif-opacity: 0.88;
+}
+
+.agent-hero::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--hero-accent) 28%,
+    var(--hero-accent) 72%,
+    transparent 100%
+  );
+  border-radius: 0 2px 2px 0;
+}
+
+.agent-hero__motif {
+  position: relative;
+  flex-shrink: 0;
+  width: 6.5rem;
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--hero-motif-opacity);
+}
+
+.agent-hero__motif-glow {
+  position: absolute;
+  inset: -18% -8%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--primary) 22%, transparent) 0%,
+    transparent 72%
+  );
+  filter: blur(10px);
+  opacity: 0.9;
+}
+
+.agent-hero__motif-svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.agent-hero__capture-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-capture-bar 2.8s ease-in-out infinite;
+}
+
+.agent-hero__capture-scan {
+  animation: hero-capture-scan 5s linear infinite;
+}
+
+.agent-hero__structure-card--back {
+  animation: hero-structure-float 7s ease-in-out infinite;
+}
+
+.agent-hero__structure-card--mid {
+  animation: hero-structure-float 7s ease-in-out infinite 0.35s;
+}
+
+.agent-hero__structure-card--front {
+  animation: hero-structure-float 7s ease-in-out infinite 0.7s;
+}
+
+.agent-hero__structure-line {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: hero-structure-line 4.5s ease-out infinite;
+}
+
+.agent-hero__measure-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  fill: var(--primary);
+  fill-opacity: 0.75;
+}
+
+.agent-hero__measure-block {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-measure-pulse 3.2s ease-in-out infinite;
+}
+
+.agent-hero__order-lane {
+  animation: hero-order-slide 4.8s ease-in-out infinite;
+}
+
+.agent-hero__order-highlight {
+  animation: hero-order-highlight 3.6s ease-in-out infinite;
+}
+
+@keyframes hero-capture-bar {
+  0%, 100% { transform: scaleY(0.72); opacity: 0.55; }
+  35% { transform: scaleY(1); opacity: 1; }
+  65% { transform: scaleY(0.86); opacity: 0.78; }
+}
+
+@keyframes hero-capture-scan {
+  0% { stroke-dashoffset: 0; opacity: 0.15; }
+  50% { opacity: 0.45; }
+  100% { stroke-dashoffset: -28; opacity: 0.15; }
+}
+
+@keyframes hero-structure-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes hero-structure-line {
+  0%, 20% { stroke-dashoffset: 48; opacity: 0.2; }
+  45%, 70% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -12; opacity: 0.35; }
+}
+
+@keyframes hero-measure-pulse {
+  0%, 100% { transform: scaleY(0.92); }
+  50% { transform: scaleY(1.04); }
+}
+
+@keyframes hero-order-slide {
+  0%, 100% { transform: translateX(0); opacity: 0.82; }
+  50% { transform: translateX(3px); opacity: 1; }
+}
+
+@keyframes hero-order-highlight {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.65; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-hero__motif *,
+  .agent-hero__motif::before,
+  .agent-hero__motif::after {
+    animation: none !important;
+  }
+}
+
+/* Zona de captura — Agente 1 */
+.agent-capture-drop::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 50%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.agent-capture-drop:hover::before,
+.agent-capture-drop:focus-within::before {
+  opacity: 1;
+}
+
 /* ── Agente 2 — Animaciones de UI mejoradas ─────────────────────────── */
 
 @keyframes heroGlow {
@@ -289,6 +547,12 @@
 @media (prefers-reduced-motion: reduce) {
   .workspace-grid__lines,
   .agent-modal-shell,
+  .detail-modal-shell,
+  .detail-modal-backdrop-in,
+  .detail-modal-backdrop-out,
+  .detail-modal-panel-in,
+  .detail-modal-panel-out,
+  .detail-section-in,
   .agent-progress-shimmer,
   .workspace-grid__lines--deep,
   .workspace-grid__lines--near {

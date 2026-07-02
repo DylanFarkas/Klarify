@@ -98,7 +98,7 @@ export function BacklogView({
       </div>
 
       {/* ── Contenido scrollable ───────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[600px]">
+      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[700px]">
         {epics.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">

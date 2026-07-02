@@ -14,6 +14,9 @@
 import { useState, useRef, useEffect } from 'react';
 import type { UserStory } from '@/lib/types/agent-2';
 import { AcceptanceCriteriaEditor } from './AcceptanceCriteriaEditor';
+import { DetailModal } from '@/components/agents/shared/DetailModal';
+import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 
 interface UserStoryItemProps {
   /** La Historia de Usuario a renderizar */
@@ -34,6 +37,7 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
   const [editDescription, setEditDescription] = useState(story.description);
   const [editCriteria, setEditCriteria] = useState<string[]>(story.acceptanceCriteria);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Autofocar título solo al entrar en modo edición (no en cada tecla)
@@ -125,6 +129,10 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
             Editado
           </span>
         )}
+
+        <div className="ml-auto">
+          <ViewDetailsButton onClick={() => setIsDetailOpen(true)} />
+        </div>
       </div>
 
       {/* ── Contenido ──────────────────────────────────────────── */}
@@ -245,6 +253,16 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
           )}
         </>
       )}
+
+      <DetailModal
+        open={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        title={story.title}
+        subtitle={story.id}
+        eyebrow="Historia de usuario"
+      >
+        <UserStoryDetailContent story={story} />
+      </DetailModal>
     </article>
   );
 }

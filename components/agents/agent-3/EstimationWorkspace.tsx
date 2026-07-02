@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch } from '@/lib/api-client';
 import type { Agent3Input } from '@/lib/types/workspace';
+import type { UserStory } from '@/lib/types/agent-2';
 import type {
   Agent3EstimationResponse,
   Agent3Status,
@@ -12,6 +13,9 @@ import type {
 } from '@/lib/types/agent-3';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
+import { DetailModal } from '@/components/agents/shared/DetailModal';
+import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 
@@ -104,9 +108,8 @@ function FibonacciPicker({ value, onChange, disabled }: FibonacciPickerProps) {
 }
 
 interface StoryRowProps {
-  storyId: string;
-  title: string;
-  description: string;
+  story: UserStory;
+  epicTitle: string;
   estimation: StoryEstimation | undefined;
   isAnalyzing: boolean;
   isApproved: boolean;
@@ -115,15 +118,15 @@ interface StoryRowProps {
 }
 
 function StoryRow({
-  storyId,
-  title,
-  description,
+  story,
+  epicTitle,
   estimation,
   isAnalyzing,
   isApproved,
   onPointChange,
   index,
 }: StoryRowProps) {
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const points = estimation?.points ?? 0;
   const hasPoint = points > 0;
   const disabled = !estimation || isApproved || isAnalyzing;
@@ -143,17 +146,21 @@ function StoryRow({
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted">
-              {storyId}
+              {story.id}
             </span>
-            <h5 className="text-sm font-semibold text-foreground">{title}</h5>
+            <h5 className="text-sm font-semibold text-foreground">{story.title}</h5>
             {estimation?.isModified && (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-500">
                 <span className="h-1 w-1 rounded-full bg-amber-500" />
                 Ajustado
               </span>
             )}
+            <ViewDetailsButton
+              onClick={() => setIsDetailOpen(true)}
+              className="ml-auto sm:ml-0"
+            />
           </div>
-          <p className="text-xs leading-relaxed text-muted line-clamp-3">{description}</p>
+          <p className="text-xs leading-relaxed text-muted line-clamp-3">{story.description}</p>
         </div>
 
         {/* Agent reasoning */}
@@ -206,6 +213,20 @@ function StoryRow({
           </div>
         </div>
       </div>
+
+      <DetailModal
+        open={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        title={story.title}
+        subtitle={story.id}
+        eyebrow="Historia de usuario"
+      >
+        <UserStoryDetailContent
+          story={story}
+          epicTitle={epicTitle}
+          estimation={estimation}
+        />
+      </DetailModal>
     </article>
   );
 }
@@ -476,9 +497,8 @@ export function EstimationWorkspace({
                     {epicStories.map((story, storyIdx) => (
                       <StoryRow
                         key={story.id}
-                        storyId={story.id}
-                        title={story.title}
-                        description={story.description}
+                        story={story}
+                        epicTitle={epic.title}
                         estimation={estimations[story.id]}
                         isAnalyzing={isAnalyzing}
                         isApproved={isApproved}
