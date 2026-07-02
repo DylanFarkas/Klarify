@@ -248,8 +248,57 @@
   100% { transform: translate(var(--grid-size), var(--grid-size)); }
 }
 
+/* ── Agente 2 — Animaciones de UI mejoradas ─────────────────────────── */
+
+@keyframes heroGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1) translate(0, 0); }
+  33% { opacity: 0.8; transform: scale(1.05) translate(4px, -4px); }
+  66% { opacity: 0.6; transform: scale(0.95) translate(-4px, 4px); }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes celebrationPop {
+  0% { opacity: 0; transform: scale(0.7); }
+  50% { transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmerPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes checkmarkDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes statusBadgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 40%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .workspace-grid__lines {
+  .workspace-grid__lines,
+  .agent-modal-shell,
+  .agent-progress-shimmer,
+  .workspace-grid__lines--deep,
+  .workspace-grid__lines--near {
     animation: none;
+  }
+  [class*="animate-"] {
+    animation: none !important;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
