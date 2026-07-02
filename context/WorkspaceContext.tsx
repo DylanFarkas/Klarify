@@ -23,7 +23,8 @@ import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
 import type { Agent3State } from '@/lib/types/agent-3';
-import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input } from '@/lib/types/workspace';
+import type { Agent4State } from '@/lib/types/agent-4';
+import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input } from '@/lib/types/workspace';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -38,12 +39,15 @@ export interface UseWorkspaceResult {
   saveAgent1: (state: Agent1State) => void;
   saveAgent2: (state: Agent2State) => void;
   saveAgent3: (state: Agent3State) => void;
+  saveAgent4: (state: Agent4State) => void;
   approveAgent1: (input: Agent2Input) => Promise<void>;
   approveAgent2: (input: Agent3Input) => Promise<void>;
   approveAgent3: (input: Agent4Input) => Promise<void>;
+  approveAgent4: (input: Agent5Input) => Promise<void>;
   resetAgent1: () => Promise<void>;
   resetAgent2: () => Promise<void>;
   resetAgent3: () => Promise<void>;
+  resetAgent4: () => Promise<void>;
   /** Limpia todo el workspace en Firestore y redirige al Agente 1 */
   resetSession: () => Promise<void>;
 }
@@ -62,12 +66,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const agent1Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agent2Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agent3Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const agent4Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const agent4Abort = useRef<AbortController | null>(null);
   const lastPersistedAgent = useRef<string | null>(null);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
     if (agent2Timer.current) clearTimeout(agent2Timer.current);
     if (agent3Timer.current) clearTimeout(agent3Timer.current);
+    if (agent4Timer.current) clearTimeout(agent4Timer.current);
+    agent4Abort.current?.abort();
   }, []);
 
   const fetchWorkspace = useCallback(async (options?: { silent?: boolean }) => {
@@ -174,6 +182,27 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const saveAgent4 = useCallback(
+    (state: Agent4State) => {
+      if (!user) return;
+      if (agent4Timer.current) clearTimeout(agent4Timer.current);
+      agent4Abort.current?.abort();
+      agent4Timer.current = setTimeout(() => {
+        const controller = new AbortController();
+        agent4Abort.current = controller;
+        void authFetch('/api/workspace', user, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent: 'agent4', data: state }),
+          signal: controller.signal,
+        }).catch(() => {
+          /* el siguiente guardado reintentará */
+        });
+      }, SAVE_DEBOUNCE_MS);
+    },
+    [user]
+  );
+
   const runAction = useCallback(
     async (action: string, payload?: unknown) => {
       if (!user) return;
@@ -254,9 +283,40 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [runAction]
   );
 
+  const approveAgent4 = useCallback(
+    async (input: Agent5Input) => {
+      if (agent4Timer.current) clearTimeout(agent4Timer.current);
+      await runAction('approveAgent4', input);
+      const agent4Input: Agent4Input = {
+        epics: input.epics,
+        estimations: input.estimations,
+        sourceWishIds: input.sourceWishIds,
+        approvedAt: input.approvedAt,
+      };
+      setWorkspace((prev) =>
+        prev
+          ? {
+              ...prev,
+              agent4: {
+                ...prev.agent4,
+                input: agent4Input,
+                priorities: input.priorities,
+                framework: input.framework,
+                status: 'approved',
+                error: null,
+              },
+              pipeline: { ...prev.pipeline, agent5Input: input },
+            }
+          : prev
+      );
+    },
+    [runAction]
+  );
+
   const resetAgent1 = useCallback(() => runAction('resetAgent1'), [runAction]);
   const resetAgent2 = useCallback(() => runAction('resetAgent2'), [runAction]);
   const resetAgent3 = useCallback(() => runAction('resetAgent3'), [runAction]);
+  const resetAgent4 = useCallback(() => runAction('resetAgent4'), [runAction]);
 
   const resetSession = useCallback(async () => {
     if (!user) return;
@@ -279,12 +339,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         saveAgent1,
         saveAgent2,
         saveAgent3,
+        saveAgent4,
         approveAgent1,
         approveAgent2,
         approveAgent3,
+        approveAgent4,
         resetAgent1,
         resetAgent2,
         resetAgent3,
+        resetAgent4,
         resetSession,
       }}
     >

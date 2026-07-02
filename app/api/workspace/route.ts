@@ -16,23 +16,27 @@ import {
   saveAgent1State,
   saveAgent2State,
   saveAgent3State,
+  saveAgent4State,
   saveLastAgent,
   approveAgent1,
   approveAgent2,
   approveAgent3,
+  approveAgent4,
   resetAgent1,
   resetAgent2,
   resetAgent3,
+  resetAgent4,
   resetWorkspace,
 } from '@/lib/workspace-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
 import type { Agent3State } from '@/lib/types/agent-3';
-import type { Agent3Input, Agent4Input } from '@/lib/types/workspace';
+import type { Agent4State } from '@/lib/types/agent-4';
+import type { Agent3Input, Agent4Input, Agent5Input } from '@/lib/types/workspace';
 
 interface PatchBody {
-  agent?: 'agent1' | 'agent2' | 'agent3';
-  data?: Agent1State | Agent2State | Agent3State;
+  agent?: 'agent1' | 'agent2' | 'agent3' | 'agent4';
+  data?: Agent1State | Agent2State | Agent3State | Agent4State;
   preferences?: { lastAgent?: string };
 }
 
@@ -41,11 +45,13 @@ interface PostBody {
     | 'approveAgent1'
     | 'approveAgent2'
     | 'approveAgent3'
+    | 'approveAgent4'
     | 'resetAgent1'
     | 'resetAgent2'
     | 'resetAgent3'
+    | 'resetAgent4'
     | 'resetWorkspace';
-  payload?: Agent2Input | Agent3Input | Agent4Input;
+  payload?: Agent2Input | Agent3Input | Agent4Input | Agent5Input;
 }
 
 function handleError(error: unknown, fallback: string): NextResponse {
@@ -94,6 +100,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (body.agent === 'agent4' && body.data) {
+      await saveAgent4State(uid, body.data as Agent4State);
+      return NextResponse.json({ ok: true });
+    }
+
     return NextResponse.json({ error: 'Petición inválida' }, { status: 400 });
   } catch (error) {
     return handleError(error, 'Error al guardar el workspace');
@@ -115,6 +126,9 @@ export async function POST(request: NextRequest) {
       case 'approveAgent3':
         await approveAgent3(uid, body.payload as Agent4Input);
         return NextResponse.json({ ok: true });
+      case 'approveAgent4':
+        await approveAgent4(uid, body.payload as Agent5Input);
+        return NextResponse.json({ ok: true });
       case 'resetAgent1':
         await resetAgent1(uid);
         return NextResponse.json({ ok: true });
@@ -123,6 +137,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true });
       case 'resetAgent3':
         await resetAgent3(uid);
+        return NextResponse.json({ ok: true });
+      case 'resetAgent4':
+        await resetAgent4(uid);
         return NextResponse.json({ ok: true });
       case 'resetWorkspace':
         await resetWorkspace(uid);

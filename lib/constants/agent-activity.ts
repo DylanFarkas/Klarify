@@ -22,6 +22,14 @@ export const AGENT_ACTIVITY = {
   ACTION_READ_WISHES: { id: 'read-wishes', label: 'Leyendo deseos aprobados' },
   ACTION_GROUP_EPICS: { id: 'group-epics', label: 'Agrupando en épicas temáticas' },
   ACTION_GENERATE_STORIES: { id: 'generate-stories', label: 'Generando historias de usuario' },
+
+  // Agente 4 — prioritize
+  PHASE_PRIORITIZE: { id: 'prioritize', label: 'Priorizando backlog' },
+  ACTION_READ_BACKLOG: { id: 'read-backlog', label: 'Leyendo backlog estimado' },
+  ACTION_PRIORITIZE_STORIES: {
+    id: 'prioritize-stories',
+    label: 'Clasificando historias (MoSCoW)',
+  },
 } as const;
 
 /** Acciones que invocan al LLM y emiten bloques de razonamiento. */
@@ -29,6 +37,7 @@ export const LLM_STREAM_ACTION_IDS = new Set<string>([
   AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.id,
   AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.id,
   AGENT_ACTIVITY.ACTION_GENERATE_STORIES.id,
+  AGENT_ACTIVITY.ACTION_PRIORITIZE_STORIES.id,
 ]);
 
 /** Tiempo mínimo visible para acciones de preparación (evita que desaparezcan al instante). */

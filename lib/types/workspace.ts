@@ -9,6 +9,11 @@
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
+import type {
+  Agent4State,
+  StoryPrioritization,
+  PrioritizationFramework,
+} from '@/lib/types/agent-4';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -25,6 +30,16 @@ export interface Agent4Input {
   approvedAt: number;
 }
 
+/** Input que el Agente 4 entrega al Agente 5 al priorizar el backlog */
+export interface Agent5Input {
+  epics: Epic[];
+  estimations: Record<string, StoryEstimation>;
+  priorities: Record<string, StoryPrioritization>;
+  framework: PrioritizationFramework;
+  sourceWishIds: string[];
+  approvedAt: number;
+}
+
 /** Puente entre agentes (resultados aprobados que consume el siguiente paso) */
 export interface WorkspacePipeline {
   /** Escrito al aprobar el Agente 1, consumido por el Agente 2 */
@@ -33,6 +48,8 @@ export interface WorkspacePipeline {
   agent3Input: Agent3Input | null;
   /** Escrito al aprobar el Agente 3, consumido por el Agente 4 */
   agent4Input: Agent4Input | null;
+  /** Escrito al aprobar el Agente 4, consumido por el Agente 5 */
+  agent5Input: Agent5Input | null;
 }
 
 /** Estado completo del workspace de un usuario (un único flujo activo) */
@@ -40,6 +57,7 @@ export interface UserWorkspace {
   agent1: Agent1State;
   agent2: Agent2State;
   agent3: Agent3State;
+  agent4: Agent4State;
   pipeline: WorkspacePipeline;
 }
 
@@ -58,6 +76,14 @@ export interface WorkspaceResponse {
 const EMPTY_AGENT3: Agent3State = {
   input: null,
   estimations: {},
+  status: 'idle',
+  error: null,
+};
+
+const EMPTY_AGENT4: Agent4State = {
+  input: null,
+  priorities: {},
+  framework: 'moscow',
   status: 'idle',
   error: null,
 };
@@ -81,10 +107,12 @@ export function createEmptyWorkspace(): UserWorkspace {
       error: null,
     },
     agent3: { ...EMPTY_AGENT3 },
+    agent4: { ...EMPTY_AGENT4 },
     pipeline: {
       agent2Input: null,
       agent3Input: null,
       agent4Input: null,
+      agent5Input: null,
     },
   };
 }
