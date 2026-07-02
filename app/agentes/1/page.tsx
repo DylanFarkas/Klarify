@@ -35,6 +35,7 @@ import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/Clarifying
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
+import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 // ---------------------------------------------------------------------------
@@ -453,24 +454,42 @@ export default function Agent1Page() {
     );
   }
 
+  const showReviewStats = state.status === 'review' && state.wishes.length > 0;
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-      {/* Hero */}
-      <div className="mb-2">
-        <div className="mb-3 flex items-center gap-3 text-primary">
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest">
-            Paso 01 / 06
-          </span>
-        </div>
-        <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Ingesta de Contexto
-        </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-muted">
-          Comparte tu idea o la transcripción de una reunión. Analizamos el contexto,
-          te hacemos unas preguntas rápidas si hace falta, y extraemos los requerimientos
-          listos para revisar.
-        </p>
-      </div>
+      <AgentPageHero
+        step={1}
+        variant="capture"
+        title="Ingesta de Contexto"
+        description="Comparte tu idea o la transcripción de una reunión. Analizamos el contexto, te hacemos unas preguntas rápidas si hace falta, y extraemos los requerimientos listos para revisar."
+        stats={
+          showReviewStats ? (
+            <>
+              <AgentStat
+                icon={
+                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                }
+                value={state.wishes.length}
+                label={`deseo${state.wishes.length !== 1 ? 's' : ''} extraído${state.wishes.length !== 1 ? 's' : ''}`}
+              />
+              {state.discovery?.questions && state.discovery.questions.length > 0 && (
+                <AgentStat
+                  icon={
+                    <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                    </svg>
+                  }
+                  value={state.discovery.questions.length}
+                  label="preguntas respondidas"
+                />
+              )}
+            </>
+          ) : undefined
+        }
+      />
 
       {/* Upload */}
       {(state.status === 'idle' ||
@@ -594,19 +613,27 @@ export default function Agent1Page() {
             />
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-border bg-surface-muted px-6 py-5 sm:flex-row">
-            <button
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium text-muted hover:border-border-strong hover:bg-surface-hover hover:text-foreground transition-all cursor-pointer"
-            >
-              Subir otro archivo
-            </button>
-
-            <ApproveButton
-              onClick={handleApprove}
-              disabled={state.wishes.length === 0 || isApproving}
-              label="Aprobar Deseos y Continuar"
-            />
+          <div className="sticky bottom-6 z-20 animate-[slideUpFade_0.4s_ease-out]">
+            <div className="rounded-2xl border border-border/80 bg-surface-muted/80 backdrop-blur-xl px-6 py-4 shadow-[0_8px_32px_color-mix(in_srgb,var(--foreground)_8%,transparent)]">
+              <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                <p className="hidden text-sm text-subtle sm:block">
+                  Revisa los deseos antes de continuar al backlog.
+                </p>
+                <div className="flex w-full flex-col-reverse items-center gap-3 sm:w-auto sm:flex-row">
+                  <button
+                    onClick={handleReset}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium text-muted transition-all hover:border-border-strong hover:bg-surface-hover hover:text-foreground cursor-pointer sm:w-auto"
+                  >
+                    Subir otro archivo
+                  </button>
+                  <ApproveButton
+                    onClick={handleApprove}
+                    disabled={state.wishes.length === 0 || isApproving}
+                    label="Aprobar deseos y continuar"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}

@@ -15,49 +15,56 @@ interface AgentLayoutShellProps {
 export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLayoutShellProps) {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* ── Sidebar (solo desktop) ─────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-surface px-6 py-8 overflow-y-auto">
-        {/* Logo */}
-        <div className="flex justify-center mb-10">
+      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-surface px-6 py-8 overflow-y-auto scrollbar-gutter-stable">
+        <div className="mb-8">
           <Link
             href="/"
-            className="text-5xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
+            className="block text-center text-4xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
           >
             <span className="text-primary">K</span>larify
           </Link>
+          <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
+            Workspace de agentes
+          </p>
         </div>
 
-        {/* Stepper de agentes */}
         <AgentStepper currentStep={currentStep} />
 
-        {/* Configuración */}
-        <AgentSidebarSettings />
+        <div className="mt-8">
+          <AgentSidebarSettings />
+        </div>
 
-        {/* Nueva sesión */}
-        <div className="mt-2">
+        <div className="mt-3">
           <NewSessionButton />
         </div>
 
-        {/* Spacer + branding inferior */}
         <div className="mt-auto pt-8 border-t border-border">
-          <p className="text-xs text-subtle">
-            Klarify v0.1.0 — MVP
-          </p>
+          <p className="text-xs text-subtle">Klarify v0.1.0 — MVP</p>
         </div>
       </aside>
 
-      {/* ── Área principal ──────────────────────────────────────────── */}
       <div className="relative flex flex-1 flex-col min-w-0">
         <WorkspaceGridBackground />
 
-        {/* Configuración + nueva sesión (móvil/tablet) */}
-        <div className="relative z-10 border-b border-border bg-surface px-6 py-4 lg:hidden">
-          <AgentSidebarSettings className="mt-0 border-t-0 pt-0" />
+        <div className="relative z-10 border-b border-border bg-surface/90 backdrop-blur-md px-6 py-4 lg:hidden">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <Link href="/" className="text-lg font-extrabold tracking-tight text-foreground">
+                <span className="text-primary">K</span>larify
+              </Link>
+              <p className="truncate text-xs text-muted">
+                Paso {currentStep} - {agentTitle}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">
+              {currentStep}/6
+            </span>
+          </div>
+          <AgentSidebarSettings className="mt-4 border-t-0 pt-0" />
           <NewSessionButton className="mt-2" />
         </div>
 
-        {/* Contenido del agente */}
-        <main className="relative z-10 flex-1 overflow-y-auto px-6 py-8 lg:px-10 lg:py-10">
+        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-10 lg:py-10">
           {children}
         </main>
       </div>

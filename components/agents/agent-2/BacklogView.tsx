@@ -80,9 +80,14 @@ export function BacklogView({
       className="flex flex-col rounded-2xl border border-border bg-surface-muted backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
       aria-labelledby="backlog-heading"
     >
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* ── Header con ícono ─────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+            </svg>
+          </div>
           <h3 id="backlog-heading" className="text-lg font-bold text-foreground">
             Backlog
           </h3>
@@ -93,7 +98,7 @@ export function BacklogView({
       </div>
 
       {/* ── Contenido scrollable ───────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[600px]">
+      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[700px]">
         {epics.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">

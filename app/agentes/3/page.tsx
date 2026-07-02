@@ -13,10 +13,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import type { Agent3Input } from '@/lib/types/workspace';
 import type { Agent3State, Agent3Status, StoryEstimation } from '@/lib/types/agent-3';
 import { EmptyPrioritizationState } from '@/components/agents/agent-3/EmptyPrioritizationState';
 import { EstimationWorkspace } from '@/components/agents/agent-3/EstimationWorkspace';
+import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
+import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
+import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 
 const INITIAL_STATE: Agent3State = {
   input: null,
@@ -134,10 +136,16 @@ export default function Agent3Page() {
     allStories.length > 0 &&
     allStories.every((s) => (state.estimations[s.id]?.points ?? 0) > 0);
 
+  // ── Loading state ──────────────────────────────────────
   if (isLoading || !isHydrated) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
+        <div className="animate-[fadeIn_0.3s_ease-out]">
+          <div className="mb-5 h-7 w-28 rounded-full bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
+          <div className="mb-4 h-11 w-72 rounded-xl bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite] md:h-12" />
+          <div className="mb-2 h-5 w-96 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
+          <div className="mb-8 h-5 w-64 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
+        </div>
       </div>
     );
   }
@@ -147,33 +155,66 @@ export default function Agent3Page() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-      <div className="mb-2">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
-            Paso 03 / 06
-          </span>
-          {isApproved && (
-            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-              Consolidado
+      <AgentPageHero
+        step={3}
+        variant="measure"
+        title="Estimación en Story Points"
+        description="El agente sugiere Story Points para cada historia según su complejidad técnica. Tu equipo revisa y ajusta antes de consolidar."
+        statusBadge={
+          isApproved ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-success">
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Aprobado
             </span>
-          )}
-        </div>
-        <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Estimación en Story Points
-        </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-muted">
-          Como Scrum Master, el agente sugiere una estimación en Story Points para
-          cada historia de usuario del backlog aprobado, basándose en su complejidad
-          técnica. El equipo revisa y ajusta antes de consolidar.
-        </p>
-      </div>
+          ) : undefined
+        }
+        stats={
+          hasInput && Object.keys(state.estimations).length > 0 ? (
+            <>
+              <AgentStat
+                icon={
+                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+                  </svg>
+                }
+                value={epicCount}
+                label={`épica${epicCount !== 1 ? 's' : ''}`}
+              />
+              <AgentStat
+                icon={
+                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                  </svg>
+                }
+                value={storyCount}
+                label={`historia${storyCount !== 1 ? 's' : ''} de usuario`}
+              />
+              <AgentStat
+                icon={
+                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+                value={totalPoints}
+                label="Story Points"
+              />
+            </>
+          ) : undefined
+        }
+      />
 
       {state.error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {state.error}
-        </div>
+        <AgentErrorBanner
+          message={state.error}
+          onDismiss={() => setState((prev) => ({ ...prev, error: null }))}
+        />
       )}
 
+      {/* ═══════════════════════════════════════════════════════════
+          CONTENIDO PRINCIPAL
+         ═══════════════════════════════════════════════════════════ */}
       {hasInput && state.input ? (
         <>
           <EstimationWorkspace
@@ -188,33 +229,31 @@ export default function Agent3Page() {
             isApproving={isApproving}
           />
 
+          {/* ═════════════════════════════════════════════════════
+              ESTADO APROBADO — Celebración
+             ═════════════════════════════════════════════════════ */}
           {isApproved && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-success/30 bg-success/10 px-6 py-5 animate-[fadeIn_0.3s_ease-out] sm:flex-row sm:items-center">
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-success/30 bg-success/20">
-                  <svg className="h-5 w-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-success">
-                    ¡Backlog estimado exitosamente!
-                  </p>
-                  <p className="text-xs text-success/75">
-                    {epicCount} épicas · {storyCount} historias · {totalPoints} Story Points listos.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center sm:ml-auto">
+            <AgentCelebrationBanner
+              title="Backlog estimado"
+              description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${totalPoints} Story Points listos para el Agente 4.`}
+              action={
                 <button
                   onClick={() => router.push('/agentes/4')}
-                  className="rounded-xl bg-success px-5 py-2.5 text-sm font-bold text-black shadow-[0_4px_16px_color-mix(in_srgb,var(--success)_35%,transparent)] transition-all hover:opacity-90 cursor-pointer"
+                  className={[
+                    'inline-flex w-full items-center justify-center gap-2 rounded-xl sm:w-auto',
+                    'bg-success px-6 py-3 text-sm font-bold text-black',
+                    'shadow-[0_4px_20px_color-mix(in_srgb,var(--success)_35%,transparent)]',
+                    'transition-all duration-200 hover:shadow-[0_6px_28px_color-mix(in_srgb,var(--success)_45%,transparent)] hover:opacity-90',
+                    'cursor-pointer',
+                  ].join(' ')}
                 >
-                  Continuar al Agente 4 →
+                  Continuar al Agente 4
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
                 </button>
-              </div>
-            </div>
+              }
+            />
           )}
         </>
       ) : (

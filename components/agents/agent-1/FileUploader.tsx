@@ -253,6 +253,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             className={[
               'group relative flex h-[min(400px,55vh)] cursor-pointer flex-col items-center justify-center',
               'overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-300',
+              'agent-capture-drop',
               isDragging
                 ? 'border-primary bg-primary/10 shadow-[0_8px_32px_color-mix(in_srgb,var(--primary)_20%,transparent)]'
                 : 'border-border-strong bg-surface-muted shadow-sm hover:border-primary/60 hover:shadow-md',
