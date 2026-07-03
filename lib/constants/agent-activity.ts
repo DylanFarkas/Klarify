@@ -30,6 +30,21 @@ export const AGENT_ACTIVITY = {
     id: 'prioritize-stories',
     label: 'Clasificando historias',
   },
+
+  // Agente 5 — plan
+  PHASE_PLAN_SPRINTS: { id: 'plan-sprints', label: 'Planificando sprints' },
+  ACTION_READ_PRIORITIZED_BACKLOG: {
+    id: 'read-prioritized-backlog',
+    label: 'Leyendo backlog priorizado',
+  },
+  ACTION_ASSIGN_SPRINTS: {
+    id: 'assign-sprints',
+    label: 'Asignando historias a sprints',
+  },
+  ACTION_BUILD_SCHEDULE: {
+    id: 'build-schedule',
+    label: 'Generando cronograma',
+  },
 } as const;
 
 /** Acciones que invocan al LLM y emiten bloques de razonamiento. */
@@ -38,6 +53,7 @@ export const LLM_STREAM_ACTION_IDS = new Set<string>([
   AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.id,
   AGENT_ACTIVITY.ACTION_GENERATE_STORIES.id,
   AGENT_ACTIVITY.ACTION_PRIORITIZE_STORIES.id,
+  AGENT_ACTIVITY.ACTION_ASSIGN_SPRINTS.id,
 ]);
 
 /** Tiempo mínimo visible para acciones de preparación (evita que desaparezcan al instante). */
