@@ -12,6 +12,7 @@ import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
 import type { Agent3State } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
+import type { Agent5State } from '@/lib/types/agent-5';
 import type {
   UserWorkspace,
   WorkspacePreferences,
@@ -19,6 +20,7 @@ import type {
   Agent3Input,
   Agent4Input,
   Agent5Input,
+  Agent6Input,
 } from '@/lib/types/workspace';
 
 const EMPTY_AGENT1: Agent1State = {
@@ -49,6 +51,13 @@ const EMPTY_AGENT4: Agent4State = {
   input: null,
   priorities: {},
   framework: 'moscow',
+  status: 'idle',
+  error: null,
+};
+
+const EMPTY_AGENT5: Agent5State = {
+  input: null,
+  plan: null,
   status: 'idle',
   error: null,
 };
@@ -87,11 +96,13 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
         ...(ws?.agent4 ?? {}),
         priorities: { ...EMPTY_AGENT4.priorities, ...(ws?.agent4?.priorities ?? {}) },
       },
+      agent5: { ...EMPTY_AGENT5, ...(ws?.agent5 ?? {}) },
       pipeline: {
         agent2Input: ws?.pipeline?.agent2Input ?? null,
         agent3Input: ws?.pipeline?.agent3Input ?? null,
         agent4Input: ws?.pipeline?.agent4Input ?? null,
         agent5Input: ws?.pipeline?.agent5Input ?? null,
+        agent6Input: ws?.pipeline?.agent6Input ?? null,
       },
     },
     preferences: {
@@ -304,6 +315,64 @@ export async function resetAgent4(uid: string): Promise<void> {
   );
 }
 
+/** Guarda (merge) el estado del Agente 5. */
+export async function saveAgent5State(uid: string, state: Agent5State): Promise<void> {
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent5: sanitize(state),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
+/** Marca el Agente 5 como aprobado y escribe el input para el Agente 6. */
+export async function approveAgent5(uid: string, agent6Input: Agent6Input): Promise<void> {
+  const { workspace } = await getWorkspaceData(uid);
+  const agent5Input: Agent5Input = {
+    epics: agent6Input.epics,
+    estimations: agent6Input.estimations,
+    priorities: agent6Input.priorities,
+    framework: agent6Input.framework,
+    sourceWishIds: agent6Input.sourceWishIds,
+    approvedAt: agent6Input.approvedAt,
+  };
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent5: sanitize({
+          ...workspace.agent5,
+          input: agent5Input,
+          plan: agent6Input.plan,
+          status: 'approved',
+          error: null,
+        }),
+        pipeline: {
+          ...workspace.pipeline,
+          agent6Input: sanitize(agent6Input),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
+/** Limpia el estado del Agente 5 (todos sus campos vuelven al estado inicial). */
+export async function resetAgent5(uid: string): Promise<void> {
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent5: EMPTY_AGENT5,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+}
+
 /** Actualiza el último agente visitado (preferencia de navegación). */
 export async function saveLastAgent(uid: string, lastAgent: string): Promise<void> {
   await userDoc(uid).set(
@@ -314,7 +383,7 @@ export async function saveLastAgent(uid: string, lastAgent: string): Promise<voi
   );
 }
 
-/** Limpia todo el workspace (agentes 1–4 + pipeline). MVP: una sesión por usuario. */
+/** Limpia todo el workspace (agentes 1–5 + pipeline). MVP: una sesión por usuario. */
 export async function resetWorkspace(uid: string): Promise<void> {
   await userDoc(uid).set(
     {
@@ -323,11 +392,13 @@ export async function resetWorkspace(uid: string): Promise<void> {
         agent2: EMPTY_AGENT2,
         agent3: EMPTY_AGENT3,
         agent4: EMPTY_AGENT4,
+        agent5: EMPTY_AGENT5,
         pipeline: {
           agent2Input: null,
           agent3Input: null,
           agent4Input: null,
           agent5Input: null,
+          agent6Input: null,
         },
         updatedAt: FieldValue.serverTimestamp(),
       },

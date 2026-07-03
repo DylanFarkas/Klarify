@@ -14,6 +14,7 @@ import type {
   StoryPrioritization,
   PrioritizationFramework,
 } from '@/lib/types/agent-4';
+import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -40,6 +41,17 @@ export interface Agent5Input {
   approvedAt: number;
 }
 
+/** Input que el Agente 5 entrega al Agente 6 al consolidar el plan de sprints */
+export interface Agent6Input {
+  epics: Epic[];
+  estimations: Record<string, StoryEstimation>;
+  priorities: Record<string, StoryPrioritization>;
+  framework: PrioritizationFramework;
+  plan: SprintPlan;
+  sourceWishIds: string[];
+  approvedAt: number;
+}
+
 /** Puente entre agentes (resultados aprobados que consume el siguiente paso) */
 export interface WorkspacePipeline {
   /** Escrito al aprobar el Agente 1, consumido por el Agente 2 */
@@ -50,6 +62,8 @@ export interface WorkspacePipeline {
   agent4Input: Agent4Input | null;
   /** Escrito al aprobar el Agente 4, consumido por el Agente 5 */
   agent5Input: Agent5Input | null;
+  /** Escrito al aprobar el Agente 5, consumido por un futuro Agente 6 */
+  agent6Input: Agent6Input | null;
 }
 
 /** Estado completo del workspace de un usuario (un único flujo activo) */
@@ -58,6 +72,7 @@ export interface UserWorkspace {
   agent2: Agent2State;
   agent3: Agent3State;
   agent4: Agent4State;
+  agent5: Agent5State;
   pipeline: WorkspacePipeline;
 }
 
@@ -88,6 +103,13 @@ const EMPTY_AGENT4: Agent4State = {
   error: null,
 };
 
+const EMPTY_AGENT5: Agent5State = {
+  input: null,
+  plan: null,
+  status: 'idle',
+  error: null,
+};
+
 /** Estado vacío del workspace (tras nueva sesión). */
 export function createEmptyWorkspace(): UserWorkspace {
   return {
@@ -108,11 +130,13 @@ export function createEmptyWorkspace(): UserWorkspace {
     },
     agent3: { ...EMPTY_AGENT3 },
     agent4: { ...EMPTY_AGENT4 },
+    agent5: { ...EMPTY_AGENT5 },
     pipeline: {
       agent2Input: null,
       agent3Input: null,
       agent4Input: null,
       agent5Input: null,
+      agent6Input: null,
     },
   };
 }
