@@ -24,6 +24,9 @@ import {
   approveAgent3,
   approveAgent4,
   approveAgent5,
+  createUserStoryAcrossWorkspace,
+  deleteUserStoryAcrossWorkspace,
+  updateUserStoryAcrossWorkspace,
   resetAgent1,
   resetAgent2,
   resetAgent3,
@@ -32,8 +35,8 @@ import {
   resetWorkspace,
 } from '@/lib/workspace-service';
 import type { Agent1State } from '@/lib/types/agent-1';
-import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
-import type { Agent3State } from '@/lib/types/agent-3';
+import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
+import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
 import type { Agent5State } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
@@ -51,13 +54,37 @@ interface PostBody {
     | 'approveAgent3'
     | 'approveAgent4'
     | 'approveAgent5'
+    | 'createUserStory'
+    | 'deleteUserStory'
+    | 'updateUserStory'
     | 'resetAgent1'
     | 'resetAgent2'
     | 'resetAgent3'
     | 'resetAgent4'
     | 'resetAgent5'
     | 'resetWorkspace';
-  payload?: Agent2Input | Agent3Input | Agent4Input | Agent5Input | Agent6Input;
+  payload?:
+    | Agent2Input
+    | Agent3Input
+    | Agent4Input
+    | Agent5Input
+    | Agent6Input
+    | {
+        storyId: string;
+        updates: Partial<UserStory>;
+        estimationUpdates?: Partial<StoryEstimation>;
+      }
+    | {
+        epicId: string;
+        sprintId?: string | null;
+        title: string;
+        description: string;
+        acceptanceCriteria: string[];
+        points: number;
+      }
+    | {
+        storyId: string;
+      };
 }
 
 function handleError(error: unknown, fallback: string): NextResponse {
@@ -143,6 +170,53 @@ export async function POST(request: NextRequest) {
       case 'approveAgent5':
         await approveAgent5(uid, body.payload as Agent6Input);
         return NextResponse.json({ ok: true });
+      case 'createUserStory': {
+        const payload = body.payload as {
+          epicId?: string;
+          sprintId?: string | null;
+          title?: string;
+          description?: string;
+          acceptanceCriteria?: string[];
+          points?: number;
+        };
+        if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await createUserStoryAcrossWorkspace(uid, {
+          epicId: payload.epicId,
+          sprintId: payload.sprintId ?? null,
+          title: payload.title,
+          description: payload.description,
+          acceptanceCriteria: payload.acceptanceCriteria ?? [],
+          points: payload.points,
+        });
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'deleteUserStory': {
+        const payload = body.payload as { storyId?: string };
+        if (!payload.storyId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await deleteUserStoryAcrossWorkspace(uid, payload.storyId);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'updateUserStory': {
+        const payload = body.payload as {
+          storyId?: string;
+          updates?: Partial<UserStory>;
+          estimationUpdates?: Partial<StoryEstimation>;
+        };
+        if (!payload.storyId || !payload.updates) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await updateUserStoryAcrossWorkspace(
+          uid,
+          payload.storyId,
+          payload.updates,
+          payload.estimationUpdates
+        );
+        return NextResponse.json({ ok: true, workspace });
+      }
       case 'resetAgent1':
         await resetAgent1(uid);
         return NextResponse.json({ ok: true });
