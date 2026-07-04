@@ -29,6 +29,15 @@ import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5
 
 const SAVE_DEBOUNCE_MS = 500;
 
+export interface CreateDashboardUserStoryInput {
+  epicId: string;
+  sprintId?: string | null;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  points: number;
+}
+
 export interface UseWorkspaceResult {
   workspace: UserWorkspace | null;
   isLoading: boolean;
@@ -47,6 +56,8 @@ export interface UseWorkspaceResult {
   approveAgent3: (input: Agent4Input) => Promise<void>;
   approveAgent4: (input: Agent5Input) => Promise<void>;
   approveAgent5: (input: Agent6Input) => Promise<void>;
+  createUserStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
+  deleteUserStory: (storyId: string) => Promise<void>;
   updateUserStory: (
     storyId: string,
     updates: Partial<UserStory>,
@@ -406,6 +417,48 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const createUserStory = useCallback(
+    async (input: CreateDashboardUserStoryInput) => {
+      if (!user) return;
+      const response = await authFetch('/api/workspace', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'createUserStory', payload: input }),
+      });
+
+      if (!response.ok) {
+        throw new Error('No se pudo crear la historia de usuario');
+      }
+
+      const data = (await response.json()) as { workspace?: UserWorkspace };
+      if (data.workspace) {
+        setWorkspace(data.workspace);
+      }
+    },
+    [user]
+  );
+
+  const deleteUserStory = useCallback(
+    async (storyId: string) => {
+      if (!user) return;
+      const response = await authFetch('/api/workspace', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteUserStory', payload: { storyId } }),
+      });
+
+      if (!response.ok) {
+        throw new Error('No se pudo eliminar la historia de usuario');
+      }
+
+      const data = (await response.json()) as { workspace?: UserWorkspace };
+      if (data.workspace) {
+        setWorkspace(data.workspace);
+      }
+    },
+    [user]
+  );
+
   const resetAgent1 = useCallback(() => runAction('resetAgent1'), [runAction]);
   const resetAgent2 = useCallback(() => runAction('resetAgent2'), [runAction]);
   const resetAgent3 = useCallback(() => runAction('resetAgent3'), [runAction]);
@@ -440,6 +493,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         approveAgent3,
         approveAgent4,
         approveAgent5,
+        createUserStory,
+        deleteUserStory,
         updateUserStory,
         resetAgent1,
         resetAgent2,

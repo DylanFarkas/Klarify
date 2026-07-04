@@ -24,6 +24,8 @@ import {
   approveAgent3,
   approveAgent4,
   approveAgent5,
+  createUserStoryAcrossWorkspace,
+  deleteUserStoryAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
   resetAgent1,
   resetAgent2,
@@ -52,6 +54,8 @@ interface PostBody {
     | 'approveAgent3'
     | 'approveAgent4'
     | 'approveAgent5'
+    | 'createUserStory'
+    | 'deleteUserStory'
     | 'updateUserStory'
     | 'resetAgent1'
     | 'resetAgent2'
@@ -69,6 +73,17 @@ interface PostBody {
         storyId: string;
         updates: Partial<UserStory>;
         estimationUpdates?: Partial<StoryEstimation>;
+      }
+    | {
+        epicId: string;
+        sprintId?: string | null;
+        title: string;
+        description: string;
+        acceptanceCriteria: string[];
+        points: number;
+      }
+    | {
+        storyId: string;
       };
 }
 
@@ -155,6 +170,36 @@ export async function POST(request: NextRequest) {
       case 'approveAgent5':
         await approveAgent5(uid, body.payload as Agent6Input);
         return NextResponse.json({ ok: true });
+      case 'createUserStory': {
+        const payload = body.payload as {
+          epicId?: string;
+          sprintId?: string | null;
+          title?: string;
+          description?: string;
+          acceptanceCriteria?: string[];
+          points?: number;
+        };
+        if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await createUserStoryAcrossWorkspace(uid, {
+          epicId: payload.epicId,
+          sprintId: payload.sprintId ?? null,
+          title: payload.title,
+          description: payload.description,
+          acceptanceCriteria: payload.acceptanceCriteria ?? [],
+          points: payload.points,
+        });
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'deleteUserStory': {
+        const payload = body.payload as { storyId?: string };
+        if (!payload.storyId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await deleteUserStoryAcrossWorkspace(uid, payload.storyId);
+        return NextResponse.json({ ok: true, workspace });
+      }
       case 'updateUserStory': {
         const payload = body.payload as {
           storyId?: string;

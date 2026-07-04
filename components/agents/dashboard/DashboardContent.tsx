@@ -10,11 +10,14 @@ import { DashboardSprintStoriesTable } from './DashboardSprintStoriesTable';
 import type { DashboardMetrics } from './dashboardMetrics';
 import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
 interface DashboardContentProps {
 	hasContent: boolean;
 	metrics: DashboardMetrics;
+	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
+	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
@@ -23,7 +26,14 @@ interface DashboardContentProps {
 	workspace: UserWorkspace;
 }
 
-export function DashboardContent({ hasContent, metrics, onEditStory, workspace }: DashboardContentProps) {
+export function DashboardContent({
+	hasContent,
+	metrics,
+	onCreateStory,
+	onDeleteStory,
+	onEditStory,
+	workspace,
+}: DashboardContentProps) {
 	const activeAgents = [
 		{ name: 'Agente 1', status: workspace.agent1.status, href: '/agentes/1' },
 		{ name: 'Agente 2', status: workspace.agent2.status, href: '/agentes/2' },
@@ -48,9 +58,12 @@ export function DashboardContent({ hasContent, metrics, onEditStory, workspace }
 			<DashboardPriorityBuckets metrics={metrics} />
 			<DashboardSecondaryMetrics metrics={metrics} />
 			<DashboardSprintStoriesTable
+				epics={metrics.epics}
 				framework={metrics.framework}
 				rows={metrics.sprintStoryRows}
 				unassignedRows={metrics.unassignedStoryRows}
+				onCreateStory={onCreateStory}
+				onDeleteStory={onDeleteStory}
 				onEditStory={onEditStory}
 			/>
 			{hasContent ? <DashboardEpicBreakdown metrics={metrics} /> : <DashboardEmptyState />}

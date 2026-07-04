@@ -6,15 +6,21 @@ import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
-import type { UserStory } from '@/lib/types/agent-2';
+import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
+import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
 
+const ALLOWED_STORY_POINTS = [1, 2, 3, 5, 8, 13, 21] as const;
+
 interface DashboardSprintStoriesTableProps {
+	epics: Epic[];
 	framework: PrioritizationFramework | null;
 	rows: DashboardSprintStoryRow[];
 	unassignedRows: DashboardSprintStoryRow[];
+	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
+	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
@@ -23,14 +29,19 @@ interface DashboardSprintStoriesTableProps {
 }
 
 export function DashboardSprintStoriesTable({
+	epics,
 	framework,
 	rows,
 	unassignedRows,
+	onCreateStory,
+	onDeleteStory,
 	onEditStory,
 }: DashboardSprintStoriesTableProps) {
 	const [detailRow, setDetailRow] = useState<DashboardSprintStoryRow | null>(null);
 	const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
+	const [isCreating, setIsCreating] = useState(false);
 	const groupedRows = useMemo(() => groupRowsBySprint(rows), [rows]);
+	const sprintOptions = useMemo(() => getSprintOptions(rows), [rows]);
 	const hasRows = rows.length > 0 || unassignedRows.length > 0;
 
 	return (
@@ -43,11 +54,39 @@ export function DashboardSprintStoriesTable({
 						Consulta que HU vive en cada sprint, revisa su detalle y ajusta titulo, descripcion o criterios cuando haga falta.
 					</p>
 				</div>
-				<div className="rounded-2xl border border-border bg-surface px-4 py-3 text-right">
-					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">HU planificadas</p>
-					<p className="mt-1 text-2xl font-bold text-foreground">{rows.length}</p>
+				<div className="flex flex-wrap items-start gap-3">
+					<button
+						type="button"
+						onClick={() => setIsCreating(true)}
+						disabled={epics.length === 0 || isCreating}
+						className={[
+							'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all',
+							epics.length > 0 && !isCreating
+								? 'bg-primary text-white hover:bg-primary-hover'
+								: 'bg-disabled text-disabled-text cursor-not-allowed',
+						].join(' ')}
+					>
+						<PlusIcon />
+						Nueva HU
+					</button>
+					<div className="rounded-2xl border border-border bg-surface px-4 py-3 text-right">
+						<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">HU planificadas</p>
+						<p className="mt-1 text-2xl font-bold text-foreground">{rows.length}</p>
+					</div>
 				</div>
 			</div>
+
+			{isCreating && (
+				<CreateStoryPanel
+					epics={epics}
+					sprintOptions={sprintOptions}
+					onCancel={() => setIsCreating(false)}
+					onCreate={async (input) => {
+						await onCreateStory(input);
+						setIsCreating(false);
+					}}
+				/>
+			)}
 
 			{hasRows ? (
 				<div className="overflow-x-auto">
@@ -70,6 +109,7 @@ export function DashboardSprintStoriesTable({
 									group={group}
 									editingStoryId={editingStoryId}
 									onCancelEdit={() => setEditingStoryId(null)}
+									onDeleteStory={onDeleteStory}
 									onEditStory={onEditStory}
 									onOpenDetail={setDetailRow}
 									onStartEdit={setEditingStoryId}
@@ -81,6 +121,7 @@ export function DashboardSprintStoriesTable({
 									group={{ key: 'unassigned', label: 'Sin sprint', meta: 'Pendientes de asignacion', rows: unassignedRows }}
 									editingStoryId={editingStoryId}
 									onCancelEdit={() => setEditingStoryId(null)}
+									onDeleteStory={onDeleteStory}
 									onEditStory={onEditStory}
 									onOpenDetail={setDetailRow}
 									onStartEdit={setEditingStoryId}
@@ -129,6 +170,11 @@ interface SprintRowsGroup {
 	rows: DashboardSprintStoryRow[];
 }
 
+interface SprintOption {
+	id: string;
+	label: string;
+}
+
 function groupRowsBySprint(rows: DashboardSprintStoryRow[]): SprintRowsGroup[] {
 	const groups = new Map<string, SprintRowsGroup>();
 
@@ -151,11 +197,26 @@ function groupRowsBySprint(rows: DashboardSprintStoryRow[]): SprintRowsGroup[] {
 	return Array.from(groups.values());
 }
 
+function getSprintOptions(rows: DashboardSprintStoryRow[]): SprintOption[] {
+	const options = new Map<string, SprintOption>();
+
+	rows.forEach((row) => {
+		if (!row.sprintId || !row.sprintNumber) return;
+		options.set(row.sprintId, {
+			id: row.sprintId,
+			label: `Sprint ${row.sprintNumber}`,
+		});
+	});
+
+	return Array.from(options.values());
+}
+
 function SprintGroupRows({
 	framework,
 	group,
 	editingStoryId,
 	onCancelEdit,
+	onDeleteStory,
 	onEditStory,
 	onOpenDetail,
 	onStartEdit,
@@ -164,6 +225,7 @@ function SprintGroupRows({
 	group: SprintRowsGroup;
 	editingStoryId: string | null;
 	onCancelEdit: () => void;
+	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
@@ -201,6 +263,7 @@ function SprintGroupRows({
 						key={row.id}
 						framework={framework}
 						row={row}
+						onDelete={async () => onDeleteStory(row.story.id)}
 						onOpenDetail={() => onOpenDetail(row)}
 						onStartEdit={() => onStartEdit(row.story.id)}
 					/>
@@ -213,14 +276,18 @@ function SprintGroupRows({
 function StoryReadOnlyRow({
 	framework,
 	row,
+	onDelete,
 	onOpenDetail,
 	onStartEdit,
 }: {
 	framework: PrioritizationFramework | null;
 	row: DashboardSprintStoryRow;
+	onDelete: () => Promise<void>;
 	onOpenDetail: () => void;
 	onStartEdit: () => void;
 }) {
+	const [isDeleting, setIsDeleting] = useState(false);
+
 	return (
 		<tr className="border-b border-border/70 transition-colors hover:bg-surface-hover/40">
 			<td className="px-6 py-4 align-top">
@@ -255,6 +322,30 @@ function StoryReadOnlyRow({
 					>
 						<EditIcon />
 					</button>
+					<button
+						type="button"
+						onClick={async () => {
+							const confirmed = window.confirm(`Eliminar ${row.story.id}: ${row.story.title}?`);
+							if (!confirmed) return;
+							setIsDeleting(true);
+							try {
+								await onDelete();
+							} finally {
+								setIsDeleting(false);
+							}
+						}}
+						disabled={isDeleting}
+						aria-label="Eliminar HU"
+						title="Eliminar HU"
+						className={[
+							'inline-flex items-center justify-center rounded-lg p-1.5 text-muted transition-all',
+							isDeleting
+								? 'cursor-not-allowed opacity-60'
+								: 'hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30',
+						].join(' ')}
+					>
+						<TrashIcon />
+					</button>
 				</div>
 			</td>
 		</tr>
@@ -276,10 +367,11 @@ function EditableStoryRow({
 	const [title, setTitle] = useState(row.story.title);
 	const [description, setDescription] = useState(row.story.description);
 	const [criteria, setCriteria] = useState(row.story.acceptanceCriteria);
-	const [points, setPoints] = useState(String(row.estimation?.points ?? 0));
+	const initialPoints = row.estimation?.points ?? 1;
+	const [points, setPoints] = useState(String(isAllowedStoryPoint(initialPoints) ? initialPoints : 1));
 	const [isSaving, setIsSaving] = useState(false);
 	const parsedPoints = Number(points);
-	const isInvalidPoints = !Number.isInteger(parsedPoints) || parsedPoints < 0;
+	const isInvalidPoints = !isAllowedStoryPoint(parsedPoints);
 	const isSaveDisabled = !title.trim() || !description.trim() || isInvalidPoints || isSaving;
 
 	return (
@@ -301,19 +393,17 @@ function EditableStoryRow({
 							</label>
 							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
 								Story points
-								<input
-									type="number"
-									min={0}
-									step={1}
+								<select
 									value={points}
 									onChange={(event) => setPoints(event.target.value)}
-									className={[
-										'mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm font-bold text-foreground outline-none transition-all',
-										isInvalidPoints
-											? 'border-red-400/60 focus:border-red-400 focus:ring-1 focus:ring-red-400/30'
-											: 'border-input-border focus:border-primary/60 focus:ring-1 focus:ring-primary/30',
-									].join(' ')}
-								/>
+									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+								>
+									{ALLOWED_STORY_POINTS.map((value) => (
+										<option key={value} value={value}>
+											{value}
+										</option>
+									))}
+								</select>
 							</label>
 						</div>
 						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
@@ -375,6 +465,157 @@ function EditableStoryRow({
 	);
 }
 
+function CreateStoryPanel({
+	epics,
+	sprintOptions,
+	onCancel,
+	onCreate,
+}: {
+	epics: Epic[];
+	sprintOptions: SprintOption[];
+	onCancel: () => void;
+	onCreate: (input: CreateDashboardUserStoryInput) => Promise<void>;
+}) {
+	const [epicId, setEpicId] = useState(epics[0]?.id ?? '');
+	const [sprintId, setSprintId] = useState('');
+	const [title, setTitle] = useState('');
+	const [description, setDescription] = useState('');
+	const [criteria, setCriteria] = useState<string[]>([]);
+	const [points, setPoints] = useState(String(ALLOWED_STORY_POINTS[0]));
+	const [isSaving, setIsSaving] = useState(false);
+	const isSaveDisabled = !epicId || !title.trim() || !description.trim() || isSaving;
+
+	return (
+		<div className="border-b border-border bg-primary/5 px-6 py-5">
+			<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">Nueva HU</p>
+					<p className="mt-1 text-sm text-muted">
+						La historia se crea como manual y queda sincronizada con el backlog y el plan.
+					</p>
+				</div>
+			</div>
+
+			<div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+				<div className="flex flex-col gap-3">
+					<div className="grid gap-3 sm:grid-cols-3">
+						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+							Epica
+							<select
+								value={epicId}
+								onChange={(event) => setEpicId(event.target.value)}
+								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+							>
+								{epics.map((epic) => (
+									<option key={epic.id} value={epic.id}>
+										{epic.title}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+							Sprint
+							<select
+								value={sprintId}
+								onChange={(event) => setSprintId(event.target.value)}
+								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+							>
+								<option value="">Sin sprint</option>
+								{sprintOptions.map((sprint) => (
+									<option key={sprint.id} value={sprint.id}>
+										{sprint.label}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+							Story points
+							<select
+								value={points}
+								onChange={(event) => setPoints(event.target.value)}
+								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+							>
+								{ALLOWED_STORY_POINTS.map((value) => (
+									<option key={value} value={value}>
+										{value}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
+
+					<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+						Titulo
+						<input
+							value={title}
+							onChange={(event) => setTitle(event.target.value)}
+							placeholder="Titulo de la historia..."
+							className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-semibold text-foreground outline-none transition-all placeholder:text-placeholder focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+						/>
+					</label>
+
+					<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+						Descripcion
+						<textarea
+							value={description}
+							onChange={(event) => setDescription(event.target.value)}
+							rows={4}
+							placeholder="Como usuario, quiero..."
+							className="mt-1 w-full resize-none rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all placeholder:text-placeholder focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+						/>
+					</label>
+				</div>
+
+				<div className="group">
+					<AcceptanceCriteriaEditor criteria={criteria} onChange={setCriteria} disabled={false} />
+				</div>
+			</div>
+
+			<div className="mt-4 flex justify-end gap-2">
+				<button
+					type="button"
+					onClick={onCancel}
+					className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+				>
+					Cancelar
+				</button>
+				<button
+					type="button"
+					onClick={async () => {
+						if (isSaveDisabled) return;
+						setIsSaving(true);
+						try {
+							await onCreate({
+								epicId,
+								sprintId: sprintId || null,
+								title: title.trim(),
+								description: description.trim(),
+								acceptanceCriteria: criteria,
+								points: Number(points),
+							});
+						} finally {
+							setIsSaving(false);
+						}
+					}}
+					disabled={isSaveDisabled}
+					className={[
+						'rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
+						isSaveDisabled
+							? 'bg-disabled text-disabled-text cursor-not-allowed'
+							: 'bg-primary text-white hover:bg-primary-hover',
+					].join(' ')}
+				>
+					{isSaving ? 'Creando...' : 'Crear HU'}
+				</button>
+			</div>
+		</div>
+	);
+}
+
+function isAllowedStoryPoint(value: number): value is (typeof ALLOWED_STORY_POINTS)[number] {
+	return ALLOWED_STORY_POINTS.includes(value as (typeof ALLOWED_STORY_POINTS)[number]);
+}
+
 function formatDateRange(startDate: string | null, endDate: string | null): string {
 	if (!startDate || !endDate) return '';
 	return `${startDate} - ${endDate}`;
@@ -384,6 +625,22 @@ function EditIcon() {
 	return (
 		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
 			<path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+		</svg>
+	);
+}
+
+function PlusIcon() {
+	return (
+		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+			<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+		</svg>
+	);
+}
+
+function TrashIcon() {
+	return (
+		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
+			<path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
 		</svg>
 	);
 }

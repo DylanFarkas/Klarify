@@ -12,7 +12,7 @@ import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
-import type { Agent5State } from '@/lib/types/agent-5';
+import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type {
   UserWorkspace,
   WorkspacePreferences,
@@ -62,6 +62,15 @@ const EMPTY_AGENT5: Agent5State = {
   error: null,
 };
 
+export interface CreateUserStoryInput {
+  epicId: string;
+  sprintId?: string | null;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  points: number;
+}
+
 /**
  * Elimina valores `undefined` de objetos anidados. Firestore rechaza `undefined`
  * (p. ej. campos opcionales como `TranscriptionSegment.speaker`), así que
@@ -90,6 +99,32 @@ function updateStoryInEpics(
   }));
 }
 
+function addStoryToEpics(
+  epics: Epic[] | null | undefined,
+  epicId: string,
+  story: UserStory
+): Epic[] | null | undefined {
+  if (!epics) return epics;
+
+  return epics.map((epic) =>
+    epic.id === epicId
+      ? { ...epic, userStories: [...epic.userStories, story], isEdited: true }
+      : epic
+  );
+}
+
+function deleteStoryFromEpics(
+  epics: Epic[] | null | undefined,
+  storyId: string
+): Epic[] | null | undefined {
+  if (!epics) return epics;
+
+  return epics.map((epic) => ({
+    ...epic,
+    userStories: epic.userStories.filter((story) => story.id !== storyId),
+  }));
+}
+
 function updateStoryEstimation(
   estimations: Record<string, StoryEstimation>,
   storyId: string,
@@ -111,6 +146,86 @@ function updateStoryEstimation(
       isModified: true,
     },
   };
+}
+
+function deleteRecordEntry<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+function addStoryToPlan(
+  plan: SprintPlan | null,
+  storyId: string,
+  sprintId?: string | null
+): SprintPlan | null {
+  if (!plan) return plan;
+
+  if (!sprintId) {
+    return {
+      ...plan,
+      unassignedStoryIds: Array.from(new Set([...plan.unassignedStoryIds, storyId])),
+    };
+  }
+
+  const sprintExists = plan.sprints.some((sprint) => sprint.id === sprintId);
+  if (!sprintExists) {
+    return {
+      ...plan,
+      unassignedStoryIds: Array.from(new Set([...plan.unassignedStoryIds, storyId])),
+    };
+  }
+
+  return {
+    ...plan,
+    sprints: plan.sprints.map((sprint) =>
+      sprint.id === sprintId
+        ? { ...sprint, storyIds: Array.from(new Set([...sprint.storyIds, storyId])), isEdited: true }
+        : sprint
+    ),
+    unassignedStoryIds: plan.unassignedStoryIds.filter((id) => id !== storyId),
+  };
+}
+
+function deleteStoryFromPlan(plan: SprintPlan | null, storyId: string): SprintPlan | null {
+  if (!plan) return plan;
+
+  return {
+    ...plan,
+    sprints: plan.sprints.map((sprint) => ({
+      ...sprint,
+      storyIds: sprint.storyIds.filter((id) => id !== storyId),
+    })),
+    dependencies: plan.dependencies.filter(
+      (dependency) =>
+        dependency.storyId !== storyId && dependency.dependsOnStoryId !== storyId
+    ),
+    unassignedStoryIds: plan.unassignedStoryIds.filter((id) => id !== storyId),
+  };
+}
+
+function collectEpics(workspace: UserWorkspace): Epic[] {
+  return [
+    ...workspace.agent2.epics,
+    ...(workspace.agent3.input?.epics ?? []),
+    ...(workspace.agent4.input?.epics ?? []),
+    ...(workspace.agent5.input?.epics ?? []),
+    ...(workspace.pipeline.agent3Input?.epics ?? []),
+    ...(workspace.pipeline.agent4Input?.epics ?? []),
+    ...(workspace.pipeline.agent5Input?.epics ?? []),
+    ...(workspace.pipeline.agent6Input?.epics ?? []),
+  ];
+}
+
+function generateUserStoryId(workspace: UserWorkspace): string {
+  const maxId = collectEpics(workspace)
+    .flatMap((epic) => epic.userStories)
+    .reduce((max, story) => {
+      const match = story.id.match(/^HU-(\d+)$/i);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+  return `HU-${String(maxId + 1).padStart(3, '0')}`;
 }
 
 /** Lee el workspace + preferencias del usuario, rellenando valores por defecto. */
@@ -267,6 +382,236 @@ export async function updateUserStoryAcrossWorkspace(
               storyId,
               estimationUpdates
             ),
+          }
+        : null,
+    },
+  };
+
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent2: sanitize(updatedWorkspace.agent2),
+        agent3: sanitize(updatedWorkspace.agent3),
+        agent4: sanitize(updatedWorkspace.agent4),
+        agent5: sanitize(updatedWorkspace.agent5),
+        pipeline: sanitize(updatedWorkspace.pipeline),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return updatedWorkspace;
+}
+
+export async function createUserStoryAcrossWorkspace(
+  uid: string,
+  input: CreateUserStoryInput
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const storyId = generateUserStoryId(workspace);
+  const story: UserStory = {
+    id: storyId,
+    title: input.title,
+    description: input.description,
+    acceptanceCriteria: input.acceptanceCriteria,
+    sourceWishIds: [],
+    source: 'manual',
+    isEdited: false,
+    createdAt: Date.now(),
+  };
+  const estimation: StoryEstimation = {
+    points: input.points,
+    justification: 'Estimacion creada manualmente desde el dashboard.',
+    isModified: true,
+  };
+  const updatedAgent5Plan = addStoryToPlan(workspace.agent5.plan, storyId, input.sprintId);
+  const updatedPipelinePlan = addStoryToPlan(
+    workspace.pipeline.agent6Input?.plan ?? null,
+    storyId,
+    input.sprintId
+  );
+  const updatedWorkspace: UserWorkspace = {
+    ...workspace,
+    agent2: {
+      ...workspace.agent2,
+      epics: addStoryToEpics(workspace.agent2.epics, input.epicId, story) ?? [],
+    },
+    agent3: {
+      ...workspace.agent3,
+      estimations: updateStoryEstimation(workspace.agent3.estimations, storyId, estimation),
+      input: workspace.agent3.input
+        ? {
+            ...workspace.agent3.input,
+            epics: addStoryToEpics(workspace.agent3.input.epics, input.epicId, story) ?? [],
+          }
+        : null,
+    },
+    agent4: {
+      ...workspace.agent4,
+      input: workspace.agent4.input
+        ? {
+            ...workspace.agent4.input,
+            epics: addStoryToEpics(workspace.agent4.input.epics, input.epicId, story) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.agent4.input.estimations,
+              storyId,
+              estimation
+            ),
+          }
+        : null,
+    },
+    agent5: {
+      ...workspace.agent5,
+      plan: updatedAgent5Plan,
+      input: workspace.agent5.input
+        ? {
+            ...workspace.agent5.input,
+            epics: addStoryToEpics(workspace.agent5.input.epics, input.epicId, story) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.agent5.input.estimations,
+              storyId,
+              estimation
+            ),
+          }
+        : null,
+    },
+    pipeline: {
+      agent2Input: workspace.pipeline.agent2Input,
+      agent3Input: workspace.pipeline.agent3Input
+        ? {
+            ...workspace.pipeline.agent3Input,
+            epics: addStoryToEpics(workspace.pipeline.agent3Input.epics, input.epicId, story) ?? [],
+          }
+        : null,
+      agent4Input: workspace.pipeline.agent4Input
+        ? {
+            ...workspace.pipeline.agent4Input,
+            epics: addStoryToEpics(workspace.pipeline.agent4Input.epics, input.epicId, story) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent4Input.estimations,
+              storyId,
+              estimation
+            ),
+          }
+        : null,
+      agent5Input: workspace.pipeline.agent5Input
+        ? {
+            ...workspace.pipeline.agent5Input,
+            epics: addStoryToEpics(workspace.pipeline.agent5Input.epics, input.epicId, story) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent5Input.estimations,
+              storyId,
+              estimation
+            ),
+          }
+        : null,
+      agent6Input: workspace.pipeline.agent6Input
+        ? {
+            ...workspace.pipeline.agent6Input,
+            epics: addStoryToEpics(workspace.pipeline.agent6Input.epics, input.epicId, story) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent6Input.estimations,
+              storyId,
+              estimation
+            ),
+            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
+          }
+        : null,
+    },
+  };
+
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent2: sanitize(updatedWorkspace.agent2),
+        agent3: sanitize(updatedWorkspace.agent3),
+        agent4: sanitize(updatedWorkspace.agent4),
+        agent5: sanitize(updatedWorkspace.agent5),
+        pipeline: sanitize(updatedWorkspace.pipeline),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return updatedWorkspace;
+}
+
+export async function deleteUserStoryAcrossWorkspace(
+  uid: string,
+  storyId: string
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const updatedWorkspace: UserWorkspace = {
+    ...workspace,
+    agent2: {
+      ...workspace.agent2,
+      epics: deleteStoryFromEpics(workspace.agent2.epics, storyId) ?? [],
+    },
+    agent3: {
+      ...workspace.agent3,
+      estimations: deleteRecordEntry(workspace.agent3.estimations, storyId),
+      input: workspace.agent3.input
+        ? {
+            ...workspace.agent3.input,
+            epics: deleteStoryFromEpics(workspace.agent3.input.epics, storyId) ?? [],
+          }
+        : null,
+    },
+    agent4: {
+      ...workspace.agent4,
+      priorities: deleteRecordEntry(workspace.agent4.priorities, storyId),
+      input: workspace.agent4.input
+        ? {
+            ...workspace.agent4.input,
+            epics: deleteStoryFromEpics(workspace.agent4.input.epics, storyId) ?? [],
+            estimations: deleteRecordEntry(workspace.agent4.input.estimations, storyId),
+          }
+        : null,
+    },
+    agent5: {
+      ...workspace.agent5,
+      plan: deleteStoryFromPlan(workspace.agent5.plan, storyId),
+      input: workspace.agent5.input
+        ? {
+            ...workspace.agent5.input,
+            epics: deleteStoryFromEpics(workspace.agent5.input.epics, storyId) ?? [],
+            estimations: deleteRecordEntry(workspace.agent5.input.estimations, storyId),
+            priorities: deleteRecordEntry(workspace.agent5.input.priorities, storyId),
+          }
+        : null,
+    },
+    pipeline: {
+      agent2Input: workspace.pipeline.agent2Input,
+      agent3Input: workspace.pipeline.agent3Input
+        ? {
+            ...workspace.pipeline.agent3Input,
+            epics: deleteStoryFromEpics(workspace.pipeline.agent3Input.epics, storyId) ?? [],
+          }
+        : null,
+      agent4Input: workspace.pipeline.agent4Input
+        ? {
+            ...workspace.pipeline.agent4Input,
+            epics: deleteStoryFromEpics(workspace.pipeline.agent4Input.epics, storyId) ?? [],
+            estimations: deleteRecordEntry(workspace.pipeline.agent4Input.estimations, storyId),
+          }
+        : null,
+      agent5Input: workspace.pipeline.agent5Input
+        ? {
+            ...workspace.pipeline.agent5Input,
+            epics: deleteStoryFromEpics(workspace.pipeline.agent5Input.epics, storyId) ?? [],
+            estimations: deleteRecordEntry(workspace.pipeline.agent5Input.estimations, storyId),
+            priorities: deleteRecordEntry(workspace.pipeline.agent5Input.priorities, storyId),
+          }
+        : null,
+      agent6Input: workspace.pipeline.agent6Input
+        ? {
+            ...workspace.pipeline.agent6Input,
+            epics: deleteStoryFromEpics(workspace.pipeline.agent6Input.epics, storyId) ?? [],
+            estimations: deleteRecordEntry(workspace.pipeline.agent6Input.estimations, storyId),
+            priorities: deleteRecordEntry(workspace.pipeline.agent6Input.priorities, storyId),
+            plan: deleteStoryFromPlan(workspace.pipeline.agent6Input.plan, storyId) ?? workspace.pipeline.agent6Input.plan,
           }
         : null,
     },
