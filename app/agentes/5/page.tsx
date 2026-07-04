@@ -290,10 +290,10 @@ export default function Agent5Page() {
               }
               action={
                 <Link
-                  href="/agentes/1"
+                  href="/agentes/dashboard"
                   className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
                 >
-                  Nueva sesión
+                  Dashboard
                 </Link>
               }
             />

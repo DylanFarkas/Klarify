@@ -9,8 +9,8 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import type { Agent1State } from '@/lib/types/agent-1';
-import type { Agent2State, Agent2Input } from '@/lib/types/agent-2';
-import type { Agent3State } from '@/lib/types/agent-3';
+import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
+import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
 import type { Agent5State } from '@/lib/types/agent-5';
 import type {
@@ -75,6 +75,44 @@ function userDoc(uid: string) {
   return adminDb.collection('users').doc(uid);
 }
 
+function updateStoryInEpics(
+  epics: Epic[] | null | undefined,
+  storyId: string,
+  updates: Partial<UserStory>
+): Epic[] | null | undefined {
+  if (!epics) return epics;
+
+  return epics.map((epic) => ({
+    ...epic,
+    userStories: epic.userStories.map((story) =>
+      story.id === storyId ? { ...story, ...updates, isEdited: true } : story
+    ),
+  }));
+}
+
+function updateStoryEstimation(
+  estimations: Record<string, StoryEstimation>,
+  storyId: string,
+  updates?: Partial<StoryEstimation>
+): Record<string, StoryEstimation> {
+  if (!updates) return estimations;
+
+  const current = estimations[storyId] ?? {
+    points: 0,
+    justification: '',
+    isModified: false,
+  };
+
+  return {
+    ...estimations,
+    [storyId]: {
+      ...current,
+      ...updates,
+      isModified: true,
+    },
+  };
+}
+
 /** Lee el workspace + preferencias del usuario, rellenando valores por defecto. */
 export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
   const snapshot = await userDoc(uid).get();
@@ -135,6 +173,120 @@ export async function saveAgent2State(uid: string, state: Agent2State): Promise<
     },
     { merge: true }
   );
+}
+
+/** Actualiza una HU en todas las copias del backlog que conserva el pipeline. */
+export async function updateUserStoryAcrossWorkspace(
+  uid: string,
+  storyId: string,
+  updates: Partial<UserStory>,
+  estimationUpdates?: Partial<StoryEstimation>
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const agent3Estimations = updateStoryEstimation(workspace.agent3.estimations, storyId, estimationUpdates);
+  const updatedWorkspace: UserWorkspace = {
+    ...workspace,
+    agent2: {
+      ...workspace.agent2,
+      epics: updateStoryInEpics(workspace.agent2.epics, storyId, updates) ?? [],
+    },
+    agent3: {
+      ...workspace.agent3,
+      estimations: agent3Estimations,
+      input: workspace.agent3.input
+        ? {
+            ...workspace.agent3.input,
+            epics: updateStoryInEpics(workspace.agent3.input.epics, storyId, updates) ?? [],
+          }
+        : null,
+    },
+    agent4: {
+      ...workspace.agent4,
+      input: workspace.agent4.input
+        ? {
+            ...workspace.agent4.input,
+            epics: updateStoryInEpics(workspace.agent4.input.epics, storyId, updates) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.agent4.input.estimations,
+              storyId,
+              estimationUpdates
+            ),
+          }
+        : null,
+    },
+    agent5: {
+      ...workspace.agent5,
+      input: workspace.agent5.input
+        ? {
+            ...workspace.agent5.input,
+            epics: updateStoryInEpics(workspace.agent5.input.epics, storyId, updates) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.agent5.input.estimations,
+              storyId,
+              estimationUpdates
+            ),
+          }
+        : null,
+    },
+    pipeline: {
+      agent2Input: workspace.pipeline.agent2Input,
+      agent3Input: workspace.pipeline.agent3Input
+        ? {
+            ...workspace.pipeline.agent3Input,
+            epics: updateStoryInEpics(workspace.pipeline.agent3Input.epics, storyId, updates) ?? [],
+          }
+        : null,
+      agent4Input: workspace.pipeline.agent4Input
+        ? {
+            ...workspace.pipeline.agent4Input,
+            epics: updateStoryInEpics(workspace.pipeline.agent4Input.epics, storyId, updates) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent4Input.estimations,
+              storyId,
+              estimationUpdates
+            ),
+          }
+        : null,
+      agent5Input: workspace.pipeline.agent5Input
+        ? {
+            ...workspace.pipeline.agent5Input,
+            epics: updateStoryInEpics(workspace.pipeline.agent5Input.epics, storyId, updates) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent5Input.estimations,
+              storyId,
+              estimationUpdates
+            ),
+          }
+        : null,
+      agent6Input: workspace.pipeline.agent6Input
+        ? {
+            ...workspace.pipeline.agent6Input,
+            epics: updateStoryInEpics(workspace.pipeline.agent6Input.epics, storyId, updates) ?? [],
+            estimations: updateStoryEstimation(
+              workspace.pipeline.agent6Input.estimations,
+              storyId,
+              estimationUpdates
+            ),
+          }
+        : null,
+    },
+  };
+
+  await userDoc(uid).set(
+    {
+      workspace: {
+        agent2: sanitize(updatedWorkspace.agent2),
+        agent3: sanitize(updatedWorkspace.agent3),
+        agent4: sanitize(updatedWorkspace.agent4),
+        agent5: sanitize(updatedWorkspace.agent5),
+        pipeline: sanitize(updatedWorkspace.pipeline),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return updatedWorkspace;
 }
 
 /** Guarda (merge) el estado del Agente 3. */

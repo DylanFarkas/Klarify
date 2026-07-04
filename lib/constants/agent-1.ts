@@ -63,6 +63,10 @@ export const AGENT_STEPS: AgentStep[] = [
     path: '/agentes/5',
     description: 'Organiza HU priorizadas en sprints con objetivos, capacidad y cronograma',
   },
+  { number: 6, 
+    name: 'Dashboard', 
+    path: '/agentes/6', 
+    description: 'Evaluación del impacto de las épicas y historias de usuario' }
 ];
 
 // ---------------------------------------------------------------------------
