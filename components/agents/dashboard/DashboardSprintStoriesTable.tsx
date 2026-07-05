@@ -9,7 +9,8 @@ import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton'
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
-import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
+import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
+import type { SprintPlan } from '@/lib/types/agent-5';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
 
 const ALLOWED_STORY_POINTS = [1, 2, 3, 5, 8, 13, 21] as const;
@@ -17,6 +18,7 @@ const ALLOWED_STORY_POINTS = [1, 2, 3, 5, 8, 13, 21] as const;
 interface DashboardSprintStoriesTableProps {
 	epics: Epic[];
 	framework: PrioritizationFramework | null;
+	plan: SprintPlan | null;
 	rows: DashboardSprintStoryRow[];
 	unassignedRows: DashboardSprintStoryRow[];
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
@@ -24,13 +26,15 @@ interface DashboardSprintStoriesTableProps {
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions
 	) => Promise<void>;
 }
 
 export function DashboardSprintStoriesTable({
 	epics,
 	framework,
+	plan,
 	rows,
 	unassignedRows,
 	onCreateStory,
@@ -41,7 +45,7 @@ export function DashboardSprintStoriesTable({
 	const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
 	const [isCreating, setIsCreating] = useState(false);
 	const groupedRows = useMemo(() => groupRowsBySprint(rows), [rows]);
-	const sprintOptions = useMemo(() => getSprintOptions(rows), [rows]);
+	const sprintOptions = useMemo(() => getSprintOptions(plan, rows), [plan, rows]);
 	const hasRows = rows.length > 0 || unassignedRows.length > 0;
 
 	return (
@@ -51,7 +55,7 @@ export function DashboardSprintStoriesTable({
 					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Plan de sprints</p>
 					<h2 className="mt-2 text-xl font-bold text-foreground">Sprints e historias de usuario</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-						Consulta que HU vive en cada sprint, revisa su detalle y ajusta titulo, descripcion o criterios cuando haga falta.
+						Consulta que HU vive en cada sprint, edita su contenido y reasigna epica o sprint cuando haga falta.
 					</p>
 				</div>
 				<div className="flex flex-wrap items-start gap-3">
@@ -107,6 +111,8 @@ export function DashboardSprintStoriesTable({
 									key={group.key}
 									framework={framework}
 									group={group}
+									epics={epics}
+									sprintOptions={sprintOptions}
 									editingStoryId={editingStoryId}
 									onCancelEdit={() => setEditingStoryId(null)}
 									onDeleteStory={onDeleteStory}
@@ -119,6 +125,8 @@ export function DashboardSprintStoriesTable({
 								<SprintGroupRows
 									framework={framework}
 									group={{ key: 'unassigned', label: 'Sin sprint', meta: 'Pendientes de asignacion', rows: unassignedRows }}
+									epics={epics}
+									sprintOptions={sprintOptions}
 									editingStoryId={editingStoryId}
 									onCancelEdit={() => setEditingStoryId(null)}
 									onDeleteStory={onDeleteStory}
@@ -197,8 +205,15 @@ function groupRowsBySprint(rows: DashboardSprintStoryRow[]): SprintRowsGroup[] {
 	return Array.from(groups.values());
 }
 
-function getSprintOptions(rows: DashboardSprintStoryRow[]): SprintOption[] {
+function getSprintOptions(plan: SprintPlan | null, rows: DashboardSprintStoryRow[]): SprintOption[] {
 	const options = new Map<string, SprintOption>();
+
+	plan?.sprints.forEach((sprint) => {
+		options.set(sprint.id, {
+			id: sprint.id,
+			label: `Sprint ${sprint.number}`,
+		});
+	});
 
 	rows.forEach((row) => {
 		if (!row.sprintId || !row.sprintNumber) return;
@@ -214,6 +229,8 @@ function getSprintOptions(rows: DashboardSprintStoryRow[]): SprintOption[] {
 function SprintGroupRows({
 	framework,
 	group,
+	epics,
+	sprintOptions,
 	editingStoryId,
 	onCancelEdit,
 	onDeleteStory,
@@ -223,13 +240,16 @@ function SprintGroupRows({
 }: {
 	framework: PrioritizationFramework | null;
 	group: SprintRowsGroup;
+	epics: Epic[];
+	sprintOptions: SprintOption[];
 	editingStoryId: string | null;
 	onCancelEdit: () => void;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions
 	) => Promise<void>;
 	onOpenDetail: (row: DashboardSprintStoryRow) => void;
 	onStartEdit: (storyId: string) => void;
@@ -252,9 +272,11 @@ function SprintGroupRows({
 					<EditableStoryRow
 						key={row.id}
 						row={row}
+						epics={epics}
+						sprintOptions={sprintOptions}
 						onCancel={onCancelEdit}
-						onSave={async (updates, estimationUpdates) => {
-							await onEditStory(row.story.id, updates, estimationUpdates);
+						onSave={async (updates, estimationUpdates, options) => {
+							await onEditStory(row.story.id, updates, estimationUpdates, options);
 							onCancelEdit();
 						}}
 					/>
@@ -354,25 +376,34 @@ function StoryReadOnlyRow({
 
 function EditableStoryRow({
 	row,
+	epics,
+	sprintOptions,
 	onCancel,
 	onSave,
 }: {
 	row: DashboardSprintStoryRow;
+	epics: Epic[];
+	sprintOptions: SprintOption[];
 	onCancel: () => void;
 	onSave: (
 		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions
 	) => Promise<void>;
 }) {
 	const [title, setTitle] = useState(row.story.title);
 	const [description, setDescription] = useState(row.story.description);
 	const [criteria, setCriteria] = useState(row.story.acceptanceCriteria);
+	const [epicId, setEpicId] = useState(row.epicId);
+	const [sprintId, setSprintId] = useState(row.sprintId ?? '');
 	const initialPoints = row.estimation?.points ?? 1;
 	const [points, setPoints] = useState(String(isAllowedStoryPoint(initialPoints) ? initialPoints : 1));
 	const [isSaving, setIsSaving] = useState(false);
 	const parsedPoints = Number(points);
 	const isInvalidPoints = !isAllowedStoryPoint(parsedPoints);
-	const isSaveDisabled = !title.trim() || !description.trim() || isInvalidPoints || isSaving;
+	const isSaveDisabled = !title.trim() || !description.trim() || !epicId || isInvalidPoints || isSaving;
+	const hasEpicChange = epicId !== row.epicId;
+	const hasSprintChange = (sprintId || null) !== row.sprintId;
 
 	return (
 		<tr className="border-b border-primary/20 bg-primary/5">
@@ -382,7 +413,36 @@ function EditableStoryRow({
 			<td colSpan={5} className="px-4 py-4">
 				<div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
 					<div className="flex flex-col gap-3">
-						<div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+						<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+								Epica
+								<select
+									value={epicId}
+									onChange={(event) => setEpicId(event.target.value)}
+									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+								>
+									{epics.map((epic) => (
+										<option key={epic.id} value={epic.id}>
+											{epic.title}
+										</option>
+									))}
+								</select>
+							</label>
+							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+								Sprint
+								<select
+									value={sprintId}
+									onChange={(event) => setSprintId(event.target.value)}
+									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
+								>
+									<option value="">Sin sprint</option>
+									{sprintOptions.map((sprint) => (
+										<option key={sprint.id} value={sprint.id}>
+											{sprint.label}
+										</option>
+									))}
+								</select>
+							</label>
 							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
 								Titulo
 								<input
@@ -444,6 +504,9 @@ function EditableStoryRow({
 										row.estimation?.justification ||
 										'Estimacion ajustada manualmente desde el dashboard.',
 									isModified: true,
+								}, {
+									...(hasEpicChange ? { epicId } : {}),
+									...(hasSprintChange ? { sprintId: sprintId || null } : {}),
 								});
 							} finally {
 								setIsSaving(false);

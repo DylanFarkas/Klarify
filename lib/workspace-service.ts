@@ -13,6 +13,14 @@ import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agen
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
+import {
+  addStoryToSprintPlan,
+  adjustSprintVelocityForStoryPoints,
+  assignStoryToSprintInPlan,
+  normalizeSprintPlan,
+  removeStoryFromSprintPlan,
+  withUpdatedSprintPlan,
+} from '@/lib/utils/sprint-plan-mutations';
 import type {
   UserWorkspace,
   WorkspacePreferences,
@@ -154,54 +162,45 @@ function deleteRecordEntry<T>(record: Record<string, T>, key: string): Record<st
   return next;
 }
 
-function addStoryToPlan(
-  plan: SprintPlan | null,
-  storyId: string,
-  sprintId?: string | null
-): SprintPlan | null {
-  if (!plan) return plan;
-
-  if (!sprintId) {
-    return {
-      ...plan,
-      unassignedStoryIds: Array.from(new Set([...plan.unassignedStoryIds, storyId])),
-    };
-  }
-
-  const sprintExists = plan.sprints.some((sprint) => sprint.id === sprintId);
-  if (!sprintExists) {
-    return {
-      ...plan,
-      unassignedStoryIds: Array.from(new Set([...plan.unassignedStoryIds, storyId])),
-    };
-  }
-
-  return {
-    ...plan,
-    sprints: plan.sprints.map((sprint) =>
-      sprint.id === sprintId
-        ? { ...sprint, storyIds: Array.from(new Set([...sprint.storyIds, storyId])), isEdited: true }
-        : sprint
-    ),
-    unassignedStoryIds: plan.unassignedStoryIds.filter((id) => id !== storyId),
-  };
+export interface UpdateUserStoryOptions {
+  epicId?: string;
+  sprintId?: string | null;
 }
 
-function deleteStoryFromPlan(plan: SprintPlan | null, storyId: string): SprintPlan | null {
-  if (!plan) return plan;
+function moveStoryBetweenEpics(
+  epics: Epic[] | null | undefined,
+  storyId: string,
+  toEpicId: string
+): Epic[] | null | undefined {
+  if (!epics) return epics;
 
-  return {
-    ...plan,
-    sprints: plan.sprints.map((sprint) => ({
-      ...sprint,
-      storyIds: sprint.storyIds.filter((id) => id !== storyId),
-    })),
-    dependencies: plan.dependencies.filter(
-      (dependency) =>
-        dependency.storyId !== storyId && dependency.dependsOnStoryId !== storyId
-    ),
-    unassignedStoryIds: plan.unassignedStoryIds.filter((id) => id !== storyId),
-  };
+  let story: UserStory | null = null;
+  const withoutStory = epics.map((epic) => {
+    const found = epic.userStories.find((s) => s.id === storyId);
+    if (found) story = found;
+    return {
+      ...epic,
+      userStories: epic.userStories.filter((s) => s.id !== storyId),
+    };
+  });
+
+  if (!story) return epics;
+
+  return withoutStory.map((epic) =>
+    epic.id === toEpicId
+      ? { ...epic, userStories: [...epic.userStories, story!], isEdited: true }
+      : epic
+  );
+}
+
+
+function findStoryEpicId(epics: Epic[], storyId: string): string | null {
+  for (const epic of epics) {
+    if (epic.userStories.some((story) => story.id === storyId)) {
+      return epic.id;
+    }
+  }
+  return null;
 }
 
 function collectEpics(workspace: UserWorkspace): Epic[] {
@@ -249,13 +248,24 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
         ...(ws?.agent4 ?? {}),
         priorities: { ...EMPTY_AGENT4.priorities, ...(ws?.agent4?.priorities ?? {}) },
       },
-      agent5: { ...EMPTY_AGENT5, ...(ws?.agent5 ?? {}) },
+      agent5: {
+        ...EMPTY_AGENT5,
+        ...(ws?.agent5 ?? {}),
+        plan: ws?.agent5?.plan ? normalizeSprintPlan(ws.agent5.plan) : null,
+      },
       pipeline: {
         agent2Input: ws?.pipeline?.agent2Input ?? null,
         agent3Input: ws?.pipeline?.agent3Input ?? null,
         agent4Input: ws?.pipeline?.agent4Input ?? null,
         agent5Input: ws?.pipeline?.agent5Input ?? null,
-        agent6Input: ws?.pipeline?.agent6Input ?? null,
+        agent6Input: ws?.pipeline?.agent6Input
+          ? {
+              ...ws.pipeline.agent6Input,
+              plan: ws.pipeline.agent6Input.plan
+                ? normalizeSprintPlan(ws.pipeline.agent6Input.plan)
+                : ws.pipeline.agent6Input.plan,
+            }
+          : null,
       },
     },
     preferences: {
@@ -295,15 +305,62 @@ export async function updateUserStoryAcrossWorkspace(
   uid: string,
   storyId: string,
   updates: Partial<UserStory>,
-  estimationUpdates?: Partial<StoryEstimation>
+  estimationUpdates?: Partial<StoryEstimation>,
+  options?: UpdateUserStoryOptions
 ): Promise<UserWorkspace> {
   const { workspace } = await getWorkspaceData(uid);
+  const epics = workspace.agent2.epics;
+  const currentEpicId = findStoryEpicId(epics, storyId);
+  const shouldMoveEpic = options?.epicId !== undefined && options.epicId !== currentEpicId;
+  const oldPoints =
+    workspace.agent5.input?.estimations[storyId]?.points ??
+    workspace.agent3.estimations[storyId]?.points ??
+    0;
+  const newPoints = estimationUpdates?.points ?? oldPoints;
+
+  let updatedPlan = workspace.agent5.plan;
+  if (updatedPlan) {
+    if (options?.sprintId !== undefined) {
+      updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newPoints);
+    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
+      updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldPoints, newPoints);
+    }
+  }
+
+  let updatedPipelinePlan = workspace.pipeline.agent6Input?.plan ?? null;
+  if (updatedPipelinePlan) {
+    if (options?.sprintId !== undefined) {
+      updatedPipelinePlan = assignStoryToSprintInPlan(
+        updatedPipelinePlan,
+        storyId,
+        options.sprintId,
+        newPoints
+      );
+    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
+      updatedPipelinePlan = adjustSprintVelocityForStoryPoints(
+        updatedPipelinePlan,
+        storyId,
+        oldPoints,
+        newPoints
+      );
+    }
+  }
+
+  const applyStoryUpdate = (sourceEpics: Epic[] | null | undefined) => {
+    if (!sourceEpics) return sourceEpics;
+    if (shouldMoveEpic && options?.epicId) {
+      const moved = moveStoryBetweenEpics(sourceEpics, storyId, options.epicId) ?? [];
+      return updateStoryInEpics(moved, storyId, updates);
+    }
+    return updateStoryInEpics(sourceEpics, storyId, updates);
+  };
+
   const agent3Estimations = updateStoryEstimation(workspace.agent3.estimations, storyId, estimationUpdates);
   const updatedWorkspace: UserWorkspace = {
     ...workspace,
     agent2: {
       ...workspace.agent2,
-      epics: updateStoryInEpics(workspace.agent2.epics, storyId, updates) ?? [],
+      epics: applyStoryUpdate(workspace.agent2.epics) ?? [],
     },
     agent3: {
       ...workspace.agent3,
@@ -311,7 +368,7 @@ export async function updateUserStoryAcrossWorkspace(
       input: workspace.agent3.input
         ? {
             ...workspace.agent3.input,
-            epics: updateStoryInEpics(workspace.agent3.input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.agent3.input.epics) ?? [],
           }
         : null,
     },
@@ -320,7 +377,7 @@ export async function updateUserStoryAcrossWorkspace(
       input: workspace.agent4.input
         ? {
             ...workspace.agent4.input,
-            epics: updateStoryInEpics(workspace.agent4.input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.agent4.input.epics) ?? [],
             estimations: updateStoryEstimation(
               workspace.agent4.input.estimations,
               storyId,
@@ -331,10 +388,11 @@ export async function updateUserStoryAcrossWorkspace(
     },
     agent5: {
       ...workspace.agent5,
+      plan: updatedPlan,
       input: workspace.agent5.input
         ? {
             ...workspace.agent5.input,
-            epics: updateStoryInEpics(workspace.agent5.input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.agent5.input.epics) ?? [],
             estimations: updateStoryEstimation(
               workspace.agent5.input.estimations,
               storyId,
@@ -348,13 +406,13 @@ export async function updateUserStoryAcrossWorkspace(
       agent3Input: workspace.pipeline.agent3Input
         ? {
             ...workspace.pipeline.agent3Input,
-            epics: updateStoryInEpics(workspace.pipeline.agent3Input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.pipeline.agent3Input.epics) ?? [],
           }
         : null,
       agent4Input: workspace.pipeline.agent4Input
         ? {
             ...workspace.pipeline.agent4Input,
-            epics: updateStoryInEpics(workspace.pipeline.agent4Input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.pipeline.agent4Input.epics) ?? [],
             estimations: updateStoryEstimation(
               workspace.pipeline.agent4Input.estimations,
               storyId,
@@ -365,7 +423,7 @@ export async function updateUserStoryAcrossWorkspace(
       agent5Input: workspace.pipeline.agent5Input
         ? {
             ...workspace.pipeline.agent5Input,
-            epics: updateStoryInEpics(workspace.pipeline.agent5Input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.pipeline.agent5Input.epics) ?? [],
             estimations: updateStoryEstimation(
               workspace.pipeline.agent5Input.estimations,
               storyId,
@@ -376,12 +434,13 @@ export async function updateUserStoryAcrossWorkspace(
       agent6Input: workspace.pipeline.agent6Input
         ? {
             ...workspace.pipeline.agent6Input,
-            epics: updateStoryInEpics(workspace.pipeline.agent6Input.epics, storyId, updates) ?? [],
+            epics: applyStoryUpdate(workspace.pipeline.agent6Input.epics) ?? [],
             estimations: updateStoryEstimation(
               workspace.pipeline.agent6Input.estimations,
               storyId,
               estimationUpdates
             ),
+            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
           }
         : null,
     },
@@ -393,6 +452,28 @@ export async function updateUserStoryAcrossWorkspace(
         agent2: sanitize(updatedWorkspace.agent2),
         agent3: sanitize(updatedWorkspace.agent3),
         agent4: sanitize(updatedWorkspace.agent4),
+        agent5: sanitize(updatedWorkspace.agent5),
+        pipeline: sanitize(updatedWorkspace.pipeline),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return updatedWorkspace;
+}
+
+export async function updateSprintPlanAcrossWorkspace(
+  uid: string,
+  plan: SprintPlan
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const normalizedPlan = normalizeSprintPlan(plan);
+  const updatedWorkspace = withUpdatedSprintPlan(workspace, normalizedPlan);
+
+  await userDoc(uid).set(
+    {
+      workspace: {
         agent5: sanitize(updatedWorkspace.agent5),
         pipeline: sanitize(updatedWorkspace.pipeline),
         updatedAt: FieldValue.serverTimestamp(),
@@ -425,12 +506,17 @@ export async function createUserStoryAcrossWorkspace(
     justification: 'Estimacion creada manualmente desde el dashboard.',
     isModified: true,
   };
-  const updatedAgent5Plan = addStoryToPlan(workspace.agent5.plan, storyId, input.sprintId);
-  const updatedPipelinePlan = addStoryToPlan(
-    workspace.pipeline.agent6Input?.plan ?? null,
-    storyId,
-    input.sprintId
-  );
+  const updatedAgent5Plan = workspace.agent5.plan
+    ? addStoryToSprintPlan(workspace.agent5.plan, storyId, input.sprintId, input.points)
+    : null;
+  const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
+    ? addStoryToSprintPlan(
+        workspace.pipeline.agent6Input.plan,
+        storyId,
+        input.sprintId,
+        input.points
+      )
+    : null;
   const updatedWorkspace: UserWorkspace = {
     ...workspace,
     agent2: {
@@ -543,6 +629,16 @@ export async function deleteUserStoryAcrossWorkspace(
   storyId: string
 ): Promise<UserWorkspace> {
   const { workspace } = await getWorkspaceData(uid);
+  const storyPoints =
+    workspace.agent5.input?.estimations[storyId]?.points ??
+    workspace.agent3.estimations[storyId]?.points ??
+    0;
+  const updatedAgent5Plan = workspace.agent5.plan
+    ? removeStoryFromSprintPlan(workspace.agent5.plan, storyId, storyPoints)
+    : null;
+  const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
+    ? removeStoryFromSprintPlan(workspace.pipeline.agent6Input.plan, storyId, storyPoints)
+    : null;
   const updatedWorkspace: UserWorkspace = {
     ...workspace,
     agent2: {
@@ -572,7 +668,7 @@ export async function deleteUserStoryAcrossWorkspace(
     },
     agent5: {
       ...workspace.agent5,
-      plan: deleteStoryFromPlan(workspace.agent5.plan, storyId),
+      plan: updatedAgent5Plan,
       input: workspace.agent5.input
         ? {
             ...workspace.agent5.input,
@@ -611,7 +707,7 @@ export async function deleteUserStoryAcrossWorkspace(
             epics: deleteStoryFromEpics(workspace.pipeline.agent6Input.epics, storyId) ?? [],
             estimations: deleteRecordEntry(workspace.pipeline.agent6Input.estimations, storyId),
             priorities: deleteRecordEntry(workspace.pipeline.agent6Input.priorities, storyId),
-            plan: deleteStoryFromPlan(workspace.pipeline.agent6Input.plan, storyId) ?? workspace.pipeline.agent6Input.plan,
+            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
           }
         : null,
     },
@@ -814,10 +910,14 @@ export async function resetAgent4(uid: string): Promise<void> {
 
 /** Guarda (merge) el estado del Agente 5. */
 export async function saveAgent5State(uid: string, state: Agent5State): Promise<void> {
+  const normalizedState: Agent5State = {
+    ...state,
+    plan: state.plan ? normalizeSprintPlan(state.plan) : null,
+  };
   await userDoc(uid).set(
     {
       workspace: {
-        agent5: sanitize(state),
+        agent5: sanitize(normalizedState),
         updatedAt: FieldValue.serverTimestamp(),
       },
     },

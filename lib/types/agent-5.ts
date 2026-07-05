@@ -6,6 +6,8 @@ import type { Agent5Input } from '@/lib/types/workspace';
 import type { Epic } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { StoryPrioritization, PrioritizationFramework } from '@/lib/types/agent-4';
+import { addDays, computeEndDateForDuration, getSprintDuration } from '@/lib/utils/sprint-dates';
+import { getPriorityRank } from '@/lib/utils/priority-rank';
 
 export interface SprintPlanningConfig {
   sprintCapacitySp: number;
@@ -32,8 +34,20 @@ export interface PlannedSprint {
   velocitySp: number;
   startDate: string;
   endDate: string;
+  /** Unidad de duración; por defecto semanas. */
+  durationUnit?: SprintDurationUnit;
+  /** Duración en semanas cuando durationUnit es 'weeks'. */
+  durationWeeks?: number;
+  /** Duración en días naturales (inclusive) cuando durationUnit es 'days'. */
+  durationDays?: number;
   isEdited: boolean;
 }
+
+export type SprintDurationUnit = 'weeks' | 'days';
+
+export type SprintDatePatch = Partial<
+  Pick<PlannedSprint, 'startDate' | 'endDate' | 'durationWeeks' | 'durationDays' | 'durationUnit'>
+>;
 
 export interface SprintPlan {
   sprints: PlannedSprint[];
@@ -81,13 +95,6 @@ export interface LocalStoryForPlanning {
   epicTitle: string;
 }
 
-const MOSCOW_PRIORITY_ORDER: Record<string, number> = {
-  must: 0,
-  should: 1,
-  could: 2,
-  wont: 3,
-};
-
 export function toLocalStoriesForPlanning(input: Agent5Input): LocalStoryForPlanning[] {
   return input.epics.flatMap((epic) =>
     epic.userStories.map((story) => ({
@@ -104,11 +111,11 @@ export function toLocalStoriesForPlanning(input: Agent5Input): LocalStoryForPlan
 
 export function sortStoriesByPriority(
   stories: LocalStoryForPlanning[],
-  _framework: PrioritizationFramework
+  framework: PrioritizationFramework
 ): LocalStoryForPlanning[] {
   return [...stories].sort((a, b) => {
-    const pa = MOSCOW_PRIORITY_ORDER[a.priorityCategory] ?? 99;
-    const pb = MOSCOW_PRIORITY_ORDER[b.priorityCategory] ?? 99;
+    const pa = getPriorityRank(framework, a.priorityCategory);
+    const pb = getPriorityRank(framework, b.priorityCategory);
     if (pa !== pb) return pa - pb;
     return a.points - b.points;
   });
@@ -118,13 +125,20 @@ export function buildSprintSchedule(
   sprints: PlannedSprint[],
   config: SprintPlanningConfig
 ): PlannedSprint[] {
-  const cursor = new Date(config.projectStartDate + 'T00:00:00');
+  let cursor = config.projectStartDate;
   return sprints.map((sprint) => {
-    const startDate = cursor.toISOString().slice(0, 10);
-    const end = new Date(cursor);
-    end.setDate(end.getDate() + config.sprintDurationWeeks * 7 - 1);
-    const endDate = end.toISOString().slice(0, 10);
-    cursor.setDate(end.getDate() + 1);
-    return { ...sprint, startDate, endDate };
+    const { unit, amount } = getSprintDuration(sprint, config.sprintDurationWeeks);
+    const startDate = cursor;
+    const endDate = computeEndDateForDuration(startDate, unit, amount);
+    cursor = addDays(endDate, 0);
+    return {
+      ...sprint,
+      startDate,
+      endDate,
+      durationUnit: unit,
+      ...(unit === 'days'
+        ? { durationDays: amount, durationWeeks: undefined }
+        : { durationWeeks: amount, durationDays: undefined }),
+    };
   });
 }

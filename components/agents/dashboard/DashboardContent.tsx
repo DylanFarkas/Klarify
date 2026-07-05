@@ -10,7 +10,9 @@ import { DashboardSprintStoriesTable } from './DashboardSprintStoriesTable';
 import type { DashboardMetrics } from './dashboardMetrics';
 import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
-import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
+import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
+import type { SprintPlan } from '@/lib/types/agent-5';
+import { DashboardSprintPlanEditor } from './DashboardSprintPlanEditor';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
 interface DashboardContentProps {
@@ -21,8 +23,10 @@ interface DashboardContentProps {
 	onEditStory: (
 		storyId: string,
 		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions
 	) => Promise<void>;
+	onUpdateSprintPlan: (plan: SprintPlan) => Promise<void>;
 	workspace: UserWorkspace;
 }
 
@@ -32,6 +36,7 @@ export function DashboardContent({
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
+	onUpdateSprintPlan,
 	workspace,
 }: DashboardContentProps) {
 	const activeAgents = [
@@ -57,9 +62,20 @@ export function DashboardContent({
 
 			<DashboardPriorityBuckets metrics={metrics} />
 			<DashboardSecondaryMetrics metrics={metrics} />
+			{metrics.plan && metrics.framework && (
+				<DashboardSprintPlanEditor
+					plan={metrics.plan}
+					epics={metrics.epics}
+					estimations={metrics.estimations}
+					priorities={metrics.priorities}
+					framework={metrics.framework}
+					onPlanChange={onUpdateSprintPlan}
+				/>
+			)}
 			<DashboardSprintStoriesTable
 				epics={metrics.epics}
 				framework={metrics.framework}
+				plan={metrics.plan}
 				rows={metrics.sprintStoryRows}
 				unassignedRows={metrics.unassignedStoryRows}
 				onCreateStory={onCreateStory}

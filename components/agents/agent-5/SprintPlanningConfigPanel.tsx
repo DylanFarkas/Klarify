@@ -1,21 +1,52 @@
 'use client';
 
+import { useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { SprintPlanningConfig } from '@/lib/types/agent-5';
+import {
+  SPRINT_CONFIG_DESCRIPTIONS,
+  type SprintConfigFieldId,
+} from '@/lib/constants/agent-5';
+import { DatePicker } from '@/components/ui/DatePicker';
+import { formatDateEs } from '@/lib/utils/dates';
 
 interface SprintPlanningConfigPanelProps {
   config: SprintPlanningConfig;
   onChange: (config: SprintPlanningConfig) => void;
   disabled: boolean;
   isApproved: boolean;
+  hasPlan?: boolean;
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
 }
 
 function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('es-ES', { dateStyle: 'medium' });
-  } catch {
-    return dateStr;
-  }
+  return formatDateEs(dateStr);
+}
+
+function ConfigFieldLabel({
+  fieldId,
+  children,
+  onShowTooltip,
+  onHideTooltip,
+  setRef,
+}: {
+  fieldId: SprintConfigFieldId;
+  children: ReactNode;
+  onShowTooltip: (id: SprintConfigFieldId) => void;
+  onHideTooltip: () => void;
+  setRef: (el: HTMLSpanElement | null) => void;
+}) {
+  return (
+    <span
+      ref={setRef}
+      onMouseEnter={() => onShowTooltip(fieldId)}
+      onMouseLeave={onHideTooltip}
+      className="cursor-help border-b border-dotted border-muted/40 text-muted transition-colors hover:border-primary/40 hover:text-foreground"
+    >
+      {children}
+    </span>
+  );
 }
 
 export function SprintPlanningConfigPanel({
@@ -23,7 +54,44 @@ export function SprintPlanningConfigPanel({
   onChange,
   disabled,
   isApproved,
+  hasPlan = false,
+  onRegenerate,
+  isRegenerating = false,
 }: SprintPlanningConfigPanelProps) {
+  const [hoveredId, setHoveredId] = useState<SprintConfigFieldId | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const labelRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTooltip = useCallback((id: SprintConfigFieldId) => {
+    if (hideTimeout.current) {
+      clearTimeout(hideTimeout.current);
+      hideTimeout.current = null;
+    }
+    const el = labelRefs.current.get(id);
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      setTooltipPos({
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
+      });
+    }
+    setHoveredId(id);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    hideTimeout.current = setTimeout(() => {
+      setHoveredId(null);
+      hideTimeout.current = null;
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    };
+  }, []);
+
   if (isApproved) {
     return (
       <div className="rounded-xl border border-success/20 bg-success/5 px-5 py-4">
@@ -48,9 +116,20 @@ export function SprintPlanningConfigPanel({
         <span className="text-xs font-semibold text-muted uppercase tracking-wider">Configuración de sprints</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted">Capacidad:</span>
+          <ConfigFieldLabel
+            fieldId="capacity"
+            onShowTooltip={showTooltip}
+            onHideTooltip={hideTooltip}
+            setRef={(el) => {
+              if (el) labelRefs.current.set('capacity', el);
+              else labelRefs.current.delete('capacity');
+            }}
+          >
+            Capacidad:
+          </ConfigFieldLabel>
           <input
             type="number"
             min={1}
@@ -66,7 +145,17 @@ export function SprintPlanningConfigPanel({
         <span className="h-5 w-px bg-border" />
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted">Duración:</span>
+          <ConfigFieldLabel
+            fieldId="duration"
+            onShowTooltip={showTooltip}
+            onHideTooltip={hideTooltip}
+            setRef={(el) => {
+              if (el) labelRefs.current.set('duration', el);
+              else labelRefs.current.delete('duration');
+            }}
+          >
+            Duración:
+          </ConfigFieldLabel>
           <input
             type="number"
             min={1}
@@ -82,16 +171,77 @@ export function SprintPlanningConfigPanel({
         <span className="h-5 w-px bg-border" />
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted">Inicio:</span>
-          <input
-            type="date"
+          <ConfigFieldLabel
+            fieldId="start"
+            onShowTooltip={showTooltip}
+            onHideTooltip={hideTooltip}
+            setRef={(el) => {
+              if (el) labelRefs.current.set('start', el);
+              else labelRefs.current.delete('start');
+            }}
+          >
+            Inicio:
+          </ConfigFieldLabel>
+          <DatePicker
             value={config.projectStartDate}
-            onChange={(e) => onChange({ ...config, projectStartDate: e.target.value })}
+            onChange={(iso) => onChange({ ...config, projectStartDate: iso })}
             disabled={disabled}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-bold text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
           />
         </label>
+        </div>
+
+        {hasPlan && onRegenerate && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={disabled || isRegenerating}
+            className={[
+              'inline-flex shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2',
+              'text-sm font-medium text-muted',
+              'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
+              'transition-all duration-200 cursor-pointer',
+              'disabled:opacity-40 disabled:cursor-not-allowed',
+            ].join(' ')}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+            </svg>
+            {isRegenerating ? 'Regenerando...' : 'Regenerar'}
+          </button>
+        )}
       </div>
+
+      {hoveredId && createPortal(
+        <div
+          className="fixed z-9999 w-72 rounded-lg border border-border bg-surface p-3 shadow-xl"
+          style={{
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translate(-50%, -100%)',
+          }}
+          onMouseEnter={() => {
+            if (hideTimeout.current) {
+              clearTimeout(hideTimeout.current);
+              hideTimeout.current = null;
+            }
+          }}
+          onMouseLeave={hideTooltip}
+        >
+          <p className="text-[11px] font-semibold text-foreground">
+            {SPRINT_CONFIG_DESCRIPTIONS[hoveredId].label}
+          </p>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+            {SPRINT_CONFIG_DESCRIPTIONS[hoveredId].summary}
+          </p>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground/70">
+            {SPRINT_CONFIG_DESCRIPTIONS[hoveredId].details}
+          </p>
+          <div
+            className="absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-border bg-surface"
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

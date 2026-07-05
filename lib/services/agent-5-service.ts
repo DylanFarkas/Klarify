@@ -56,5 +56,5 @@ export async function planSprintsStream(
   onThought: LLMThoughtCallback
 ): Promise<SprintPlan> {
   const stories = toLocalStoriesForPlanning(input);
-  return sprintPlanningAdapter.planSprintsStream(stories, config, onThought);
+  return sprintPlanningAdapter.planSprintsStream(stories, config, input.framework, onThought);
 }
