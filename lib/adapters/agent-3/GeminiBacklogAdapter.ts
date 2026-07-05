@@ -13,6 +13,8 @@ import {
   MAX_JUSTIFICATION_LENGTH,
 } from '@/lib/constants/agent-3';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
+import { defaultAiConfig } from '@/lib/plans/ai-config';
 
 interface ContentPart {
   text?: string;
@@ -39,14 +41,19 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
     }
   }
 
-  async estimateBacklog(epics: LocalEpic[]): Promise<Agent3SuggestionItem[]> {
-    return this.estimateBacklogStream(epics, () => {});
+  async estimateBacklog(
+    epics: LocalEpic[],
+    aiConfig?: AiGenerationConfig
+  ): Promise<Agent3SuggestionItem[]> {
+    return this.estimateBacklogStream(epics, () => {}, aiConfig);
   }
 
   async estimateBacklogStream(
     epics: LocalEpic[],
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]> {
+    const config = aiConfig ?? defaultAiConfig();
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
     }
@@ -59,7 +66,8 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
       const responseText = await this.streamGenerate(
         userPrompt,
         systemInstruction,
-        onThought
+        onThought,
+        config.thinkingBudget
       );
 
       if (!responseText) {
@@ -108,7 +116,8 @@ ${JSON.stringify(epics, null, 2)}`;
   private async streamGenerate(
     contents: string,
     systemInstruction: string,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    thinkingBudget: number
   ): Promise<string> {
     if (!this.ai) throw new Error('SDK no inicializado.');
 
@@ -121,7 +130,7 @@ ${JSON.stringify(epics, null, 2)}`;
         temperature: 0.1, // Temperatura baja para asegurar exactitud en estimaciones y JSON estructurado
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: 1024,
+          thinkingBudget,
         },
       },
     });

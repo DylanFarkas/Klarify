@@ -8,6 +8,9 @@
 
 import { type NextRequest } from 'next/server';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { getAiConfig, resolveUserPlan } from '@/lib/plans/plan-service';
+import { assertAiRegenerationAllowed } from '@/lib/plans/regeneration-guard';
+import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import { FRAMEWORK_DESCRIPTIONS } from '@/lib/constants/agent-4';
 import type { Agent4Input } from '@/lib/types/workspace';
@@ -29,10 +32,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Verificación de identidad obligatoria con Firebase Admin
-    await verifyRequestUser(request);
+    const uid = await verifyRequestUser(request);
+    const body = (await request.json()) as Agent4PrioritizeRequest & { isRegeneration?: boolean };
 
-    const body = (await request.json()) as Agent4PrioritizeRequest;
+    await assertAiRegenerationAllowed(uid, 'agent4', body.isRegeneration);
+    const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
     // 2. Construir Agent4Input temporal para validar
     const agent4Input: Agent4Input = {
@@ -80,7 +84,8 @@ export async function POST(request: NextRequest) {
                 prioritizeBacklogStream(
                   agent4Input,
                   body.framework ?? 'moscow',
-                  emitter.bindThought()
+                  emitter.bindThought(),
+                  aiConfig
                 )
             );
           }
@@ -110,6 +115,10 @@ export async function POST(request: NextRequest) {
         { error: 'No autorizado', code: 'PROCESSING_ERROR' },
         { status: 401 }
       );
+    }
+
+    if (isPlanLimitError(error)) {
+      return Response.json(planErrorToJson(error), { status: 403 });
     }
 
     console.error('[Agent 4 Prioritize] Critical Error:', error);

@@ -17,6 +17,8 @@ import type {
   Agent1ErrorResponse,
 } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { getAiConfig, resolveUserPlan } from '@/lib/plans/plan-service';
+import type { AiGenerationConfig } from '@/lib/plans/types';
 import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import {
   AgentStreamEmitter,
@@ -27,7 +29,8 @@ import {
 async function runExtraction(
   emitter: AgentStreamEmitter,
   body: Agent1AnalyzeRequest,
-  discovery: Awaited<ReturnType<typeof analyzeContextStream>>
+  discovery: Awaited<ReturnType<typeof analyzeContextStream>>,
+  aiConfig: AiGenerationConfig
 ) {
   return emitter.runPhase(
     AGENT_ACTIVITY.PHASE_EXTRACT.id,
@@ -49,7 +52,8 @@ async function runExtraction(
             discovery,
             emitter.bindThought(),
             [],
-            false
+            false,
+            aiConfig
           )
       );
     }
@@ -58,7 +62,8 @@ async function runExtraction(
 
 export async function POST(request: NextRequest) {
   try {
-    await verifyRequestUser(request);
+    const uid = await verifyRequestUser(request);
+    const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
     const body = (await request.json()) as Agent1AnalyzeRequest;
 
@@ -89,13 +94,13 @@ export async function POST(request: NextRequest) {
             return emitter.runAction(
               AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.id,
               AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.label,
-              () => analyzeContextStream(body.transcription, emitter.bindThought())
+              () => analyzeContextStream(body.transcription, emitter.bindThought(), aiConfig)
             );
           }
         );
 
         if (!discovery.isSufficient && discovery.questions.length === 0) {
-          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery);
+          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery, aiConfig);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, isSufficient: true, completedAt: Date.now() },
@@ -107,7 +112,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (discovery.isSufficient) {
-          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery);
+          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery, aiConfig);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, completedAt: Date.now() },

@@ -51,10 +51,8 @@ export async function estimateBacklog(epics: LocalEpic[]): Promise<Agent3Suggest
  */
 export async function estimateBacklogStream(
   epics: LocalEpic[],
-  onThought: LLMThoughtCallback
+  onThought: LLMThoughtCallback,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Agent3SuggestionItem[]> {
-  
-  // 🚀 Ejecución directa de la IA: Aquí se remueve la simulación local
-  // Al invocar este método, se activa nativamente el 'generateContentStream' de Gemini
-  return estimationAdapter.estimateBacklogStream(epics, onThought);
+  return estimationAdapter.estimateBacklogStream(epics, onThought, aiConfig);
 }

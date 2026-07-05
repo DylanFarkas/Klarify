@@ -11,6 +11,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { handleApiError } from '@/lib/api-error';
 import {
   getWorkspaceData,
   saveAgent1State,
@@ -95,14 +96,7 @@ interface PostBody {
 }
 
 function handleError(error: unknown, fallback: string): NextResponse {
-  const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-
-  if (message === 'UNAUTHORIZED') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
-
-  console.error(fallback, error);
-  return NextResponse.json({ error: fallback }, { status: 500 });
+  return handleApiError(error, fallback);
 }
 
 export async function GET(request: NextRequest) {

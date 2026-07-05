@@ -28,8 +28,11 @@ const INITIAL_STATE: Agent5State = {
   error: null,
 };
 
-function resolveHydratedStatus(a5: Agent5State): Agent5Status {
-  if (a5.status === 'approved') return 'approved';
+function resolveHydratedStatus(a5: Agent5State, workspace: UserWorkspace): Agent5Status {
+  // Solo consolidado si existe agent6Input (approveAgent5); evita estado obsoleto.
+  if (a5.status === 'approved' && workspace.pipeline.agent6Input) {
+    return 'approved';
+  }
   if (a5.plan?.sprints.length) return 'review';
   return 'idle';
 }
@@ -82,7 +85,7 @@ export default function Agent5Page() {
       setState({
         input: resolvedInput,
         plan,
-        status: resolveHydratedStatus({ ...a5, plan, input: resolvedInput }),
+        status: resolveHydratedStatus({ ...a5, plan, input: resolvedInput }, workspace),
         error: null,
       });
       setIsHydrated(true);
@@ -94,6 +97,9 @@ export default function Agent5Page() {
 
   useEffect(() => {
     if (!isHydrated) return;
+    // "approved" solo se persiste vía approveAgent5, no por autosave al hidratar.
+    if (state.status === 'approved') return;
+    if (!state.input && !state.plan) return;
     saveAgent5({
       input: state.input,
       plan: state.plan,

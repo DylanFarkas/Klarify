@@ -17,6 +17,8 @@ import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 
 interface EstimationWorkspaceProps {
@@ -243,6 +245,7 @@ export function EstimationWorkspace({
   isApproving,
 }: EstimationWorkspaceProps) {
   const { user } = useAuth();
+  const { canRegenerate } = useWorkspace();
   const { entries, reset, consumeStream } = useAgentActivity();
   const { showModelReasoning } = useWorkspaceSettings();
 
@@ -275,7 +278,10 @@ export function EstimationWorkspace({
       const response = await authFetch('/api/agentes/3/estimate', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ epics: input.epics }),
+        body: JSON.stringify({
+          epics: input.epics,
+          ...(hasEstimations ? { isRegeneration: true } : {}),
+        }),
       });
 
       if (!response.ok) {
@@ -546,7 +552,7 @@ export function EstimationWorkspace({
               <div className="flex w-full flex-col-reverse items-stretch gap-2.5 sm:w-auto sm:flex-row sm:items-center">
                 <button
                   onClick={handleAnalyzeWithAgent}
-                  disabled={isAnalyzing || isApproving}
+                  disabled={isAnalyzing || isApproving || (hasEstimations && !canRegenerate('agent3'))}
                   className={[
                     'inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5',
                     'text-sm font-medium text-muted cursor-pointer',
@@ -558,6 +564,7 @@ export function EstimationWorkspace({
                   <RegenerateIcon className="h-4 w-4" />
                   Regenerar
                 </button>
+                {hasEstimations ? <RegenerationHint agent="agent3" /> : null}
 
                 <ApproveButton
                   onClick={onApprove}

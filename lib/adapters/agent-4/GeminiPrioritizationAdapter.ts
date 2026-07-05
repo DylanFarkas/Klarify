@@ -19,6 +19,8 @@ import {
   FRAMEWORK_DESCRIPTIONS,
 } from '@/lib/constants/agent-4';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
+import { defaultAiConfig } from '@/lib/plans/ai-config';
 
 interface ContentPart {
   text?: string;
@@ -49,16 +51,19 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
 
   async prioritizeBacklog(
     epics: LocalEpicWithEstimation[],
-    framework: PrioritizationFramework
+    framework: PrioritizationFramework,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]> {
-    return this.prioritizeBacklogStream(epics, framework, () => {});
+    return this.prioritizeBacklogStream(epics, framework, () => {}, aiConfig);
   }
 
   async prioritizeBacklogStream(
     epics: LocalEpicWithEstimation[],
     framework: PrioritizationFramework,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]> {
+    const config = aiConfig ?? defaultAiConfig();
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
     }
@@ -71,7 +76,8 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
       const responseText = await this.streamGenerate(
         userPrompt,
         systemInstruction,
-        onThought
+        onThought,
+        config.thinkingBudget
       );
 
       if (!responseText) {
@@ -133,7 +139,8 @@ ${JSON.stringify(epics, null, 2)}`;
   private async streamGenerate(
     contents: string,
     systemInstruction: string,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    thinkingBudget: number
   ): Promise<string> {
     if (!this.ai) throw new Error('SDK no inicializado.');
 
@@ -146,7 +153,7 @@ ${JSON.stringify(epics, null, 2)}`;
         temperature: 0.1,
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: 1024,
+          thinkingBudget,
         },
       },
     });

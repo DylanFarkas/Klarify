@@ -50,13 +50,17 @@ async function emitMockThoughts(
 }
 
 export class MockLLMAdapter implements ILLMAdapter {
-  async analyzeContext(transcription: TranscriptionResult): Promise<ContextDiscovery> {
-    return this.analyzeContextStream(transcription, () => {});
+  async analyzeContext(
+    transcription: TranscriptionResult,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
+  ): Promise<ContextDiscovery> {
+    return this.analyzeContextStream(transcription, () => {}, _aiConfig);
   }
 
   async analyzeContextStream(
     transcription: TranscriptionResult,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<ContextDiscovery> {
     await emitMockThoughts(MOCK_ASSESSMENT_THOUGHTS, onThought, ASSESSMENT_DELAY_MS);
 
@@ -73,15 +77,17 @@ export class MockLLMAdapter implements ILLMAdapter {
 
   async extractWishes(
     _transcription: TranscriptionResult,
-    _enrichedContext?: string | null
+    _enrichedContext?: string | null,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Wish[]> {
-    return this.extractWishesStream(_transcription, _enrichedContext, () => {});
+    return this.extractWishesStream(_transcription, _enrichedContext, () => {}, _aiConfig);
   }
 
   async extractWishesStream(
     _transcription: TranscriptionResult,
     _enrichedContext: string | null | undefined,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Wish[]> {
     await emitMockThoughts(MOCK_EXTRACTION_THOUGHTS, onThought, EXTRACTION_DELAY_MS);
 

@@ -8,6 +8,16 @@
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
+import { checkAndIncrementRegeneration } from '@/lib/plans/plan-service';
+import type { RegenerationAgent } from '@/lib/plans/types';
+import {
+  getProjectWorkspace,
+  projectDoc,
+  requireUnlockedProject,
+  tryResolveActiveProjectId,
+} from '@/lib/project-service';
+import { createEmptyWorkspace } from '@/lib/types/workspace';
+import { resolveUserPlan } from '@/lib/plans/plan-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
@@ -90,6 +100,39 @@ function sanitize<T>(value: T): T {
 
 function userDoc(uid: string) {
   return adminDb.collection('users').doc(uid);
+}
+
+async function activeProject(uid: string): Promise<string> {
+  const projectId = await tryResolveActiveProjectId(uid);
+  if (!projectId) {
+    throw new Error('NO_PROJECTS');
+  }
+  return projectId;
+}
+
+async function saveProjectWorkspace(
+  uid: string,
+  projectId: string,
+  workspacePartial: Record<string, unknown>
+): Promise<void> {
+  await requireUnlockedProject(uid, projectId);
+  await projectDoc(uid, projectId).set(
+    {
+      workspace: workspacePartial,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+async function resetAgentWithRegenerationCheck(
+  uid: string,
+  agent: RegenerationAgent,
+  emptyState: Record<string, unknown>
+): Promise<void> {
+  await checkAndIncrementRegeneration(uid, agent);
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, emptyState);
 }
 
 function updateStoryInEpics(
@@ -227,77 +270,60 @@ function generateUserStoryId(workspace: UserWorkspace): string {
   return `HU-${String(maxId + 1).padStart(3, '0')}`;
 }
 
-/** Lee el workspace + preferencias del usuario, rellenando valores por defecto. */
+/** Lee el workspace del proyecto activo + preferencias y plan del usuario. */
 export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
+  const projectId = await tryResolveActiveProjectId(uid);
   const snapshot = await userDoc(uid).get();
-  const data = snapshot.data();
-  const ws = data?.workspace as Partial<UserWorkspace> | undefined;
-  const prefs = data?.preferences as Partial<WorkspacePreferences> | undefined;
+  const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
+  const plan = await resolveUserPlan(uid);
+
+  if (!projectId) {
+    return {
+      workspace: createEmptyWorkspace(),
+      preferences: {
+        lastAgent: prefs?.lastAgent ?? '1',
+      },
+      activeProjectId: null,
+      plan: {
+        id: plan.id,
+        limits: plan.limits,
+        usage: plan.usage,
+        subscription: plan.subscription,
+      },
+    };
+  }
+
+  const workspace = await getProjectWorkspace(uid, projectId);
 
   return {
-    workspace: {
-      agent1: { ...EMPTY_AGENT1, ...(ws?.agent1 ?? {}) },
-      agent2: { ...EMPTY_AGENT2, ...(ws?.agent2 ?? {}) },
-      agent3: {
-        ...EMPTY_AGENT3,
-        ...(ws?.agent3 ?? {}),
-        estimations: { ...EMPTY_AGENT3.estimations, ...(ws?.agent3?.estimations ?? {}) },
-      },
-      agent4: {
-        ...EMPTY_AGENT4,
-        ...(ws?.agent4 ?? {}),
-        priorities: { ...EMPTY_AGENT4.priorities, ...(ws?.agent4?.priorities ?? {}) },
-      },
-      agent5: {
-        ...EMPTY_AGENT5,
-        ...(ws?.agent5 ?? {}),
-        plan: ws?.agent5?.plan ? normalizeSprintPlan(ws.agent5.plan) : null,
-      },
-      pipeline: {
-        agent2Input: ws?.pipeline?.agent2Input ?? null,
-        agent3Input: ws?.pipeline?.agent3Input ?? null,
-        agent4Input: ws?.pipeline?.agent4Input ?? null,
-        agent5Input: ws?.pipeline?.agent5Input ?? null,
-        agent6Input: ws?.pipeline?.agent6Input
-          ? {
-              ...ws.pipeline.agent6Input,
-              plan: ws.pipeline.agent6Input.plan
-                ? normalizeSprintPlan(ws.pipeline.agent6Input.plan)
-                : ws.pipeline.agent6Input.plan,
-            }
-          : null,
-      },
-    },
+    workspace,
     preferences: {
       lastAgent: prefs?.lastAgent ?? '1',
+    },
+    activeProjectId: projectId,
+    plan: {
+      id: plan.id,
+      limits: plan.limits,
+      usage: plan.usage,
+      subscription: plan.subscription,
     },
   };
 }
 
 /** Guarda (merge) el estado del Agente 1. */
 export async function saveAgent1State(uid: string, state: Agent1State): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent1: sanitize(state),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent1: sanitize(state),
+  });
 }
 
 /** Guarda (merge) el estado del Agente 2. */
 export async function saveAgent2State(uid: string, state: Agent2State): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: sanitize(state),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent2: sanitize(state),
+  });
 }
 
 /** Actualiza una HU en todas las copias del backlog que conserva el pipeline. */
@@ -446,19 +472,13 @@ export async function updateUserStoryAcrossWorkspace(
     },
   };
 
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: sanitize(updatedWorkspace.agent2),
-        agent3: sanitize(updatedWorkspace.agent3),
-        agent4: sanitize(updatedWorkspace.agent4),
-        agent5: sanitize(updatedWorkspace.agent5),
-        pipeline: sanitize(updatedWorkspace.pipeline),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await saveProjectWorkspace(uid, (await activeProject(uid)), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
 
   return updatedWorkspace;
 }
@@ -471,16 +491,10 @@ export async function updateSprintPlanAcrossWorkspace(
   const normalizedPlan = normalizeSprintPlan(plan);
   const updatedWorkspace = withUpdatedSprintPlan(workspace, normalizedPlan);
 
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent5: sanitize(updatedWorkspace.agent5),
-        pipeline: sanitize(updatedWorkspace.pipeline),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await saveProjectWorkspace(uid, (await activeProject(uid)), {
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
 
   return updatedWorkspace;
 }
@@ -607,19 +621,13 @@ export async function createUserStoryAcrossWorkspace(
     },
   };
 
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: sanitize(updatedWorkspace.agent2),
-        agent3: sanitize(updatedWorkspace.agent3),
-        agent4: sanitize(updatedWorkspace.agent4),
-        agent5: sanitize(updatedWorkspace.agent5),
-        pipeline: sanitize(updatedWorkspace.pipeline),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await saveProjectWorkspace(uid, (await activeProject(uid)), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
 
   return updatedWorkspace;
 }
@@ -713,74 +721,53 @@ export async function deleteUserStoryAcrossWorkspace(
     },
   };
 
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: sanitize(updatedWorkspace.agent2),
-        agent3: sanitize(updatedWorkspace.agent3),
-        agent4: sanitize(updatedWorkspace.agent4),
-        agent5: sanitize(updatedWorkspace.agent5),
-        pipeline: sanitize(updatedWorkspace.pipeline),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await saveProjectWorkspace(uid, (await activeProject(uid)), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
 
   return updatedWorkspace;
 }
 
 /** Guarda (merge) el estado del Agente 3. */
 export async function saveAgent3State(uid: string, state: Agent3State): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent3: sanitize(state),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent3: sanitize(state),
+  });
 }
 
 /** Marca el Agente 1 como aprobado y escribe el input para el Agente 2. */
 export async function approveAgent1(uid: string, agent2Input: Agent2Input): Promise<void> {
   const { workspace } = await getWorkspaceData(uid);
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent1: sanitize({
-          ...workspace.agent1,
-          transcription: agent2Input.transcription,
-          wishes: agent2Input.wishes,
-          status: 'approved',
-          error: null,
-        }),
-        pipeline: { agent2Input: sanitize(agent2Input) },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent1: sanitize({
+      ...workspace.agent1,
+      transcription: agent2Input.transcription,
+      wishes: agent2Input.wishes,
+      status: 'approved',
+      error: null,
+    }),
+    pipeline: { agent2Input: sanitize(agent2Input) },
+  });
 }
 
 /** Marca el Agente 2 como aprobado y escribe el input para el Agente 3. */
 export async function approveAgent2(uid: string, agent3Input: Agent3Input): Promise<void> {
   const { workspace } = await getWorkspaceData(uid);
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: sanitize({
-          ...workspace.agent2,
-          status: 'approved',
-          error: null,
-        }),
-        pipeline: { agent3Input: sanitize(agent3Input) },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent2: sanitize({
+      ...workspace.agent2,
+      status: 'approved',
+      error: null,
+    }),
+    pipeline: { agent3Input: sanitize(agent3Input) },
+  });
 }
 
 /** Marca el Agente 3 como aprobado y escribe el input para el Agente 4. */
@@ -791,38 +778,28 @@ export async function approveAgent3(uid: string, agent4Input: Agent4Input): Prom
     sourceWishIds: agent4Input.sourceWishIds,
     approvedAt: agent4Input.approvedAt,
   };
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent3: sanitize({
-          ...workspace.agent3,
-          input: agent3Input,
-          estimations: agent4Input.estimations,
-          status: 'approved',
-          error: null,
-        }),
-        pipeline: {
-          ...workspace.pipeline,
-          agent4Input: sanitize(agent4Input),
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent3: sanitize({
+      ...workspace.agent3,
+      input: agent3Input,
+      estimations: agent4Input.estimations,
+      status: 'approved',
+      error: null,
+    }),
+    pipeline: {
+      ...workspace.pipeline,
+      agent4Input: sanitize(agent4Input),
     },
-    { merge: true }
-  );
+  });
 }
 
 /** Guarda (merge) el estado del Agente 4. */
 export async function saveAgent4State(uid: string, state: Agent4State): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent4: sanitize(state),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent4: sanitize(state),
+  });
 }
 
 /** Marca el Agente 4 como aprobado y escribe el input para el Agente 5. */
@@ -834,78 +811,46 @@ export async function approveAgent4(uid: string, agent5Input: Agent5Input): Prom
     sourceWishIds: agent5Input.sourceWishIds,
     approvedAt: agent5Input.approvedAt,
   };
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent4: sanitize({
-          ...workspace.agent4,
-          input: agent4Input,
-          priorities: agent5Input.priorities,
-          framework: agent5Input.framework,
-          status: 'approved',
-          error: null,
-        }),
-        pipeline: {
-          ...workspace.pipeline,
-          agent5Input: sanitize(agent5Input),
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent4: sanitize({
+      ...workspace.agent4,
+      input: agent4Input,
+      priorities: agent5Input.priorities,
+      framework: agent5Input.framework,
+      status: 'approved',
+      error: null,
+    }),
+    agent5: sanitize(EMPTY_AGENT5),
+    pipeline: {
+      ...workspace.pipeline,
+      agent5Input: sanitize(agent5Input),
+      agent6Input: null,
     },
-    { merge: true }
-  );
+  });
 }
 
 /** Limpia el estado del Agente 1 (todos sus campos vuelven al estado inicial). */
 export async function resetAgent1(uid: string): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent1: EMPTY_AGENT1,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent1: EMPTY_AGENT1,
+  });
 }
 
-/** Limpia el estado del Agente 2 (todos sus campos vuelven al estado inicial). */
+/** Limpia el estado del Agente 2 (precede regeneración IA). */
 export async function resetAgent2(uid: string): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent2: EMPTY_AGENT2,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await resetAgentWithRegenerationCheck(uid, 'agent2', { agent2: EMPTY_AGENT2 });
 }
 
-/** Limpia el estado del Agente 3 (todos sus campos vuelven al estado inicial). */
+/** Limpia el estado del Agente 3 (precede regeneración IA). */
 export async function resetAgent3(uid: string): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent3: EMPTY_AGENT3,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await resetAgentWithRegenerationCheck(uid, 'agent3', { agent3: EMPTY_AGENT3 });
 }
 
-/** Limpia el estado del Agente 4 (todos sus campos vuelven al estado inicial). */
+/** Limpia el estado del Agente 4 (precede regeneración IA). */
 export async function resetAgent4(uid: string): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent4: EMPTY_AGENT4,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await resetAgentWithRegenerationCheck(uid, 'agent4', { agent4: EMPTY_AGENT4 });
 }
 
 /** Guarda (merge) el estado del Agente 5. */
@@ -914,15 +859,10 @@ export async function saveAgent5State(uid: string, state: Agent5State): Promise<
     ...state,
     plan: state.plan ? normalizeSprintPlan(state.plan) : null,
   };
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent5: sanitize(normalizedState),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent5: sanitize(normalizedState),
+  });
 }
 
 /** Marca el Agente 5 como aprobado y escribe el input para el Agente 6. */
@@ -936,71 +876,61 @@ export async function approveAgent5(uid: string, agent6Input: Agent6Input): Prom
     sourceWishIds: agent6Input.sourceWishIds,
     approvedAt: agent6Input.approvedAt,
   };
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent5: sanitize({
-          ...workspace.agent5,
-          input: agent5Input,
-          plan: agent6Input.plan,
-          status: 'approved',
-          error: null,
-        }),
-        pipeline: {
-          ...workspace.pipeline,
-          agent6Input: sanitize(agent6Input),
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent5: sanitize({
+      ...workspace.agent5,
+      input: agent5Input,
+      plan: agent6Input.plan,
+      status: 'approved',
+      error: null,
+    }),
+    pipeline: {
+      ...workspace.pipeline,
+      agent6Input: sanitize(agent6Input),
     },
-    { merge: true }
-  );
+  });
 }
 
-/** Limpia el estado del Agente 5 (todos sus campos vuelven al estado inicial). */
+/** Limpia el estado del Agente 5 (precede regeneración IA). */
 export async function resetAgent5(uid: string): Promise<void> {
-  await userDoc(uid).set(
-    {
-      workspace: {
-        agent5: EMPTY_AGENT5,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    },
-    { merge: true }
-  );
+  await resetAgentWithRegenerationCheck(uid, 'agent5', { agent5: EMPTY_AGENT5 });
 }
 
 /** Actualiza el último agente visitado (preferencia de navegación). */
 export async function saveLastAgent(uid: string, lastAgent: string): Promise<void> {
+  const projectId = await activeProject(uid);
   await userDoc(uid).set(
     {
       preferences: { lastAgent },
     },
     { merge: true }
   );
+  await projectDoc(uid, projectId).set({ lastAgent }, { merge: true });
 }
 
-/** Limpia todo el workspace (agentes 1–5 + pipeline). MVP: una sesión por usuario. */
+/** Reinicia el proyecto activo (conserva el proyecto, vacía el pipeline). */
 export async function resetWorkspace(uid: string): Promise<void> {
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    agent1: EMPTY_AGENT1,
+    agent2: EMPTY_AGENT2,
+    agent3: EMPTY_AGENT3,
+    agent4: EMPTY_AGENT4,
+    agent5: EMPTY_AGENT5,
+    pipeline: {
+      agent2Input: null,
+      agent3Input: null,
+      agent4Input: null,
+      agent5Input: null,
+      agent6Input: null,
+    },
+  });
   await userDoc(uid).set(
     {
-      workspace: {
-        agent1: EMPTY_AGENT1,
-        agent2: EMPTY_AGENT2,
-        agent3: EMPTY_AGENT3,
-        agent4: EMPTY_AGENT4,
-        agent5: EMPTY_AGENT5,
-        pipeline: {
-          agent2Input: null,
-          agent3Input: null,
-          agent4Input: null,
-          agent5Input: null,
-          agent6Input: null,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      preferences: { lastAgent: '1' },
+      preferences: { lastAgent: '1', activeProjectId: projectId },
     },
     { merge: true }
   );
+  await projectDoc(uid, projectId).set({ lastAgent: '1' }, { merge: true });
 }

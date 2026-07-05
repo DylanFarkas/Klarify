@@ -82,10 +82,20 @@ export interface WorkspacePreferences {
   lastAgent: string;
 }
 
+/** Snapshot del plan expuesto al cliente */
+export interface WorkspacePlanSnapshot {
+  id: import('@/lib/plans/types').PlanId;
+  limits: import('@/lib/plans/types').PlanLimits;
+  usage: import('@/lib/plans/types').UserUsage;
+  subscription?: import('@/lib/plans/types').UserSubscription;
+}
+
 /** Respuesta del endpoint GET /api/workspace */
 export interface WorkspaceResponse {
   workspace: UserWorkspace;
   preferences: WorkspacePreferences;
+  activeProjectId: string | null;
+  plan: WorkspacePlanSnapshot;
 }
 
 const EMPTY_AGENT3: Agent3State = {

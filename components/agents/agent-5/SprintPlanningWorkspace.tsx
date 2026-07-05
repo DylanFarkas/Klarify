@@ -10,6 +10,8 @@ import { DEFAULT_SPRINT_CAPACITY_SP, DEFAULT_SPRINT_DURATION_WEEKS } from '@/lib
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import {
   addSprintToPlan,
   deleteEmptySprintAtIndex,
@@ -46,6 +48,7 @@ export function SprintPlanningWorkspace({
   onError,
 }: SprintPlanningWorkspaceProps) {
   const { user } = useAuth();
+  const { canRegenerate } = useWorkspace();
   const { entries, reset, consumeStream } = useAgentActivity();
   const { showModelReasoning } = useWorkspaceSettings();
 
@@ -98,6 +101,7 @@ export function SprintPlanningWorkspace({
           priorities: input.priorities,
           framework: input.framework,
           config,
+          ...(hasPlan ? { isRegeneration: true } : {}),
         }),
       });
 
@@ -191,7 +195,9 @@ export function SprintPlanningWorkspace({
         hasPlan={hasPlan}
         onRegenerate={handleGenerate}
         isRegenerating={isPlanning}
+        regenerateDisabled={hasPlan && !canRegenerate('agent5')}
       />
+      {hasPlan ? <RegenerationHint agent="agent5" /> : null}
 
       {!hasPlan && !isPlanning && !isApproved && (
         <EmptySprintPlanningStartState

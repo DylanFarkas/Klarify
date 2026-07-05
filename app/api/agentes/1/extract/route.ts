@@ -17,6 +17,7 @@ import type {
   Agent1ErrorResponse,
 } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { getAiConfig, resolveUserPlan } from '@/lib/plans/plan-service';
 import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import {
   AgentStreamEmitter,
@@ -26,7 +27,8 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    await verifyRequestUser(request);
+    const uid = await verifyRequestUser(request);
+    const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
     const body = (await request.json()) as Agent1ExtractRequest;
     const skipped = body.skipped ?? false;
@@ -80,7 +82,8 @@ export async function POST(request: NextRequest) {
                   body.discovery,
                   emitter.bindThought(),
                   answers,
-                  skipped
+                  skipped,
+                  aiConfig
                 )
             );
           }

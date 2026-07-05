@@ -53,18 +53,17 @@ export function generateUserStoryId(existing: UserStory[] = []): string {
 
 export async function generateBacklog(
   wishes: Wish[],
-  transcription?: TranscriptionResult | null
+  transcription?: TranscriptionResult | null,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Epic[]> {
-  return backlogAdapter.generateBacklog(wishes, transcription);
+  return backlogAdapter.generateBacklog(wishes, transcription, aiConfig);
 }
 
-/**
- * Genera backlog emitiendo pensamientos del LLM en tiempo real.
- */
 export async function generateBacklogStream(
   wishes: Wish[],
   onThought: LLMThoughtCallback,
-  transcription?: TranscriptionResult | null
+  transcription?: TranscriptionResult | null,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Epic[]> {
-  return backlogAdapter.generateBacklogStream(wishes, onThought, transcription);
+  return backlogAdapter.generateBacklogStream(wishes, onThought, transcription, aiConfig);
 }

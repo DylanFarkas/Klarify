@@ -59,8 +59,9 @@ export function validateAgent4Input(input: Agent4Input | null): ValidationResult
 export async function prioritizeBacklogStream(
   input: Agent4Input,
   framework: PrioritizationFramework = DEFAULT_FRAMEWORK,
-  onThought: LLMThoughtCallback
+  onThought: LLMThoughtCallback,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Agent4SuggestionItem[]> {
   const localEpics = toLocalEpicsWithEstimation(input.epics, input.estimations);
-  return prioritizationAdapter.prioritizeBacklogStream(localEpics, framework, onThought);
+  return prioritizationAdapter.prioritizeBacklogStream(localEpics, framework, onThought, aiConfig);
 }

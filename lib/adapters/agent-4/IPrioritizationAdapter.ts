@@ -9,22 +9,19 @@ import type {
   PrioritizationFramework,
 } from '@/lib/types/agent-4';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
 
 export interface IPrioritizationAdapter {
-  /**
-   * Genera priorizaciones de manera síncrona (Promesa estándar).
-   */
   prioritizeBacklog(
     epics: LocalEpicWithEstimation[],
-    framework: PrioritizationFramework
+    framework: PrioritizationFramework,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]>;
 
-  /**
-   * Genera priorizaciones transmitiendo pensamientos intermedios en tiempo real.
-   */
   prioritizeBacklogStream(
     epics: LocalEpicWithEstimation[],
     framework: PrioritizationFramework,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]>;
 }

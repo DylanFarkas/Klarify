@@ -19,7 +19,11 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch, saveLastAgent } from '@/lib/api-client';
+import { canRegenerateClient } from '@/lib/plans/regeneration-policy';
+import type { RegenerationAgent } from '@/lib/plans/types';
+import type { ProjectSlotsInfo, ProjectSummary } from '@/lib/types/project';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
+import type { WorkspacePlanSnapshot } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
@@ -47,10 +51,20 @@ export interface UseWorkspaceResult {
   workspace: UserWorkspace | null;
   isLoading: boolean;
   error: string | null;
+  plan: WorkspacePlanSnapshot | null;
+  activeProjectId: string | null;
+  projects: ProjectSummary[];
+  projectSlots: ProjectSlotsInfo | null;
   /** Incrementa tras resetear sesión; las páginas deben re-hidratar al cambiar */
   sessionVersion: number;
   /** Recarga el workspace desde Firestore (p. ej. al entrar a un agente) */
   refreshWorkspace: (options?: { silent?: boolean }) => Promise<void>;
+  refreshProjects: () => Promise<void>;
+  createProject: (name?: string) => Promise<ProjectSummary>;
+  switchProject: (projectId: string) => Promise<void>;
+  activateProjects: (projectIds: string[]) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  canRegenerate: (agent: RegenerationAgent) => boolean;
   saveAgent1: (state: Agent1State) => void;
   saveAgent2: (state: Agent2State) => void;
   saveAgent3: (state: Agent3State) => void;
@@ -86,6 +100,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null);
+  const [plan, setPlan] = useState<WorkspacePlanSnapshot | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectSlots, setProjectSlots] = useState<ProjectSlotsInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionVersion, setSessionVersion] = useState(0);
@@ -120,6 +138,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error('No se pudo cargar el workspace');
       const data = (await response.json()) as WorkspaceResponse;
       setWorkspace(data.workspace);
+      setPlan(data.plan);
+      setActiveProjectId(data.activeProjectId);
     } catch (err) {
       if (!options?.silent) {
         setError(err instanceof Error ? err.message : 'Error al cargar el workspace');
@@ -131,9 +151,163 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const refreshProjects = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await authFetch('/api/projects', user);
+      if (!response.ok) throw new Error('No se pudieron cargar los proyectos');
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar proyectos');
+    }
+  }, [user]);
+
+  const createProject = useCallback(
+    async (name?: string) => {
+      if (!user) throw new Error('No autenticado');
+      const response = await authFetch('/api/projects', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo crear el proyecto');
+      }
+      const data = (await response.json()) as {
+        project: ProjectSummary;
+        activeProjectId: string;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects((prev) => [data.project, ...prev.filter((p) => p.id !== data.project.id)]);
+      setActiveProjectId(data.activeProjectId);
+      setPlan(data.plan);
+      setWorkspace(createEmptyWorkspace());
+      setSessionVersion((v) => v + 1);
+      return data.project;
+    },
+    [user]
+  );
+
+  const switchProject = useCallback(
+    async (projectId: string) => {
+      if (!user) return;
+      cancelPendingSaves();
+      const response = await authFetch('/api/projects', user, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+      }
+      setActiveProjectId(projectId);
+      setSessionVersion((v) => v + 1);
+      await fetchWorkspace();
+    },
+    [user, cancelPendingSaves, fetchWorkspace]
+  );
+
+  const activateProjects = useCallback(
+    async (projectIds: string[]) => {
+      if (!user) throw new Error('No autenticado');
+      const response = await authFetch('/api/projects', user, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'activate', projectIds }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudieron activar los proyectos');
+      }
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+    },
+    [user]
+  );
+
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      if (!user) throw new Error('No autenticado');
+      const wasActive = activeProjectId === projectId;
+      if (wasActive) {
+        cancelPendingSaves();
+      }
+
+      const response = await authFetch(
+        `/api/projects?projectId=${encodeURIComponent(projectId)}`,
+        user,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo eliminar el proyecto');
+      }
+
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+
+      if (wasActive) {
+        setSessionVersion((v) => v + 1);
+        if (pathname?.startsWith('/agentes') && pathname !== '/agentes/proyectos') {
+          router.push('/agentes/proyectos');
+        } else {
+          await fetchWorkspace({ silent: true });
+        }
+      }
+    },
+    [user, activeProjectId, cancelPendingSaves, pathname, router, fetchWorkspace]
+  );
+
+  const canRegenerate = useCallback(
+    (agent: RegenerationAgent) => {
+      if (!plan) return false;
+      return canRegenerateClient(plan.id, agent, plan.usage).allowed;
+    },
+    [plan]
+  );
+
   useEffect(() => {
     void fetchWorkspace();
-  }, [fetchWorkspace]);
+    void refreshProjects();
+  }, [fetchWorkspace, refreshProjects]);
+
+  useEffect(() => {
+    if (!user || !pathname?.startsWith('/agentes')) return;
+    if (pathname === '/agentes/proyectos') return;
+    if (isLoading) return;
+    if (projects.length === 0 && !activeProjectId) {
+      router.replace('/agentes/proyectos');
+    }
+  }, [user, pathname, projects.length, activeProjectId, isLoading, router]);
 
   // Al cambiar de agente, sincronizar con Firestore (el estado local no se
   // actualiza tras PATCH/POST; sin esto el Agente 2 no ve pipeline.agent2Input).
@@ -145,6 +319,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Persistir el último agente visitado en preferencias (p. ej. tras login).
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;
+
+    if (pathname === '/agentes/dashboard' || pathname.startsWith('/agentes/dashboard/')) {
+      if (lastPersistedAgent.current === 'dashboard') return;
+      lastPersistedAgent.current = 'dashboard';
+      void saveLastAgent(user, 'dashboard').catch(() => {
+        lastPersistedAgent.current = null;
+      });
+      return;
+    }
 
     const match = pathname.match(/^\/agentes\/(\d+)/);
     if (!match) return;
@@ -357,7 +540,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 status: 'approved',
                 error: null,
               },
-              pipeline: { ...prev.pipeline, agent5Input: input },
+              agent5: createEmptyWorkspace().agent5,
+              pipeline: {
+                ...prev.pipeline,
+                agent5Input: input,
+                agent6Input: null,
+              },
             }
           : prev
       );
@@ -500,12 +688,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const resetSession = useCallback(async () => {
     if (!user) return;
     cancelPendingSaves();
-    await runAction('resetWorkspace');
-    setWorkspace(createEmptyWorkspace());
-    setSessionVersion((v) => v + 1);
-    lastPersistedAgent.current = '1';
-    router.push('/agentes/1');
-  }, [user, cancelPendingSaves, runAction, router]);
+    router.push('/agentes/proyectos');
+  }, [user, cancelPendingSaves, router]);
 
   return (
     <WorkspaceContext.Provider
@@ -513,8 +697,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspace,
         isLoading,
         error,
+        plan,
+        activeProjectId,
+        projects,
+        projectSlots,
         sessionVersion,
         refreshWorkspace: fetchWorkspace,
+        refreshProjects,
+        createProject,
+        switchProject,
+        activateProjects,
+        deleteProject,
+        canRegenerate,
         saveAgent1,
         saveAgent2,
         saveAgent3,

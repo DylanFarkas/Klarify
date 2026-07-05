@@ -20,7 +20,7 @@ export function AgentSidebarSettings({ className = '' }: AgentSidebarSettingsPro
 
   return (
     <>
-      <div className={['relative z-10 mt-8 border-t border-border pt-6', className].filter(Boolean).join(' ')}>
+      <div className={['relative z-10 border-border', className].filter(Boolean).join(' ')}>
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}

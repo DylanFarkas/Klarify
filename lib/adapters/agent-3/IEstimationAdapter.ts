@@ -4,19 +4,18 @@
  */
 
 import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
+import type { AiGenerationConfig } from '@/lib/plans/types';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 export interface IEstimationAdapter {
-  /**
-   * Genera estimaciones de manera síncrona (Promesa estándar).
-   */
-  estimateBacklog(epics: LocalEpic[]): Promise<Agent3SuggestionItem[]>;
+  estimateBacklog(
+    epics: LocalEpic[],
+    aiConfig?: AiGenerationConfig
+  ): Promise<Agent3SuggestionItem[]>;
 
-  /**
-   * Genera estimaciones transmitiendo pensamientos intermedios en tiempo real.
-   */
   estimateBacklogStream(
     epics: LocalEpic[],
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]>;
 }

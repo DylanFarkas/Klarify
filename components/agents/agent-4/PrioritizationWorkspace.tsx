@@ -24,6 +24,8 @@ import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { CategorySelect, CategoryBadge } from './CategorySelect';
 import { FrameworkSelector } from './FrameworkSelector';
 import { EmptyPrioritizationStartState } from './EmptyPrioritizationStartState';
@@ -186,6 +188,7 @@ export function PrioritizationWorkspace({
   onError,
 }: PrioritizationWorkspaceProps) {
   const { user } = useAuth();
+  const { canRegenerate } = useWorkspace();
   const { entries, reset, consumeStream } = useAgentActivity();
   const { showModelReasoning } = useWorkspaceSettings();
 
@@ -228,6 +231,7 @@ export function PrioritizationWorkspace({
           epics: input.epics,
           estimations: input.estimations,
           framework,
+          ...(hasPriorities ? { isRegeneration: true } : {}),
         }),
       });
 
@@ -506,7 +510,7 @@ export function PrioritizationWorkspace({
               <div className="flex w-full flex-col-reverse items-center gap-3 sm:w-auto sm:flex-row">
                 <button
                   onClick={handlePrioritizeWithAgent}
-                  disabled={isAnalyzing || isApproving}
+                  disabled={isAnalyzing || isApproving || (hasPriorities && !canRegenerate('agent4'))}
                   className={[
                     'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 sm:w-auto',
                     'text-sm font-medium text-muted',
@@ -520,6 +524,7 @@ export function PrioritizationWorkspace({
                   </svg>
                   Regenerar
                 </button>
+                {hasPriorities ? <RegenerationHint agent="agent4" /> : null}
 
                 <ApproveButton
                   onClick={onApprove}
