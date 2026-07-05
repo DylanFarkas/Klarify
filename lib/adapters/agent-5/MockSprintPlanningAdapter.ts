@@ -4,6 +4,7 @@
  */
 
 import type { ISprintPlanningAdapter } from './ISprintPlanningAdapter';
+import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import type { LocalStoryForPlanning, SprintPlan, SprintPlanningConfig, StoryDependency } from '@/lib/types/agent-5';
 import { SPRINT_PLANNING_DELAY_MS } from '@/lib/constants/agent-5';
 import { MOCK_SPRINT_PLANNING_THOUGHTS, mockPlanSprints } from '@/lib/mock/agent-5-mock';
@@ -30,17 +31,19 @@ export class MockSprintPlanningAdapter implements ISprintPlanningAdapter {
   async planSprints(
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
+    framework: PrioritizationFramework,
     _dependencies: StoryDependency[]
   ): Promise<SprintPlan> {
-    return mockPlanSprints(stories, config);
+    return mockPlanSprints(stories, config, framework);
   }
 
   async planSprintsStream(
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
+    framework: PrioritizationFramework,
     onThought: LLMThoughtCallback
   ): Promise<SprintPlan> {
     await emitMockThoughts(MOCK_SPRINT_PLANNING_THOUGHTS, onThought, SPRINT_PLANNING_DELAY_MS);
-    return mockPlanSprints(stories, config);
+    return mockPlanSprints(stories, config, framework);
   }
 }

@@ -3,6 +3,7 @@ import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
+import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
 export type PriorityBucket = 'alta' | 'media' | 'baja';
@@ -34,6 +35,7 @@ export interface DashboardMetrics {
 	prioritizationCoverage: number;
 	planningCoverage: number;
 	hasPlan: boolean;
+	plan: SprintPlan | null;
 	estimations: Record<string, StoryEstimation>;
 	priorities: Record<string, StoryPrioritization>;
 	nextAction: {
@@ -114,7 +116,8 @@ function resolveFramework(workspace: UserWorkspace): PrioritizationFramework | n
 }
 
 function resolvePlan(workspace: UserWorkspace): SprintPlan | null {
-	return workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
+	const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
+	return plan ? normalizeSprintPlan(plan) : null;
 }
 
 function getPriorityBucket(
@@ -394,6 +397,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		prioritizationCoverage,
 		planningCoverage,
 		hasPlan: Boolean(plan),
+		plan,
 		estimations,
 		priorities,
 		nextAction,

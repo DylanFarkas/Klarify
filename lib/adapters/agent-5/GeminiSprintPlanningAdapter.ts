@@ -15,10 +15,18 @@ import type {
 } from '@/lib/types/agent-5';
 import { buildSprintSchedule } from '@/lib/types/agent-5';
 import { mockPlanSprints } from '@/lib/mock/agent-5-mock';
+import { sanitizeDependencies } from '@/lib/utils/story-dependencies';
+import { mergeAndSanitizeDependencies } from '@/lib/utils/foundational-stories';
+import {
+  assignStoriesToSprints,
+  generateSprintGoals,
+} from '@/lib/utils/sprint-assignment';
+import type { PrioritizationFramework } from '@/lib/types/agent-4';
+import { FRAMEWORK_DESCRIPTIONS } from '@/lib/constants/agent-4';
+import { getPriorityOrderLabel } from '@/lib/utils/priority-rank';
 import {
   SPRINT_ID_PREFIX,
   GEMINI_SPRINT_PLANNING_PREFIX,
-  MOSCOW_PRIORITY_ORDER,
 } from '@/lib/constants/agent-5';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
@@ -55,14 +63,16 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
   async planSprints(
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
+    framework: PrioritizationFramework,
     _dependencies: StoryDependency[]
   ): Promise<SprintPlan> {
-    return this.planSprintsStream(stories, config, () => {});
+    return this.planSprintsStream(stories, config, framework, () => {});
   }
 
   async planSprintsStream(
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
+    framework: PrioritizationFramework,
     onThought: LLMThoughtCallback
   ): Promise<SprintPlan> {
     if (!this.ai) {
@@ -72,7 +82,7 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
     try {
       console.log('[GeminiSprintPlanningAdapter] Iniciando planificación de sprints con Gemini...');
 
-      const { systemInstruction, userPrompt } = this.buildPrompts(stories, config);
+      const { systemInstruction, userPrompt } = this.buildPrompts(stories, config, framework);
 
       const responseText = await this.streamGenerate(userPrompt, systemInstruction, onThought);
 
@@ -81,7 +91,7 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
       }
 
       console.log('[GEMINI SPRINT RESPONSE]:', responseText);
-      const result = this.parseSprintPlanResponse(responseText, config, stories);
+      const result = this.parseSprintPlanResponse(responseText, config, stories, framework);
       console.log(
         `[GeminiSprintPlanningAdapter] Planificación exitosa. Sprints: ${result.sprints.length}`
       );
@@ -97,8 +107,12 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
 
   private buildPrompts(
     stories: LocalStoryForPlanning[],
-    config: SprintPlanningConfig
+    config: SprintPlanningConfig,
+    framework: PrioritizationFramework
   ): { systemInstruction: string; userPrompt: string } {
+    const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
+    const priorityOrder = getPriorityOrderLabel(framework);
+
     const systemInstruction = `Devuelve la respuesta estrictamente como un objeto JSON con la siguiente forma exacta. No incluyas markdown, bloques de código (\`\`\`json) ni ningún texto extra — solo el JSON puro.
 
 {
@@ -112,7 +126,7 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
     {
       "storyId": "HU-002",
       "dependsOnStoryId": "HU-001",
-      "reason": "Motivo de la dependencia"
+      "reason": "Requiere completar primero «título de la historia prerequisito»"
     }
   ],
   "unassignedStoryIds": []
@@ -120,11 +134,21 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
 
 REGLAS CRÍTICAS:
 - Asigna cada historia a EXACTAMENTE un sprint.
-- Respeta el orden de prioridad MoSCoW: must > should > could > wont.
+- Respeta el orden de prioridad del framework ${frameworkLabel}: ${priorityOrder}.
 - La suma de Story Points por sprint NO debe exceder ${config.sprintCapacitySp} SP.
-- Detecta dependencias funcionales entre historias y respétalas (una dependiente no puede ir en sprint anterior a su dependencia).
+- Detecta dependencias funcionales REALES entre historias (storyId depende de dependsOnStoryId).
+- Una dependencia significa: la historia storyId NO puede implementarse ni entregarse antes que dependsOnStoryId.
+- Solo declara dependencia si existe relación técnica directa y verificable entre las dos historias.
+- El prerequisito (dependsOnStoryId) debe ser una capacidad habilitante que la dependiente necesita para funcionar.
+- Las historias de plataforma, infraestructura o habilitación suelen ser prerequisitos de las historias que las consumen, nunca al revés.
+- CAPACIDADES HABILITANTES (sprints tempranos): Las historias que CREAN o GESTIONAN capacidades transversales deben ir en Sprint 1-2, aunque tengan muchos Story Points. Ejemplos: gestión de usuarios/roles/permisos, autenticación, modelo de datos, configuración inicial, API base.
+- Si una historia de negocio menciona usuarios, roles, permisos, sesión o acceso, probablemente depende de la historia que implementa esa capacidad.
+- Si una historia de mayor prioridad depende de una de menor prioridad según ${frameworkLabel}, probablemente la dependencia está invertida: corrígela o no la incluyas.
+- Respeta las dependencias al asignar sprints (una dependiente no puede ir en sprint anterior a su prerequisito).
 - Cada sprintGoal debe ser un objetivo claro, conciso y orientado a valor de negocio.
-- Si hay historias que no caben en la capacidad, inclúyelas en unassignedStoryIds.`;
+- Si hay historias que no caben en la capacidad, inclúyelas en unassignedStoryIds.
+- En el campo reason escribe una frase corta y simple en español, por ejemplo: "Requiere completar primero «Acceder al Sistema de Forma Segura»." No uses términos técnicos.
+- Si no hay dependencia funcional clara y directa entre dos historias, NO la inventes; devuelve un array dependencies vacío o solo las que estés seguro.`;
 
     const userPrompt = `Eres un Scrum Master experto en planificación de sprints ágiles.
 
@@ -134,7 +158,8 @@ Objetivo: Organizar el backlog priorizado en sprints concretos con Sprint Goals 
 DATOS DE PLANIFICACIÓN:
 - Capacidad del equipo: ${config.sprintCapacitySp} Story Points por sprint
 - Duración de cada sprint: ${config.sprintDurationWeeks} semanas
-- Orden de prioridad MoSCoW: ${MOSCOW_PRIORITY_ORDER.join(' > ')}
+- Framework de priorización: ${frameworkLabel}
+- Orden de prioridad: ${priorityOrder}
 
 HISTORIAS A PLANIFICAR:
 ${JSON.stringify(stories, null, 2)}`;
@@ -185,9 +210,10 @@ ${JSON.stringify(stories, null, 2)}`;
   private parseSprintPlanResponse(
     responseText: string,
     config: SprintPlanningConfig,
-    stories: LocalStoryForPlanning[]
+    stories: LocalStoryForPlanning[],
+    framework: PrioritizationFramework
   ): SprintPlan {
-    const fallbackPlan = () => mockPlanSprints(stories, config);
+    const fallbackPlan = () => mockPlanSprints(stories, config, framework);
 
     let raw: RawSprintPlanResponse;
     try {
@@ -261,27 +287,40 @@ ${JSON.stringify(stories, null, 2)}`;
       return fallbackPlan();
     }
 
-    const dependencies: StoryDependency[] = (raw.dependencies ?? [])
-      .filter(
-        (d) =>
-          d &&
-          typeof d.storyId === 'string' &&
-          typeof d.dependsOnStoryId === 'string' &&
-          typeof d.reason === 'string'
-      )
-      .map((d) => ({
-        storyId: d.storyId.trim(),
-        dependsOnStoryId: d.dependsOnStoryId.trim(),
-        reason: `${GEMINI_SPRINT_PLANNING_PREFIX} ${d.reason.trim()}`,
-      }));
+    const llmDependencies: StoryDependency[] = sanitizeDependencies(
+      (raw.dependencies ?? [])
+        .filter(
+          (d) =>
+            d &&
+            typeof d.storyId === 'string' &&
+            typeof d.dependsOnStoryId === 'string' &&
+            typeof d.reason === 'string'
+        )
+        .map((d) => ({
+          storyId: d.storyId.trim(),
+          dependsOnStoryId: d.dependsOnStoryId.trim(),
+          reason: `${GEMINI_SPRINT_PLANNING_PREFIX} ${d.reason.trim()}`,
+        })),
+      stories,
+      { framework }
+    );
 
-    const scheduled = buildSprintSchedule(sprints, config);
+    const dependencies = mergeAndSanitizeDependencies(llmDependencies, stories, framework);
+
+    const { sprints: rebalancedSprints, unassigned } = assignStoriesToSprints(
+      stories,
+      dependencies,
+      config,
+      framework
+    );
+    const withGoals = generateSprintGoals(rebalancedSprints, stories);
+    const scheduled = buildSprintSchedule(withGoals, config);
 
     return {
       sprints: scheduled,
       dependencies,
       config,
-      unassignedStoryIds: raw.unassignedStoryIds ?? [],
+      unassignedStoryIds: unassigned.length > 0 ? unassigned : (raw.unassignedStoryIds ?? []),
     };
   }
 }

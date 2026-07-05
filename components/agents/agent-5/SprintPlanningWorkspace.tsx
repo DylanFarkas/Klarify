@@ -5,17 +5,22 @@ import { useAgentActivity } from '@/hooks/useAgentActivity';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch } from '@/lib/api-client';
 import type { Agent5Input } from '@/lib/types/workspace';
-import type { Agent5Status, SprintPlan, SprintPlanningConfig, Agent5PlanResponse } from '@/lib/types/agent-5';
+import type { Agent5Status, SprintPlan, SprintPlanningConfig, Agent5PlanResponse, SprintDatePatch } from '@/lib/types/agent-5';
 import { DEFAULT_SPRINT_CAPACITY_SP, DEFAULT_SPRINT_DURATION_WEEKS } from '@/lib/constants/agent-5';
-import { getFrameworkShortLabels, getFrameworkColors } from '@/lib/constants/agent-4';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import {
+  addSprintToPlan,
+  deleteEmptySprintAtIndex,
+  moveStoryInPlan,
+  updateSprintDates,
+  updateSprintGoal,
+} from '@/lib/utils/sprint-plan-mutations';
 import { SprintPlanningConfigPanel } from './SprintPlanningConfigPanel';
 import { SprintBoard } from './SprintBoard';
 import { SprintTimeline } from './SprintTimeline';
 import { EmptySprintPlanningStartState } from './EmptySprintPlanningStartState';
-import type { PrioritizationFramework } from '@/lib/types/agent-4';
 
 interface SprintPlanningWorkspaceProps {
   input: Agent5Input;
@@ -77,11 +82,6 @@ export function SprintPlanningWorkspace({
     return map;
   }, [input.epics]);
 
-  const storyMap = useMemo(
-    () => Object.fromEntries(allStories.map((s) => [s.id, s])),
-    [allStories]
-  );
-
   const handleGenerate = useCallback(async () => {
     if (!input || !user) return;
 
@@ -120,40 +120,42 @@ export function SprintPlanningWorkspace({
   const handleGoalChange = useCallback(
     (sprintId: string, goal: string) => {
       if (!plan) return;
-      const updatedSprints = plan.sprints.map((s) =>
-        s.id === sprintId ? { ...s, sprintGoal: goal, isEdited: true } : s
-      );
-      onPlanChange({ ...plan, sprints: updatedSprints });
+      onPlanChange(updateSprintGoal(plan, sprintId, goal));
+    },
+    [plan, onPlanChange]
+  );
+
+  const handleSprintDatesChange = useCallback(
+    (sprintId: string, patch: SprintDatePatch) => {
+      if (!plan) return;
+      onPlanChange(updateSprintDates(plan, sprintId, patch));
     },
     [plan, onPlanChange]
   );
 
   const handleMoveStory = useCallback(
-    (storyId: string, fromSprintId: string, toSprintId: string | null) => {
+    (storyId: string, fromSprintId: string | null, toSprintId: string | null) => {
       if (!plan) return;
       const storyPoints = input.estimations[storyId]?.points ?? 0;
-      let sprints = plan.sprints.map((s) => {
-        if (s.id === fromSprintId) {
-          return {
-            ...s,
-            storyIds: s.storyIds.filter((id) => id !== storyId),
-            velocitySp: s.velocitySp - storyPoints,
-            isEdited: true,
-          };
-        }
-        if (toSprintId && s.id === toSprintId) {
-          return {
-            ...s,
-            storyIds: [...s.storyIds, storyId],
-            velocitySp: s.velocitySp + storyPoints,
-            isEdited: true,
-          };
-        }
-        return s;
-      });
-      onPlanChange({ ...plan, sprints });
+      onPlanChange(moveStoryInPlan(plan, storyId, fromSprintId, toSprintId, storyPoints));
     },
     [plan, input.estimations, onPlanChange]
+  );
+
+  const handleAddSprint = useCallback(() => {
+    if (!plan) return;
+    onPlanChange(addSprintToPlan(plan));
+  }, [plan, onPlanChange]);
+
+  const handleDeleteSprint = useCallback(
+    (sprintIndex: number) => {
+      if (!plan) return;
+      const nextPlan = deleteEmptySprintAtIndex(plan, sprintIndex);
+      if (!nextPlan) return;
+      if (!window.confirm('¿Eliminar este sprint vacío?')) return;
+      onPlanChange(nextPlan);
+    },
+    [plan, onPlanChange]
   );
 
   const isApprovable = hasPlan && plan.sprints.every((s) => s.sprintGoal.trim().length > 0);
@@ -186,6 +188,9 @@ export function SprintPlanningWorkspace({
         onChange={setConfig}
         disabled={isPlanning || isApproving}
         isApproved={isApproved}
+        hasPlan={hasPlan}
+        onRegenerate={handleGenerate}
+        isRegenerating={isPlanning}
       />
 
       {!hasPlan && !isPlanning && !isApproved && (
@@ -224,7 +229,10 @@ export function SprintPlanningWorkspace({
             epicMap={epicMap}
             isApproved={isApproved}
             onGoalChange={handleGoalChange}
+            onDatesChange={handleSprintDatesChange}
             onMoveStory={handleMoveStory}
+            onAddSprint={!isApproved ? handleAddSprint : undefined}
+            onDeleteSprint={!isApproved ? handleDeleteSprint : undefined}
           />
 
           <SprintTimeline sprints={plan.sprints} />
@@ -238,26 +246,10 @@ export function SprintPlanningWorkspace({
               Revisar y aprobar plan de sprints
             </h3>
             <p className="mt-0.5 text-xs text-muted">
-              Haz clic en el Sprint Goal para editarlo. Las historias sin asignar se muestran abajo.
+              Edita objetivos y fechas desde cada sprint. Arrastra historias entre sprints para reorganizar.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <button
-              onClick={handleGenerate}
-              disabled={isPlanning || isApproving}
-              className={[
-                'inline-flex items-center gap-2 rounded-xl border border-border px-5 py-3',
-                'text-sm font-medium text-muted',
-                'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
-                'transition-all duration-200 cursor-pointer',
-                'disabled:opacity-40 disabled:cursor-not-allowed',
-              ].join(' ')}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
-              Regenerar
-            </button>
             <ApproveButton
               onClick={onApprove}
               disabled={!isApprovable || isApproving || isPlanning}

@@ -27,6 +27,7 @@ import {
   createUserStoryAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
+  updateSprintPlanAcrossWorkspace,
   resetAgent1,
   resetAgent2,
   resetAgent3,
@@ -38,7 +39,7 @@ import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
-import type { Agent5State } from '@/lib/types/agent-5';
+import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 
 interface PatchBody {
@@ -57,6 +58,7 @@ interface PostBody {
     | 'createUserStory'
     | 'deleteUserStory'
     | 'updateUserStory'
+    | 'updateSprintPlan'
     | 'resetAgent1'
     | 'resetAgent2'
     | 'resetAgent3'
@@ -73,6 +75,11 @@ interface PostBody {
         storyId: string;
         updates: Partial<UserStory>;
         estimationUpdates?: Partial<StoryEstimation>;
+        epicId?: string;
+        sprintId?: string | null;
+      }
+    | {
+        plan: SprintPlan;
       }
     | {
         epicId: string;
@@ -205,6 +212,8 @@ export async function POST(request: NextRequest) {
           storyId?: string;
           updates?: Partial<UserStory>;
           estimationUpdates?: Partial<StoryEstimation>;
+          epicId?: string;
+          sprintId?: string | null;
         };
         if (!payload.storyId || !payload.updates) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
@@ -213,8 +222,20 @@ export async function POST(request: NextRequest) {
           uid,
           payload.storyId,
           payload.updates,
-          payload.estimationUpdates
+          payload.estimationUpdates,
+          {
+            epicId: payload.epicId,
+            sprintId: payload.sprintId,
+          }
         );
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'updateSprintPlan': {
+        const payload = body.payload as { plan?: SprintPlan };
+        if (!payload.plan) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await updateSprintPlanAcrossWorkspace(uid, payload.plan);
         return NextResponse.json({ ok: true, workspace });
       }
       case 'resetAgent1':
