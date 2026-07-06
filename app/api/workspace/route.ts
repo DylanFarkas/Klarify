@@ -35,6 +35,12 @@ import {
   resetAgent4,
   resetAgent5,
   resetWorkspace,
+  ensureExecutionInitialized,
+  upsertProjectMember,
+  deleteProjectMember,
+  updateStoryExecution,
+  bulkUpdateStoryExecutions,
+  updateExecutionSprintFilter,
 } from '@/lib/workspace-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
@@ -42,6 +48,7 @@ import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
+import type { KanbanStatus, ProjectMember, ProjectMemberRole } from '@/lib/types/execution';
 
 interface PatchBody {
   agent?: 'agent1' | 'agent2' | 'agent3' | 'agent4' | 'agent5';
@@ -60,6 +67,12 @@ interface PostBody {
     | 'deleteUserStory'
     | 'updateUserStory'
     | 'updateSprintPlan'
+    | 'initializeExecution'
+    | 'upsertProjectMember'
+    | 'deleteProjectMember'
+    | 'updateStoryExecution'
+    | 'bulkUpdateStoryExecutions'
+    | 'updateExecutionSprintFilter'
     | 'resetAgent1'
     | 'resetAgent2'
     | 'resetAgent3'
@@ -92,6 +105,23 @@ interface PostBody {
       }
     | {
         storyId: string;
+      }
+    | {
+        member?: {
+          id?: string;
+          displayName: string;
+          email?: string;
+          role: ProjectMemberRole;
+        };
+        memberId?: string;
+        storyId?: string;
+        patch?: {
+          status?: KanbanStatus;
+          assigneeId?: string | null;
+          columnOrder?: number;
+        };
+        updates?: { storyId: string; status: KanbanStatus; columnOrder: number }[];
+        sprintFilter?: string | 'all';
       };
 }
 
@@ -230,6 +260,66 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
         const workspace = await updateSprintPlanAcrossWorkspace(uid, payload.plan);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'initializeExecution': {
+        const workspace = await ensureExecutionInitialized(uid);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'upsertProjectMember': {
+        const payload = body.payload as {
+          member?: {
+            id?: string;
+            displayName: string;
+            email?: string;
+            role: ProjectMemberRole;
+          };
+        };
+        if (!payload.member?.displayName || !payload.member.role) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await upsertProjectMember(uid, payload.member);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'deleteProjectMember': {
+        const payload = body.payload as { memberId?: string };
+        if (!payload.memberId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await deleteProjectMember(uid, payload.memberId);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'updateStoryExecution': {
+        const payload = body.payload as {
+          storyId?: string;
+          patch?: {
+            status?: KanbanStatus;
+            assigneeId?: string | null;
+            columnOrder?: number;
+          };
+        };
+        if (!payload.storyId || !payload.patch) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await updateStoryExecution(uid, payload.storyId, payload.patch);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'bulkUpdateStoryExecutions': {
+        const payload = body.payload as {
+          updates?: { storyId: string; status: KanbanStatus; columnOrder: number }[];
+        };
+        if (!payload.updates?.length) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await bulkUpdateStoryExecutions(uid, payload.updates);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'updateExecutionSprintFilter': {
+        const payload = body.payload as { sprintFilter?: string | 'all' };
+        if (payload.sprintFilter === undefined) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await updateExecutionSprintFilter(uid, payload.sprintFilter);
         return NextResponse.json({ ok: true, workspace });
       }
       case 'resetAgent1':

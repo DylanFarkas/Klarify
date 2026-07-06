@@ -12,6 +12,7 @@ import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
+import { ExecutionStatusBadge } from './ExecutionStatusBadge';
 
 const ALLOWED_STORY_POINTS = [1, 2, 3, 5, 8, 13, 21] as const;
 
@@ -102,6 +103,7 @@ export function DashboardSprintStoriesTable({
 								<th className="px-4 py-3">Epica</th>
 								<th className="px-4 py-3">SP</th>
 								<th className="px-4 py-3">Prioridad</th>
+								<th className="px-4 py-3">Estado</th>
 								<th className="px-4 py-3 text-right">Acciones</th>
 							</tr>
 						</thead>
@@ -158,13 +160,18 @@ export function DashboardSprintStoriesTable({
 				maxWidth="xl"
 			>
 				{detailRow && (
-					<UserStoryDetailContent
-						story={detailRow.story}
-						epicTitle={detailRow.epicTitle}
-						estimation={detailRow.estimation}
-						prioritization={detailRow.prioritization}
-						framework={framework ?? undefined}
-					/>
+					<>
+						<div className="mb-4">
+							<ExecutionStatusBadge status={detailRow.executionStatus} />
+						</div>
+						<UserStoryDetailContent
+							story={detailRow.story}
+							epicTitle={detailRow.epicTitle}
+							estimation={detailRow.estimation}
+							prioritization={detailRow.prioritization}
+							framework={framework ?? undefined}
+						/>
+					</>
 				)}
 			</DetailModal>
 		</section>
@@ -257,7 +264,7 @@ function SprintGroupRows({
 	return (
 		<>
 			<tr className="border-b border-border bg-surface-hover/50">
-				<td colSpan={6} className="px-6 py-3">
+				<td colSpan={7} className="px-6 py-3">
 					<div className="flex flex-wrap items-center gap-3">
 						<span className="text-sm font-bold text-foreground">{group.label}</span>
 						<span className="text-xs text-muted">{group.meta}</span>
@@ -331,6 +338,9 @@ function StoryReadOnlyRow({
 				) : (
 					<span className="text-xs text-muted">N/D</span>
 				)}
+			</td>
+			<td className="px-4 py-4 align-top">
+				<ExecutionStatusBadge status={row.executionStatus} />
 			</td>
 			<td className="px-4 py-4 align-top">
 				<div className="flex justify-end gap-1.5">
@@ -410,7 +420,7 @@ function EditableStoryRow({
 			<td className="px-6 py-4 align-top">
 				<span className="font-mono text-xs font-bold text-primary">{row.story.id}</span>
 			</td>
-			<td colSpan={5} className="px-4 py-4">
+			<td colSpan={6} className="px-4 py-4">
 				<div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
 					<div className="flex flex-col gap-3">
 						<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

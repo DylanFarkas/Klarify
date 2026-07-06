@@ -116,6 +116,22 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
     [activeProjectId, canChangeSelection, router, switchProject]
   );
 
+  const handleOpenBoard = useCallback(
+    async (project: ProjectSummary) => {
+      if (project.status === 'locked') return;
+      setError(null);
+      try {
+        if (project.id !== activeProjectId) {
+          await switchProject(project.id);
+        }
+        router.push('/agentes/board');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo abrir el tablero');
+      }
+    },
+    [activeProjectId, router, switchProject]
+  );
+
   const handleCreate = useCallback(async () => {
     if (!canCreate) return;
     setCreating(true);
@@ -445,13 +461,24 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
                       </Link>
                     )
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => void handleOpen(project)}
-                      className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                      Abrir
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleOpen(project)}
+                        className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      >
+                        Abrir
+                      </button>
+                      {project.pipelineStep >= 6 && (plan?.limits.executionBoard ?? false) ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenBoard(project)}
+                          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-background"
+                        >
+                          Gestionar
+                        </button>
+                      ) : null}
+                    </>
                   )}
                   <button
                     type="button"

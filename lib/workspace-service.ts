@@ -13,8 +13,7 @@ import type { RegenerationAgent } from '@/lib/plans/types';
 import {
   getProjectWorkspace,
   projectDoc,
-  requireUnlockedProject,
-  tryResolveActiveProjectId,
+  readActiveProjectId,
 } from '@/lib/project-service';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
 import { resolveUserPlan } from '@/lib/plans/plan-service';
@@ -31,6 +30,17 @@ import {
   removeStoryFromSprintPlan,
   withUpdatedSprintPlan,
 } from '@/lib/utils/sprint-plan-mutations';
+import { buildInitialExecutionState, createDefaultStoryExecution, syncExecutionStories } from '@/lib/board/board-utils';
+import { assertExecutionBoardAllowed, assertTeamMemberLimit } from '@/lib/plans/execution-guard';
+import type {
+  ExecutionState,
+  KanbanStatus,
+  ProjectMember,
+  ProjectMemberInput,
+  StoryExecution,
+  ExecutionActivityEntry,
+} from '@/lib/types/execution';
+import { AVATAR_COLORS } from '@/lib/types/execution';
 import type {
   UserWorkspace,
   WorkspacePreferences,
@@ -103,11 +113,22 @@ function userDoc(uid: string) {
 }
 
 async function activeProject(uid: string): Promise<string> {
-  const projectId = await tryResolveActiveProjectId(uid);
+  const projectId = await readActiveProjectId(uid);
   if (!projectId) {
     throw new Error('NO_PROJECTS');
   }
   return projectId;
+}
+
+async function loadProjectWorkspace(
+  uid: string
+): Promise<{ projectId: string; workspace: UserWorkspace }> {
+  const projectId = await readActiveProjectId(uid);
+  if (!projectId) {
+    throw new Error('NO_PROJECTS');
+  }
+  const workspace = await getProjectWorkspace(uid, projectId);
+  return { projectId, workspace };
 }
 
 async function saveProjectWorkspace(
@@ -115,7 +136,6 @@ async function saveProjectWorkspace(
   projectId: string,
   workspacePartial: Record<string, unknown>
 ): Promise<void> {
-  await requireUnlockedProject(uid, projectId);
   await projectDoc(uid, projectId).set(
     {
       workspace: workspacePartial,
@@ -270,14 +290,226 @@ function generateUserStoryId(workspace: UserWorkspace): string {
   return `HU-${String(maxId + 1).padStart(3, '0')}`;
 }
 
+function generateMemberId(members: ProjectMember[]): string {
+  const maxId = members.reduce((max, member) => {
+    const match = member.id.match(/^MEM-(\d+)$/i);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `MEM-${String(maxId + 1).padStart(3, '0')}`;
+}
+
+function pickAvatarColor(index: number): string {
+  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+}
+
+function appendActivity(
+  current: StoryExecution,
+  entry: ExecutionActivityEntry
+): StoryExecution {
+  const activity = [...(current.activity ?? []), entry].slice(-20);
+  return { ...current, activity, updatedAt: Date.now() };
+}
+
+async function saveExecutionState(
+  uid: string,
+  execution: ExecutionState,
+  ctx?: { projectId: string; workspace: UserWorkspace }
+): Promise<UserWorkspace> {
+  const projectId = ctx?.projectId ?? (await readActiveProjectId(uid));
+  if (!projectId) {
+    throw new Error('NO_PROJECTS');
+  }
+  const workspace = ctx?.workspace ?? (await getProjectWorkspace(uid, projectId));
+  const sanitized = sanitize(execution);
+  await saveProjectWorkspace(uid, projectId, { execution: sanitized });
+  return { ...workspace, execution: sanitized };
+}
+
+/** Inicializa el estado de ejecución a partir de las épicas del agent6Input. */
+export function buildExecutionFromEpics(epics: Epic[]): ExecutionState {
+  return buildInitialExecutionState(epics);
+}
+
+/** Asegura que execution exista (migración lazy para proyectos legacy). */
+export async function ensureExecutionInitialized(uid: string): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const agent6 = workspace.pipeline.agent6Input;
+  if (!agent6) {
+    throw new Error('PIPELINE_INCOMPLETE');
+  }
+  if (workspace.execution?.initializedAt) {
+    const synced = syncExecutionStories(workspace.execution, agent6.epics);
+    if (synced !== workspace.execution) {
+      return saveExecutionState(uid, synced, { projectId, workspace });
+    }
+    return workspace;
+  }
+  const execution = buildInitialExecutionState(agent6.epics);
+  return saveExecutionState(uid, execution, { projectId, workspace });
+}
+
+export async function initializeExecution(uid: string): Promise<UserWorkspace> {
+  return ensureExecutionInitialized(uid);
+}
+
+export async function upsertProjectMember(
+  uid: string,
+  memberInput: ProjectMemberInput
+): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace: initialWorkspace } = await loadProjectWorkspace(uid);
+  let workspace = initialWorkspace;
+  let execution = workspace.execution;
+  if (!execution?.initializedAt) {
+    workspace = await ensureExecutionInitialized(uid);
+    execution = workspace.execution!;
+  }
+  const existingIndex = memberInput.id
+    ? execution.members.findIndex((m) => m.id === memberInput.id)
+    : -1;
+
+  let members: ProjectMember[];
+  if (existingIndex >= 0) {
+    members = execution.members.map((m, i) =>
+      i === existingIndex
+        ? {
+            ...m,
+            displayName: memberInput.displayName,
+            email: memberInput.email,
+            role: memberInput.role,
+          }
+        : m
+    );
+  } else {
+    await assertTeamMemberLimit(uid, execution.members.length);
+    const newMember: ProjectMember = {
+      id: generateMemberId(execution.members),
+      displayName: memberInput.displayName,
+      email: memberInput.email,
+      role: memberInput.role,
+      avatarColor: pickAvatarColor(execution.members.length),
+      createdAt: Date.now(),
+    };
+    members = [...execution.members, newMember];
+  }
+
+  return saveExecutionState(uid, { ...execution, members }, { projectId, workspace });
+}
+
+export async function deleteProjectMember(uid: string, memberId: string): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const execution = workspace.execution;
+  if (!execution?.initializedAt) {
+    return ensureExecutionInitialized(uid);
+  }
+  const members = execution.members.filter((m) => m.id !== memberId);
+  const stories = { ...execution.stories };
+
+  for (const [storyId, storyExec] of Object.entries(stories)) {
+    if (storyExec.assigneeId === memberId) {
+      stories[storyId] = { ...storyExec, assigneeId: null, updatedAt: Date.now() };
+    }
+  }
+
+  return saveExecutionState(uid, { ...execution, members, stories }, { projectId, workspace });
+}
+
+export async function updateStoryExecution(
+  uid: string,
+  storyId: string,
+  patch: Partial<Pick<StoryExecution, 'status' | 'assigneeId' | 'columnOrder'>>
+): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const execution = workspace.execution;
+  if (!execution?.initializedAt) {
+    return ensureExecutionInitialized(uid);
+  }
+  const current = execution.stories[storyId] ?? createDefaultStoryExecution(0);
+  let updated = { ...current, ...patch, updatedAt: Date.now() };
+
+  if (patch.status !== undefined && patch.status !== current.status) {
+    updated = appendActivity(updated, {
+      type: 'status_change',
+      from: current.status,
+      to: patch.status,
+      at: Date.now(),
+    });
+  }
+
+  if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
+    updated = appendActivity(updated, {
+      type: 'assignee_change',
+      from: current.assigneeId,
+      to: patch.assigneeId,
+      at: Date.now(),
+    });
+  }
+
+  const stories = { ...execution.stories, [storyId]: updated };
+  return saveExecutionState(uid, { ...execution, stories }, { projectId, workspace });
+}
+
+export interface StoryExecutionReorderUpdate {
+  storyId: string;
+  status: KanbanStatus;
+  columnOrder: number;
+}
+
+export async function bulkUpdateStoryExecutions(
+  uid: string,
+  updates: StoryExecutionReorderUpdate[]
+): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const execution = workspace.execution;
+  if (!execution?.initializedAt) {
+    return ensureExecutionInitialized(uid);
+  }
+  const stories = { ...execution.stories };
+  const now = Date.now();
+
+  for (const update of updates) {
+    const current = stories[update.storyId] ?? createDefaultStoryExecution(update.columnOrder);
+    let next = { ...current, status: update.status, columnOrder: update.columnOrder, updatedAt: now };
+
+    if (update.status !== current.status) {
+      next = appendActivity(next, {
+        type: 'status_change',
+        from: current.status,
+        to: update.status,
+        at: now,
+      });
+    }
+
+    stories[update.storyId] = next;
+  }
+
+  return saveExecutionState(uid, { ...execution, stories }, { projectId, workspace });
+}
+
+export async function updateExecutionSprintFilter(
+  uid: string,
+  sprintFilter: string | 'all'
+): Promise<UserWorkspace> {
+  await assertExecutionBoardAllowed(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const execution = workspace.execution;
+  if (!execution?.initializedAt) {
+    return ensureExecutionInitialized(uid);
+  }
+  return saveExecutionState(uid, { ...execution, sprintFilter }, { projectId, workspace });
+}
+
 /** Lee el workspace del proyecto activo + preferencias y plan del usuario. */
 export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
-  const projectId = await tryResolveActiveProjectId(uid);
-  const snapshot = await userDoc(uid).get();
-  const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
-  const plan = await resolveUserPlan(uid);
+  const projectId = await readActiveProjectId(uid);
 
   if (!projectId) {
+    const [snapshot, plan] = await Promise.all([userDoc(uid).get(), resolveUserPlan(uid)]);
+    const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
     return {
       workspace: createEmptyWorkspace(),
       preferences: {
@@ -293,7 +525,12 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     };
   }
 
-  const workspace = await getProjectWorkspace(uid, projectId);
+  const [snapshot, plan, workspace] = await Promise.all([
+    userDoc(uid).get(),
+    resolveUserPlan(uid),
+    getProjectWorkspace(uid, projectId),
+  ]);
+  const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
 
   return {
     workspace,
@@ -619,6 +856,17 @@ export async function createUserStoryAcrossWorkspace(
           }
         : null,
     },
+    execution: workspace.execution
+      ? {
+          ...workspace.execution,
+          stories: {
+            ...workspace.execution.stories,
+            [storyId]: createDefaultStoryExecution(
+              Object.keys(workspace.execution.stories).length
+            ),
+          },
+        }
+      : workspace.execution,
   };
 
   await saveProjectWorkspace(uid, (await activeProject(uid)), {
@@ -627,6 +875,7 @@ export async function createUserStoryAcrossWorkspace(
     agent4: sanitize(updatedWorkspace.agent4),
     agent5: sanitize(updatedWorkspace.agent5),
     pipeline: sanitize(updatedWorkspace.pipeline),
+    ...(updatedWorkspace.execution ? { execution: sanitize(updatedWorkspace.execution) } : {}),
   });
 
   return updatedWorkspace;
@@ -719,6 +968,12 @@ export async function deleteUserStoryAcrossWorkspace(
           }
         : null,
     },
+    execution: workspace.execution
+      ? {
+          ...workspace.execution,
+          stories: deleteRecordEntry(workspace.execution.stories, storyId),
+        }
+      : workspace.execution,
   };
 
   await saveProjectWorkspace(uid, (await activeProject(uid)), {
@@ -727,6 +982,7 @@ export async function deleteUserStoryAcrossWorkspace(
     agent4: sanitize(updatedWorkspace.agent4),
     agent5: sanitize(updatedWorkspace.agent5),
     pipeline: sanitize(updatedWorkspace.pipeline),
+    ...(updatedWorkspace.execution ? { execution: sanitize(updatedWorkspace.execution) } : {}),
   });
 
   return updatedWorkspace;
@@ -877,6 +1133,7 @@ export async function approveAgent5(uid: string, agent6Input: Agent6Input): Prom
     approvedAt: agent6Input.approvedAt,
   };
   const projectId = await activeProject(uid);
+  const execution = buildInitialExecutionState(agent6Input.epics);
   await saveProjectWorkspace(uid, projectId, {
     agent5: sanitize({
       ...workspace.agent5,
@@ -889,6 +1146,7 @@ export async function approveAgent5(uid: string, agent6Input: Agent6Input): Prom
       ...workspace.pipeline,
       agent6Input: sanitize(agent6Input),
     },
+    execution: sanitize(execution),
   });
 }
 
@@ -899,14 +1157,16 @@ export async function resetAgent5(uid: string): Promise<void> {
 
 /** Actualiza el último agente visitado (preferencia de navegación). */
 export async function saveLastAgent(uid: string, lastAgent: string): Promise<void> {
-  const projectId = await activeProject(uid);
+  const projectId = await readActiveProjectId(uid);
   await userDoc(uid).set(
     {
       preferences: { lastAgent },
     },
     { merge: true }
   );
-  await projectDoc(uid, projectId).set({ lastAgent }, { merge: true });
+  if (projectId) {
+    await projectDoc(uid, projectId).set({ lastAgent }, { merge: true });
+  }
 }
 
 /** Reinicia el proyecto activo (conserva el proyecto, vacía el pipeline). */
@@ -925,6 +1185,7 @@ export async function resetWorkspace(uid: string): Promise<void> {
       agent5Input: null,
       agent6Input: null,
     },
+    execution: null,
   });
   await userDoc(uid).set(
     {

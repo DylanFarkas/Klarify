@@ -17,6 +17,8 @@ export type PlanErrorCode =
   | 'PLAN_STORY_LIMIT'
   | 'PLAN_FEATURE_GITHUB'
   | 'PLAN_FEATURE_EXPORT'
+  | 'PLAN_FEATURE_EXECUTION_BOARD'
+  | 'PLAN_TEAM_MEMBER_LIMIT'
   | 'PLAN_AUDIO_NOT_ALLOWED';
 
 export interface PlanLimits {
@@ -29,6 +31,8 @@ export interface PlanLimits {
   allowedFileTypes: readonly string[];
   github: boolean;
   export: false | 'manual' | 'full';
+  executionBoard: boolean;
+  maxTeamMembers: number;
 }
 
 export interface AiGenerationConfig {

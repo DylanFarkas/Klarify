@@ -2,7 +2,13 @@ import Link from 'next/link';
 import { DashboardMetricCard, type DashboardCardTone } from './DashboardMetricCard';
 import type { DashboardMetrics } from './dashboardMetrics';
 
-export function DashboardNextActionPanel({ metrics }: { metrics: DashboardMetrics }) {
+export function DashboardNextActionPanel({
+  metrics,
+  executionBoardEnabled = false,
+}: {
+  metrics: DashboardMetrics;
+  executionBoardEnabled?: boolean;
+}) {
 	const contextTone: DashboardCardTone =
 		metrics.contextIsSufficient === true ? 'success' : metrics.contextIsSufficient === false ? 'warning' : 'default';
 
@@ -21,6 +27,14 @@ export function DashboardNextActionPanel({ metrics }: { metrics: DashboardMetric
 				>
 					Abrir agente
 				</Link>
+				{metrics.hasPlan && executionBoardEnabled ? (
+					<Link
+						href="/agentes/board"
+						className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/10"
+					>
+						Ir al tablero
+					</Link>
+				) : null}
 				<Link
 					href="/agentes/1"
 					className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover"

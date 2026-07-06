@@ -87,6 +87,7 @@ function normalizeWorkspace(ws: Partial<UserWorkspace> | undefined): UserWorkspa
           }
         : null,
     },
+    execution: ws.execution ?? null,
   };
 }
 
@@ -236,6 +237,48 @@ export async function requireUnlockedProject(uid: string, projectId: string): Pr
   assertProjectSlotAccessible(status);
 }
 
+/**
+ * Resuelve el proyecto activo con lecturas mínimas (sin sincronizar slots).
+ * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
+ */
+export async function readActiveProjectId(uid: string): Promise<string | null> {
+  await ensureUserAccount(uid);
+
+  const userSnapshot = await userDoc(uid).get();
+  const preferredId =
+    (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
+      ?.activeProjectId ?? null;
+
+  if (preferredId) {
+    const doc = await projectDoc(uid, preferredId).get();
+    if (doc.exists) {
+      const status = normalizeProjectStatus((doc.data() as ProjectDocument).status);
+      if (status === 'active') {
+        return preferredId;
+      }
+    }
+  }
+
+  const activeSnap = await projectsCol(uid).where('status', '==', 'active').limit(1).get();
+  if (!activeSnap.empty) {
+    const projectId = activeSnap.docs[0].id;
+    if (projectId !== preferredId) {
+      await userDoc(uid).set(
+        { preferences: { activeProjectId: projectId } },
+        { merge: true }
+      );
+    }
+    return projectId;
+  }
+
+  const anyProject = await projectsCol(uid).limit(1).get();
+  if (anyProject.empty) {
+    return migrateLegacyWorkspace(uid);
+  }
+
+  return null;
+}
+
 async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
   const snapshot = await userDoc(uid).get();
   const data = snapshot.data();
@@ -272,45 +315,8 @@ async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
 }
 
 export async function tryResolveActiveProjectId(uid: string): Promise<string | null> {
-  await ensureUserAccount(uid);
-
-  const existing = await projectsCol(uid).limit(1).get();
-  if (existing.empty) {
-    const migratedId = await migrateLegacyWorkspace(uid);
-    if (!migratedId) {
-      return null;
-    }
-  }
-
   await syncProjectSlots(uid);
-
-  const userSnapshot = await userDoc(uid).get();
-  const preferredId =
-    (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
-      ?.activeProjectId ?? null;
-
-  const projects = await fetchAllProjects(uid);
-  if (projects.length === 0) {
-    return null;
-  }
-
-  const unlocked = projects.filter((p) => p.status === 'active');
-
-  if (unlocked.length === 0) {
-    return null;
-  }
-
-  const match = preferredId ? unlocked.find((p) => p.id === preferredId) : null;
-  const projectId = match?.id ?? unlocked[0].id;
-
-  if (projectId !== preferredId) {
-    await userDoc(uid).set(
-      { preferences: { activeProjectId: projectId } },
-      { merge: true }
-    );
-  }
-
-  return projectId;
+  return readActiveProjectId(uid);
 }
 
 export async function resolveActiveProjectId(uid: string): Promise<string> {
@@ -325,12 +331,12 @@ export async function getProjectWorkspace(
   uid: string,
   projectId: string
 ): Promise<UserWorkspace> {
-  await requireUnlockedProject(uid, projectId);
   const doc = await projectDoc(uid, projectId).get();
   if (!doc.exists) {
     throw new Error('PROJECT_NOT_FOUND');
   }
   const data = doc.data() as ProjectDocument;
+  assertProjectSlotAccessible(normalizeProjectStatus(data.status));
   return normalizeWorkspace(data.workspace);
 }
 

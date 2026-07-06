@@ -25,7 +25,7 @@ const NAV_ITEMS = [
 
 export function WorkspaceHomeNav() {
   const pathname = usePathname();
-  const { projects, activeProjectId } = useWorkspace();
+  const { projects, activeProjectId, plan } = useWorkspace();
 
   const activeProject = useMemo(
     () => projects.find((p) => p.id === activeProjectId && p.status === 'active'),
@@ -38,6 +38,8 @@ export function WorkspaceHomeNav() {
     (activeProject.pipelineStep >= 6 ||
       activeProject.lastAgent === 'dashboard' ||
       activeProject.completionPercentage >= 100);
+
+  const showBoard = showDashboard && (plan?.limits.executionBoard ?? false);
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Navegación del workspace">
@@ -99,6 +101,27 @@ export function WorkspaceHomeNav() {
                 />
               </svg>
               <span>Dashboard</span>
+            </Link>
+          ) : null}
+
+          {showBoard ? (
+            <Link
+              href="/agentes/board"
+              className={[
+                'flex items-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium transition-colors',
+                pathname === '/agentes/board'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted hover:bg-surface-hover hover:text-foreground',
+              ].join(' ')}
+            >
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 4.5v15m6-15v15M4.5 9.75h15M4.5 14.25h15"
+                />
+              </svg>
+              <span>Tablero</span>
             </Link>
           ) : null}
 

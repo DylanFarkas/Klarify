@@ -66,6 +66,7 @@ export default function Agent5Page() {
     workspace,
     isLoading,
     sessionVersion,
+    plan,
     saveAgent5,
     approveAgent5,
   } = useWorkspace();
@@ -295,12 +296,22 @@ export default function Agent5Page() {
                 </div>
               }
               action={
-                <Link
-                  href="/agentes/dashboard"
-                  className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
-                >
-                  Dashboard
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href="/agentes/dashboard"
+                    className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
+                  >
+                    Dashboard
+                  </Link>
+                  {plan?.limits.executionBoard ? (
+                    <Link
+                      href="/agentes/board"
+                      className="rounded-xl border border-success/20 px-5 py-2.5 text-sm font-bold text-success/90 transition-colors hover:bg-success/10"
+                    >
+                      Ir al tablero
+                    </Link>
+                  ) : null}
+                </div>
               }
             />
           )}

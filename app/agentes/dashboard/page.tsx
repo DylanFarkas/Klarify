@@ -10,7 +10,7 @@ import { buildDashboardMetrics } from '@/components/agents/dashboard/dashboardMe
 import { useWorkspace } from '@/hooks/useWorkspace';
 
 export default function DashboardPage() {
-	const { workspace, isLoading, createUserStory, deleteUserStory, updateUserStory, updateSprintPlan } = useWorkspace();
+	const { workspace, isLoading, plan, createUserStory, deleteUserStory, updateUserStory, updateSprintPlan } = useWorkspace();
 
 	if (isLoading || !workspace) {
 		return <DashboardLoadingState />;
@@ -23,6 +23,7 @@ export default function DashboardPage() {
 		<DashboardContent
 			hasContent={hasContent}
 			metrics={metrics}
+			executionBoardEnabled={plan?.limits.executionBoard ?? false}
 			onCreateStory={createUserStory}
 			onDeleteStory={deleteUserStory}
 			onEditStory={updateUserStory}

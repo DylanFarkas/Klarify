@@ -15,6 +15,7 @@ import type {
   PrioritizationFramework,
 } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
+import type { ExecutionState } from '@/lib/types/execution';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -74,6 +75,8 @@ export interface UserWorkspace {
   agent4: Agent4State;
   agent5: Agent5State;
   pipeline: WorkspacePipeline;
+  /** Estado operativo del tablero Kanban (post-pipeline) */
+  execution?: ExecutionState | null;
 }
 
 /** Preferencias de usuario que antes vivían en localStorage */

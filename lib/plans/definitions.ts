@@ -15,6 +15,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     allowedFileTypes: ['.txt', '.pdf'],
     github: false,
     export: false,
+    executionBoard: false,
+    maxTeamMembers: 0,
   },
   starter: {
     maxProjects: 3,
@@ -26,6 +28,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     allowedFileTypes: ['.mp3', '.wav', '.txt', '.pdf'],
     github: false,
     export: 'manual',
+    executionBoard: true,
+    maxTeamMembers: 8,
   },
   pro: {
     maxProjects: 10,
@@ -37,6 +41,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     allowedFileTypes: ['.mp3', '.wav', '.txt', '.pdf'],
     github: true,
     export: 'full',
+    executionBoard: true,
+    maxTeamMembers: 25,
   },
 };
 
