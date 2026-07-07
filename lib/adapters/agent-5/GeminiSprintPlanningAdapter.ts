@@ -29,6 +29,8 @@ import {
   GEMINI_SPRINT_PLANNING_PREFIX,
 } from '@/lib/constants/agent-5';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
+import { defaultAiConfig } from '@/lib/plans/ai-config';
 
 interface ContentPart {
   text?: string;
@@ -73,8 +75,10 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
     framework: PrioritizationFramework,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<SprintPlan> {
+    const ai = aiConfig ?? defaultAiConfig();
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
     }
@@ -84,7 +88,12 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
 
       const { systemInstruction, userPrompt } = this.buildPrompts(stories, config, framework);
 
-      const responseText = await this.streamGenerate(userPrompt, systemInstruction, onThought);
+      const responseText = await this.streamGenerate(
+        userPrompt,
+        systemInstruction,
+        onThought,
+        ai.thinkingBudget
+      );
 
       if (!responseText) {
         throw new Error('Respuesta vacía de Gemini al planificar sprints.');
@@ -170,7 +179,8 @@ ${JSON.stringify(stories, null, 2)}`;
   private async streamGenerate(
     contents: string,
     systemInstruction: string,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    thinkingBudget: number
   ): Promise<string> {
     if (!this.ai) throw new Error('SDK no inicializado.');
 
@@ -183,7 +193,7 @@ ${JSON.stringify(stories, null, 2)}`;
         temperature: 0.2,
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: 2048,
+          thinkingBudget,
         },
       },
     });

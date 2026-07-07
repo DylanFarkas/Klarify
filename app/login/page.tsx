@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar/Navbar";
-import { fetchWorkspace } from "@/lib/api-client";
 
 export default function LoginPage() {
   const { user, loading, signInWithGoogle, signInWithGithub, authError, clearAuthError } = useAuth();
@@ -14,21 +13,9 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   useEffect(() => {
-    if (loading || !user) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const { preferences } = await fetchWorkspace(user);
-        if (!cancelled) router.push(`/agentes/${preferences.lastAgent || "1"}`);
-      } catch {
-        if (!cancelled) router.push("/agentes/1");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    if (!loading && user) {
+      router.push('/agentes/proyectos');
+    }
   }, [user, loading, router]);
 
   const handleGoogleLogin = async () => {

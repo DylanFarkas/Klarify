@@ -21,6 +21,8 @@ import {
 } from '@/lib/constants/agent-1';
 import { generateWishId } from '@/lib/services/agent-1-service';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
+import { defaultAiConfig } from '@/lib/plans/ai-config';
 
 interface RawAnalyzeResponse {
   isSufficient: boolean;
@@ -51,14 +53,19 @@ export class GeminiLLMAdapter implements ILLMAdapter {
     }
   }
 
-  async analyzeContext(transcription: TranscriptionResult): Promise<ContextDiscovery> {
-    return this.analyzeContextStream(transcription, () => {});
+  async analyzeContext(
+    transcription: TranscriptionResult,
+    aiConfig?: AiGenerationConfig
+  ): Promise<ContextDiscovery> {
+    return this.analyzeContextStream(transcription, () => {}, aiConfig);
   }
 
   async analyzeContextStream(
     transcription: TranscriptionResult,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<ContextDiscovery> {
+    const config = aiConfig ?? defaultAiConfig();
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
     }
@@ -105,7 +112,8 @@ ${transcription.fullText}
         systemInstruction,
         'application/json',
         0.3,
-        onThought
+        onThought,
+        config.thinkingBudget
       );
 
       if (!responseText) {
@@ -137,16 +145,19 @@ ${transcription.fullText}
 
   async extractWishes(
     transcription: TranscriptionResult,
-    enrichedContext?: string | null
+    enrichedContext?: string | null,
+    aiConfig?: AiGenerationConfig
   ): Promise<Wish[]> {
-    return this.extractWishesStream(transcription, enrichedContext, () => {});
+    return this.extractWishesStream(transcription, enrichedContext, () => {}, aiConfig);
   }
 
   async extractWishesStream(
     transcription: TranscriptionResult,
     enrichedContext: string | null | undefined,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    aiConfig?: AiGenerationConfig
   ): Promise<Wish[]> {
+    const config = aiConfig ?? defaultAiConfig();
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
     }
@@ -182,7 +193,8 @@ ${contextBlock}
         'Devuelve la respuesta estrictamente como un array de strings en formato JSON (ej: ["deseo 1", "deseo 2"]). No incluyas markdown ni bloques de código extra, solo el array.',
         'application/json',
         0.2,
-        onThought
+        onThought,
+        config.thinkingBudget
       );
 
       if (!responseText) {
@@ -223,7 +235,8 @@ ${contextBlock}
     systemInstruction: string,
     responseMimeType: string,
     temperature: number,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    thinkingBudget: number
   ): Promise<string> {
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
@@ -238,7 +251,7 @@ ${contextBlock}
         temperature,
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: 1024,
+          thinkingBudget,
         },
       },
     });

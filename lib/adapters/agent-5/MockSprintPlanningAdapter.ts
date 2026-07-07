@@ -32,7 +32,8 @@ export class MockSprintPlanningAdapter implements ISprintPlanningAdapter {
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
     framework: PrioritizationFramework,
-    _dependencies: StoryDependency[]
+    _dependencies: StoryDependency[],
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<SprintPlan> {
     return mockPlanSprints(stories, config, framework);
   }
@@ -41,7 +42,8 @@ export class MockSprintPlanningAdapter implements ISprintPlanningAdapter {
     stories: LocalStoryForPlanning[],
     config: SprintPlanningConfig,
     framework: PrioritizationFramework,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<SprintPlan> {
     await emitMockThoughts(MOCK_SPRINT_PLANNING_THOUGHTS, onThought, SPRINT_PLANNING_DELAY_MS);
     return mockPlanSprints(stories, config, framework);

@@ -4,6 +4,7 @@ import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
 export type PriorityBucket = 'alta' | 'media' | 'baja';
@@ -55,6 +56,7 @@ export interface DashboardMetrics {
 	}>;
 	sprintStoryRows: DashboardSprintStoryRow[];
 	unassignedStoryRows: DashboardSprintStoryRow[];
+	executionStatusCounts: Record<KanbanStatus, number>;
 }
 
 export interface DashboardSprintStoryRow {
@@ -69,6 +71,8 @@ export interface DashboardSprintStoryRow {
 	epicTitle: string;
 	estimation?: StoryEstimation;
 	prioritization?: StoryPrioritization;
+	executionStatus: KanbanStatus;
+	assigneeId: string | null;
 }
 
 function resolveEpics(workspace: UserWorkspace): Epic[] {
@@ -357,6 +361,8 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 			epicTitle: entry.epicTitle,
 			estimation: estimations[storyId],
 			prioritization: priorities[storyId],
+			executionStatus: workspace.execution?.stories[storyId]?.status ?? 'todo',
+			assigneeId: workspace.execution?.stories[storyId]?.assigneeId ?? null,
 		};
 	};
 	const sprintStoryRows =
@@ -369,6 +375,17 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		plan?.unassignedStoryIds
 			.map((storyId) => toSprintStoryRow(storyId, null))
 			.filter((row): row is DashboardSprintStoryRow => Boolean(row)) ?? [];
+
+	const allSprintRows = [...sprintStoryRows, ...unassignedStoryRows];
+	const executionStatusCounts: DashboardMetrics['executionStatusCounts'] = {
+		todo: 0,
+		in_progress: 0,
+		code_review: 0,
+		done: 0,
+	};
+	for (const row of allSprintRows) {
+		executionStatusCounts[row.executionStatus] += 1;
+	}
 
 	return {
 		epics,
@@ -404,5 +421,6 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		epicBreakdown,
 		sprintStoryRows,
 		unassignedStoryRows,
+		executionStatusCounts,
 	};
 }

@@ -36,7 +36,8 @@ async function emitMockThoughts(
 export class MockPrioritizationAdapter implements IPrioritizationAdapter {
   async prioritizeBacklog(
     epics: LocalEpicWithEstimation[],
-    framework: PrioritizationFramework
+    framework: PrioritizationFramework,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]> {
     return mockPrioritizeStories(epics, framework);
   }
@@ -44,7 +45,8 @@ export class MockPrioritizationAdapter implements IPrioritizationAdapter {
   async prioritizeBacklogStream(
     epics: LocalEpicWithEstimation[],
     framework: PrioritizationFramework,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]> {
     await emitMockThoughts(
       MOCK_PRIORITIZATION_THOUGHTS,

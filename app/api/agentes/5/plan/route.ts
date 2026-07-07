@@ -8,6 +8,9 @@
 
 import { type NextRequest } from 'next/server';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { getAiConfig, resolveUserPlan } from '@/lib/plans/plan-service';
+import { assertAiRegenerationAllowed } from '@/lib/plans/regeneration-guard';
+import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import type { Agent5Input } from '@/lib/types/workspace';
 import {
@@ -25,9 +28,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    await verifyRequestUser(request);
+    const uid = await verifyRequestUser(request);
+    const body = (await request.json()) as Agent5PlanRequest & { isRegeneration?: boolean };
 
-    const body = (await request.json()) as Agent5PlanRequest;
+    await assertAiRegenerationAllowed(uid, 'agent5', body.isRegeneration);
+    const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
     const agent5Input: Agent5Input = {
       epics: body.epics,
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
             const result = await emitter.runAction(
               'ACTION_ASSIGN_SPRINTS',
               'Asignando historias a sprints...',
-              () => planSprintsStream(agent5Input, body.config, emitter.bindThought())
+              () => planSprintsStream(agent5Input, body.config, emitter.bindThought(), aiConfig)
             );
 
             await emitter.runAction(
@@ -103,6 +108,10 @@ export async function POST(request: NextRequest) {
         { error: 'No autorizado', code: 'PROCESSING_ERROR' },
         { status: 401 }
       );
+    }
+
+    if (isPlanLimitError(error)) {
+      return Response.json(planErrorToJson(error), { status: 403 });
     }
 
     console.error('[Agent 5 Plan] Critical Error:', error);

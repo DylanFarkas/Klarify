@@ -19,15 +19,22 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch, saveLastAgent } from '@/lib/api-client';
+import { canRegenerateClient } from '@/lib/plans/regeneration-policy';
+import type { RegenerationAgent } from '@/lib/plans/types';
+import type { ProjectSlotsInfo, ProjectSummary } from '@/lib/types/project';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
+import type { WorkspacePlanSnapshot } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
+import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
+import { buildInitialExecutionState } from '@/lib/board/board-utils';
 
 const SAVE_DEBOUNCE_MS = 500;
+const BULK_REORDER_DEBOUNCE_MS = 400;
 
 export interface UpdateDashboardUserStoryOptions {
   epicId?: string;
@@ -47,10 +54,20 @@ export interface UseWorkspaceResult {
   workspace: UserWorkspace | null;
   isLoading: boolean;
   error: string | null;
+  plan: WorkspacePlanSnapshot | null;
+  activeProjectId: string | null;
+  projects: ProjectSummary[];
+  projectSlots: ProjectSlotsInfo | null;
   /** Incrementa tras resetear sesión; las páginas deben re-hidratar al cambiar */
   sessionVersion: number;
   /** Recarga el workspace desde Firestore (p. ej. al entrar a un agente) */
   refreshWorkspace: (options?: { silent?: boolean }) => Promise<void>;
+  refreshProjects: () => Promise<void>;
+  createProject: (name?: string) => Promise<ProjectSummary>;
+  switchProject: (projectId: string) => Promise<void>;
+  activateProjects: (projectIds: string[]) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  canRegenerate: (agent: RegenerationAgent) => boolean;
   saveAgent1: (state: Agent1State) => void;
   saveAgent2: (state: Agent2State) => void;
   saveAgent3: (state: Agent3State) => void;
@@ -70,6 +87,17 @@ export interface UseWorkspaceResult {
     options?: UpdateDashboardUserStoryOptions
   ) => Promise<void>;
   updateSprintPlan: (plan: SprintPlan) => Promise<void>;
+  initializeExecution: () => Promise<void>;
+  upsertMember: (member: ProjectMemberInput) => Promise<void>;
+  deleteMember: (memberId: string) => Promise<void>;
+  updateStoryExecution: (
+    storyId: string,
+    patch: Partial<{ status: KanbanStatus; assigneeId: string | null; columnOrder: number }>
+  ) => Promise<void>;
+  bulkReorderExecutions: (
+    updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]
+  ) => void;
+  updateExecutionSprintFilter: (sprintFilter: string | 'all') => Promise<void>;
   resetAgent1: () => Promise<void>;
   resetAgent2: () => Promise<void>;
   resetAgent3: () => Promise<void>;
@@ -86,6 +114,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null);
+  const [plan, setPlan] = useState<WorkspacePlanSnapshot | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectSlots, setProjectSlots] = useState<ProjectSlotsInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionVersion, setSessionVersion] = useState(0);
@@ -97,7 +129,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const agent4Abort = useRef<AbortController | null>(null);
   const agent5Timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agent5Abort = useRef<AbortController | null>(null);
+  const bulkReorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingBulkReorder = useRef<
+    { storyId: string; status: KanbanStatus; columnOrder: number }[] | null
+  >(null);
   const lastPersistedAgent = useRef<string | null>(null);
+  const lastFetchedRouteKey = useRef<string | null>(null);
+  const sprintFilterRequestId = useRef(0);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
@@ -107,7 +145,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     agent4Abort.current?.abort();
     if (agent5Timer.current) clearTimeout(agent5Timer.current);
     agent5Abort.current?.abort();
+    if (bulkReorderTimer.current) clearTimeout(bulkReorderTimer.current);
+    bulkReorderTimer.current = null;
   }, []);
+
+  const persistBulkReorder = useCallback(async () => {
+    if (bulkReorderTimer.current) {
+      clearTimeout(bulkReorderTimer.current);
+      bulkReorderTimer.current = null;
+    }
+    const payload = pendingBulkReorder.current;
+    pendingBulkReorder.current = null;
+    if (!payload || !user) return;
+
+    const response = await authFetch('/api/workspace', user, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'bulkUpdateStoryExecutions',
+        payload: { updates: payload },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('No se pudo guardar el orden del tablero');
+    }
+    const result = (await response.json()) as { ok: boolean; workspace?: UserWorkspace };
+    if (result.workspace) setWorkspace(result.workspace);
+  }, [user]);
 
   const fetchWorkspace = useCallback(async (options?: { silent?: boolean }) => {
     if (!user) return;
@@ -119,7 +183,27 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user);
       if (!response.ok) throw new Error('No se pudo cargar el workspace');
       const data = (await response.json()) as WorkspaceResponse;
-      setWorkspace(data.workspace);
+      setWorkspace((prev) => {
+        const incoming = data.workspace;
+        const localStories = prev?.execution?.stories;
+        const serverStories = incoming.execution?.stories;
+        if (!localStories || !serverStories || !incoming.execution) return incoming;
+
+        const mergedStories = { ...serverStories };
+        for (const [storyId, local] of Object.entries(localStories)) {
+          const server = serverStories[storyId];
+          if (!server || local.updatedAt > server.updatedAt) {
+            mergedStories[storyId] = local;
+          }
+        }
+
+        return {
+          ...incoming,
+          execution: { ...incoming.execution, stories: mergedStories },
+        };
+      });
+      setPlan(data.plan);
+      setActiveProjectId(data.activeProjectId);
     } catch (err) {
       if (!options?.silent) {
         setError(err instanceof Error ? err.message : 'Error al cargar el workspace');
@@ -131,20 +215,201 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const refreshProjects = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await authFetch('/api/projects', user);
+      if (!response.ok) throw new Error('No se pudieron cargar los proyectos');
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar proyectos');
+    }
+  }, [user]);
+
+  const createProject = useCallback(
+    async (name?: string) => {
+      if (!user) throw new Error('No autenticado');
+      const response = await authFetch('/api/projects', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo crear el proyecto');
+      }
+      const data = (await response.json()) as {
+        project: ProjectSummary;
+        activeProjectId: string;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects((prev) => [data.project, ...prev.filter((p) => p.id !== data.project.id)]);
+      setActiveProjectId(data.activeProjectId);
+      setPlan(data.plan);
+      setWorkspace(createEmptyWorkspace());
+      setSessionVersion((v) => v + 1);
+      return data.project;
+    },
+    [user]
+  );
+
+  const switchProject = useCallback(
+    async (projectId: string) => {
+      if (!user) return;
+      cancelPendingSaves();
+      const response = await authFetch('/api/projects', user, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+      }
+      setActiveProjectId(projectId);
+      setSessionVersion((v) => v + 1);
+      await fetchWorkspace();
+    },
+    [user, cancelPendingSaves, fetchWorkspace]
+  );
+
+  const activateProjects = useCallback(
+    async (projectIds: string[]) => {
+      if (!user) throw new Error('No autenticado');
+      const response = await authFetch('/api/projects', user, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'activate', projectIds }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudieron activar los proyectos');
+      }
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+    },
+    [user]
+  );
+
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      if (!user) throw new Error('No autenticado');
+      const wasActive = activeProjectId === projectId;
+      if (wasActive) {
+        cancelPendingSaves();
+      }
+
+      const response = await authFetch(
+        `/api/projects?projectId=${encodeURIComponent(projectId)}`,
+        user,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? 'No se pudo eliminar el proyecto');
+      }
+
+      const data = (await response.json()) as {
+        projects: ProjectSummary[];
+        activeProjectId: string | null;
+        slots: ProjectSlotsInfo;
+        plan: WorkspacePlanSnapshot;
+      };
+
+      setProjects(data.projects);
+      setActiveProjectId(data.activeProjectId);
+      setProjectSlots(data.slots);
+      setPlan(data.plan);
+
+      if (wasActive) {
+        setSessionVersion((v) => v + 1);
+        if (pathname?.startsWith('/agentes') && pathname !== '/agentes/proyectos') {
+          router.push('/agentes/proyectos');
+        } else {
+          await fetchWorkspace({ silent: true });
+        }
+      }
+    },
+    [user, activeProjectId, cancelPendingSaves, pathname, router, fetchWorkspace]
+  );
+
+  const canRegenerate = useCallback(
+    (agent: RegenerationAgent) => {
+      if (!plan) return false;
+      return canRegenerateClient(plan.id, agent, plan.usage).allowed;
+    },
+    [plan]
+  );
+
   useEffect(() => {
     void fetchWorkspace();
-  }, [fetchWorkspace]);
+    void refreshProjects();
+  }, [fetchWorkspace, refreshProjects]);
 
-  // Al cambiar de agente, sincronizar con Firestore (el estado local no se
-  // actualiza tras PATCH/POST; sin esto el Agente 2 no ve pipeline.agent2Input).
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;
-    void fetchWorkspace({ silent: true });
-  }, [pathname, user, fetchWorkspace]);
+    if (pathname === '/agentes/proyectos') return;
+    if (isLoading) return;
+    if (projects.length === 0 && !activeProjectId) {
+      router.replace('/agentes/proyectos');
+    }
+  }, [user, pathname, projects.length, activeProjectId, isLoading, router]);
+
+  // Al cambiar de ruta de agente, sincronizar con Firestore (evita refetch duplicado al montar).
+  useEffect(() => {
+    if (!user || !pathname?.startsWith('/agentes')) return;
+    if (pathname === '/agentes/proyectos') return;
+
+    const routeKey =
+      pathname.match(/^\/agentes\/(\d+)/)?.[1] ??
+      (pathname.startsWith('/agentes/board') ? 'board' : null) ??
+      (pathname.startsWith('/agentes/dashboard') ? 'dashboard' : null);
+
+    if (!routeKey) return;
+    if (lastFetchedRouteKey.current === routeKey) return;
+    lastFetchedRouteKey.current = routeKey;
+
+    // La carga inicial ya la hace fetchWorkspace() al montar; no repetir en la primera ruta.
+    if (isLoading) return;
+
+    void (async () => {
+      if (pendingBulkReorder.current) {
+        await persistBulkReorder().catch(() => undefined);
+      }
+      await fetchWorkspace({ silent: true });
+    })();
+  }, [pathname, user, fetchWorkspace, isLoading, persistBulkReorder]);
 
   // Persistir el último agente visitado en preferencias (p. ej. tras login).
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;
+
+    if (pathname === '/agentes/dashboard' || pathname.startsWith('/agentes/dashboard/')) {
+      if (lastPersistedAgent.current === 'dashboard') return;
+      lastPersistedAgent.current = 'dashboard';
+      void saveLastAgent(user, 'dashboard').catch(() => {
+        lastPersistedAgent.current = null;
+      });
+      return;
+    }
 
     const match = pathname.match(/^\/agentes\/(\d+)/);
     if (!match) return;
@@ -159,8 +424,38 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [pathname, user]);
 
   useEffect(() => {
-    return () => cancelPendingSaves();
-  }, [cancelPendingSaves]);
+    const flushOnUnload = () => {
+      if (!pendingBulkReorder.current || !user) return;
+      const payload = pendingBulkReorder.current;
+      pendingBulkReorder.current = null;
+      if (bulkReorderTimer.current) {
+        clearTimeout(bulkReorderTimer.current);
+        bulkReorderTimer.current = null;
+      }
+      const body = JSON.stringify({
+        action: 'bulkUpdateStoryExecutions',
+        payload: { updates: payload },
+      });
+      void user.getIdToken().then((token) => {
+        fetch('/api/workspace', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body,
+          keepalive: true,
+        });
+      });
+    };
+
+    window.addEventListener('pagehide', flushOnUnload);
+    return () => {
+      window.removeEventListener('pagehide', flushOnUnload);
+      void persistBulkReorder().catch(() => undefined);
+      cancelPendingSaves();
+    };
+  }, [cancelPendingSaves, persistBulkReorder, user]);
 
   const saveAgent1 = useCallback(
     (state: Agent1State) => {
@@ -251,6 +546,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           /* el siguiente guardado reintentará */
         });
       }, SAVE_DEBOUNCE_MS);
+    },
+    [user]
+  );
+
+  const runActionWithWorkspace = useCallback(
+    async (action: string, payload?: unknown): Promise<UserWorkspace | null> => {
+      if (!user) return null;
+      const response = await authFetch('/api/workspace', user, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload }),
+      });
+      if (!response.ok) {
+        throw new Error('No se pudo actualizar el workspace');
+      }
+      const data = (await response.json()) as { workspace?: UserWorkspace };
+      return data.workspace ?? null;
     },
     [user]
   );
@@ -357,7 +669,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 status: 'approved',
                 error: null,
               },
-              pipeline: { ...prev.pipeline, agent5Input: input },
+              agent5: createEmptyWorkspace().agent5,
+              pipeline: {
+                ...prev.pipeline,
+                agent5Input: input,
+                agent6Input: null,
+              },
             }
           : prev
       );
@@ -389,6 +706,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 error: null,
               },
               pipeline: { ...prev.pipeline, agent6Input: input },
+              execution: buildInitialExecutionState(input.epics),
             }
           : prev
       );
@@ -491,6 +809,107 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const initializeExecution = useCallback(async () => {
+    const ws = await runActionWithWorkspace('initializeExecution');
+    if (ws) setWorkspace(ws);
+  }, [runActionWithWorkspace]);
+
+  const upsertMember = useCallback(
+    async (member: ProjectMemberInput) => {
+      const ws = await runActionWithWorkspace('upsertProjectMember', { member });
+      if (ws) setWorkspace(ws);
+    },
+    [runActionWithWorkspace]
+  );
+
+  const deleteMember = useCallback(
+    async (memberId: string) => {
+      const ws = await runActionWithWorkspace('deleteProjectMember', { memberId });
+      if (ws) setWorkspace(ws);
+    },
+    [runActionWithWorkspace]
+  );
+
+  const updateStoryExecution = useCallback(
+    async (
+      storyId: string,
+      patch: Partial<{ status: KanbanStatus; assigneeId: string | null; columnOrder: number }>
+    ) => {
+      setWorkspace((prev) => {
+        if (!prev?.execution) return prev;
+        const current = prev.execution.stories[storyId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          execution: {
+            ...prev.execution,
+            stories: {
+              ...prev.execution.stories,
+              [storyId]: { ...current, ...patch, updatedAt: Date.now() },
+            },
+          },
+        };
+      });
+
+      const ws = await runActionWithWorkspace('updateStoryExecution', { storyId, patch });
+      if (ws) setWorkspace(ws);
+    },
+    [runActionWithWorkspace]
+  );
+
+  const bulkReorderExecutions = useCallback(
+    (updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]) => {
+      setWorkspace((prev) => {
+        if (!prev?.execution) return prev;
+        const stories = { ...prev.execution.stories };
+        const now = Date.now();
+        for (const update of updates) {
+          const current =
+            stories[update.storyId] ??
+            ({
+              status: 'todo' as const,
+              assigneeId: null,
+              columnOrder: update.columnOrder,
+              updatedAt: now,
+              activity: [],
+            });
+          stories[update.storyId] = {
+            ...current,
+            status: update.status,
+            columnOrder: update.columnOrder,
+            updatedAt: now,
+          };
+        }
+        return { ...prev, execution: { ...prev.execution, stories } };
+      });
+
+      pendingBulkReorder.current = updates;
+      if (bulkReorderTimer.current) clearTimeout(bulkReorderTimer.current);
+      bulkReorderTimer.current = setTimeout(() => {
+        void persistBulkReorder().catch(() => {
+          /* el siguiente drag reintentará */
+        });
+      }, BULK_REORDER_DEBOUNCE_MS);
+    },
+    [persistBulkReorder]
+  );
+
+  const updateExecutionSprintFilter = useCallback(
+    async (sprintFilter: string | 'all') => {
+      const requestId = ++sprintFilterRequestId.current;
+      setWorkspace((prev) =>
+        prev?.execution
+          ? { ...prev, execution: { ...prev.execution, sprintFilter } }
+          : prev
+      );
+      const ws = await runActionWithWorkspace('updateExecutionSprintFilter', { sprintFilter });
+      if (ws && requestId === sprintFilterRequestId.current) {
+        setWorkspace(ws);
+      }
+    },
+    [runActionWithWorkspace]
+  );
+
   const resetAgent1 = useCallback(() => runAction('resetAgent1'), [runAction]);
   const resetAgent2 = useCallback(() => runAction('resetAgent2'), [runAction]);
   const resetAgent3 = useCallback(() => runAction('resetAgent3'), [runAction]);
@@ -500,12 +919,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const resetSession = useCallback(async () => {
     if (!user) return;
     cancelPendingSaves();
-    await runAction('resetWorkspace');
-    setWorkspace(createEmptyWorkspace());
-    setSessionVersion((v) => v + 1);
-    lastPersistedAgent.current = '1';
-    router.push('/agentes/1');
-  }, [user, cancelPendingSaves, runAction, router]);
+    router.push('/agentes/proyectos');
+  }, [user, cancelPendingSaves, router]);
 
   return (
     <WorkspaceContext.Provider
@@ -513,8 +928,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspace,
         isLoading,
         error,
+        plan,
+        activeProjectId,
+        projects,
+        projectSlots,
         sessionVersion,
         refreshWorkspace: fetchWorkspace,
+        refreshProjects,
+        createProject,
+        switchProject,
+        activateProjects,
+        deleteProject,
+        canRegenerate,
         saveAgent1,
         saveAgent2,
         saveAgent3,
@@ -529,6 +954,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         deleteUserStory,
         updateUserStory,
         updateSprintPlan,
+        initializeExecution,
+        upsertMember,
+        deleteMember,
+        updateStoryExecution,
+        bulkReorderExecutions,
+        updateExecutionSprintFilter,
         resetAgent1,
         resetAgent2,
         resetAgent3,

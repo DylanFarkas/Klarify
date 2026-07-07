@@ -54,6 +54,8 @@ export interface Agent2State {
 /** Respuesta del endpoint POST /api/agentes/2/generate */
 export interface Agent2GenerateResponse {
   epics: Epic[];
+  truncated?: boolean;
+  truncationMessage?: string;
 }
 
 /** Respuesta de error */

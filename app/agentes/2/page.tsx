@@ -18,6 +18,7 @@ import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/Agen
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
+import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 
 const INITIAL_STATE: Agent2State = {
@@ -105,7 +106,7 @@ function mergeStories(oldStories: UserStory[], newStories: UserStory[]): UserSto
 export default function Agent2Page() {
   const router = useRouter();
   const { user } = useAuth();
-  const { workspace, isLoading, sessionVersion, saveAgent2, approveAgent2 } = useWorkspace();
+  const { workspace, isLoading, sessionVersion, saveAgent2, approveAgent2, canRegenerate } = useWorkspace();
   const [state, setState] = useState<Agent2State>(INITIAL_STATE);
   const { entries, reset, consumeStream } = useAgentActivity();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -208,7 +209,7 @@ export default function Agent2Page() {
       const response = await authFetch('/api/agentes/2/generate', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state.input),
+        body: JSON.stringify({ ...state.input, isRegeneration: true }),
       });
 
       if (!response.ok) {
@@ -465,20 +466,25 @@ export default function Agent2Page() {
                   </div>
 
                   <div className="flex w-full flex-col-reverse items-center gap-3 sm:w-auto sm:flex-row">
-                    <button
-                      onClick={handleRegenerate}
-                      className={[
-                        'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 sm:w-auto',
-                        'text-sm font-medium text-muted',
-                        'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
-                        'transition-all duration-200 cursor-pointer',
-                      ].join(' ')}
-                    >
+                    <div className="flex w-full flex-col items-center gap-2 sm:w-auto">
+                      <button
+                        onClick={handleRegenerate}
+                        disabled={!canRegenerate('agent2')}
+                        className={[
+                          'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 sm:w-auto',
+                          'text-sm font-medium text-muted',
+                          'hover:border-border-strong hover:bg-surface-hover hover:text-foreground',
+                          'transition-all duration-200 cursor-pointer',
+                          'disabled:cursor-not-allowed disabled:opacity-40',
+                        ].join(' ')}
+                      >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
                       </svg>
                       Regenerar Backlog
                     </button>
+                      <RegenerationHint agent="agent2" className="text-center sm:text-left" />
+                    </div>
 
                     <ApproveButton
                       onClick={handleApprove}

@@ -12,6 +12,8 @@ import type { Wish, TranscriptionResult } from '@/lib/types/agent-1';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-service';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
+import { backlogDetailPrompt, defaultAiConfig } from '@/lib/plans/ai-config';
 
 interface ContentPart {
   text?: string;
@@ -45,15 +47,17 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
 
   async generateBacklog(
     wishes: Wish[],
-    transcription?: TranscriptionResult | null
+    transcription?: TranscriptionResult | null,
+    aiConfig?: AiGenerationConfig
   ): Promise<Epic[]> {
-    return this.generateBacklogStream(wishes, () => {}, transcription);
+    return this.generateBacklogStream(wishes, () => {}, transcription, aiConfig);
   }
 
   async generateBacklogStream(
     wishes: Wish[],
     onThought: LLMThoughtCallback,
-    transcription?: TranscriptionResult | null
+    transcription?: TranscriptionResult | null,
+    aiConfig?: AiGenerationConfig
   ): Promise<Epic[]> {
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
@@ -62,12 +66,14 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
     try {
       console.log('[GeminiBacklogAdapter] Iniciando generación de backlog con Gemini...');
 
-      const { systemInstruction, userPrompt } = this.buildPrompts(wishes, transcription);
+      const config = aiConfig ?? defaultAiConfig();
+      const { systemInstruction, userPrompt } = this.buildPrompts(wishes, transcription, config);
 
       const responseText = await this.streamGenerate(
         userPrompt,
         systemInstruction,
-        onThought
+        onThought,
+        config.thinkingBudget
       );
 
       if (!responseText) {
@@ -90,8 +96,11 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
 
   private buildPrompts(
     wishes: Wish[],
-    transcription?: TranscriptionResult | null
+    transcription: TranscriptionResult | null | undefined,
+    config: AiGenerationConfig
   ): { systemInstruction: string; userPrompt: string } {
+    const detailHint = backlogDetailPrompt(config.backlogDetail);
+
     const systemInstruction = `Devuelve la respuesta estrictamente como un objeto JSON con la siguiente forma exacta. No incluyas markdown, bloques de código ni ningún texto extra — solo el JSON puro.
 
 {
@@ -116,21 +125,24 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
 
 REGLAS CRÍTICAS:
 - NO incluyas campos "id", "source", "isEdited" ni "createdAt" en ningún objeto. Estos campos serán generados por el sistema después.
-- Cada épica debe tener entre 1 y 5 historias de usuario.
+- Genera como máximo ${config.maxEpics} épicas y como máximo ${config.maxStories} historias en total.
+- Cada épica debe tener entre 1 y ${config.maxStoriesPerEpic} historias de usuario.
 - Cada historia debe tener entre 1 y 5 criterios de aceptación.
 - Cada historia debe incluir al menos un elemento en sourceWishIds referenciando un ID de deseo válido.
-- Agrupa los deseos relacionados en épicas temáticas (típicamente 3-7 épicas).`;
+- ${detailHint}`;
 
     const userPrompt = `Eres un Product Owner experto en gestión ágil de proyectos.
 A partir de los siguientes deseos aprobados por el cliente, genera un backlog estructurado con Épicas e Historias de Usuario.
 
 REGLAS:
-1. Agrupa los deseos relacionados en Épicas temáticas (típicamente 3-7 épicas).
-2. Cada Épica agrupa 1-5 Historias de Usuario relacionadas.
-3. Formato estándar de HU: "Como [rol], quiero [acción] para [beneficio]".
-4. Los criterios de aceptación deben ser verificables (formato dado/cuando/entonces o checklist).
-5. En sourceWishIds, referencia los IDs exactos de los deseos que originaron cada HU (ej: "DESEO-001").
-6. Si hay transcripción de la reunión, úsala como contexto adicional para enriquecer las HU.
+1. Agrupa los deseos relacionados en Épicas temáticas (máximo ${config.maxEpics} épicas).
+2. Cada Épica agrupa 1-${config.maxStoriesPerEpic} Historias de Usuario relacionadas.
+3. El total de historias no debe superar ${config.maxStories}.
+4. Formato estándar de HU: "Como [rol], quiero [acción] para [beneficio]".
+5. Los criterios de aceptación deben ser verificables (formato dado/cuando/entonces o checklist).
+6. En sourceWishIds, referencia los IDs exactos de los deseos que originaron cada HU (ej: "DESEO-001").
+7. Si hay transcripción de la reunión, úsala como contexto adicional para enriquecer las HU.
+8. ${detailHint}
 
 DESEOS APROBADOS:
 ${wishes.map((w) => `- ${w.id}: ${w.text}`).join('\n')}
@@ -142,7 +154,8 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
   private async streamGenerate(
     contents: string,
     systemInstruction: string,
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    thinkingBudget: number
   ): Promise<string> {
     if (!this.ai) {
       throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
@@ -157,7 +170,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
         temperature: 0.2,
         thinkingConfig: {
           includeThoughts: true,
-          thinkingBudget: 1024,
+          thinkingBudget,
         },
       },
     });

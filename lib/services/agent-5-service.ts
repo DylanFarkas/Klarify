@@ -53,8 +53,9 @@ export function validateAgent5Input(input: Agent5Input | null): ValidationResult
 export async function planSprintsStream(
   input: Agent5Input,
   config: SprintPlanningConfig,
-  onThought: LLMThoughtCallback
+  onThought: LLMThoughtCallback,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<SprintPlan> {
   const stories = toLocalStoriesForPlanning(input);
-  return sprintPlanningAdapter.planSprintsStream(stories, config, input.framework, onThought);
+  return sprintPlanningAdapter.planSprintsStream(stories, config, input.framework, onThought, aiConfig);
 }

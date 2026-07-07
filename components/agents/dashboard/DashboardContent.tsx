@@ -13,11 +13,13 @@ import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import { DashboardSprintPlanEditor } from './DashboardSprintPlanEditor';
+import { DashboardExecutionPanel } from './DashboardExecutionPanel';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
 interface DashboardContentProps {
 	hasContent: boolean;
 	metrics: DashboardMetrics;
+	executionBoardEnabled: boolean;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -33,6 +35,7 @@ interface DashboardContentProps {
 export function DashboardContent({
 	hasContent,
 	metrics,
+	executionBoardEnabled,
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
@@ -57,8 +60,10 @@ export function DashboardContent({
 					activeAgents={activeAgents}
 					completionPercentage={metrics.completionPercentage}
 				/>
-				<DashboardNextActionPanel metrics={metrics} />
+				<DashboardNextActionPanel metrics={metrics} executionBoardEnabled={executionBoardEnabled} />
 			</section>
+
+			<DashboardExecutionPanel workspace={workspace} executionBoardEnabled={executionBoardEnabled} />
 
 			<DashboardPriorityBuckets metrics={metrics} />
 			<DashboardSecondaryMetrics metrics={metrics} />

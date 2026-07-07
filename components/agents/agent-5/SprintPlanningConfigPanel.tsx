@@ -18,6 +18,7 @@ interface SprintPlanningConfigPanelProps {
   hasPlan?: boolean;
   onRegenerate?: () => void;
   isRegenerating?: boolean;
+  regenerateDisabled?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -57,6 +58,7 @@ export function SprintPlanningConfigPanel({
   hasPlan = false,
   onRegenerate,
   isRegenerating = false,
+  regenerateDisabled = false,
 }: SprintPlanningConfigPanelProps) {
   const [hoveredId, setHoveredId] = useState<SprintConfigFieldId | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
@@ -194,7 +196,7 @@ export function SprintPlanningConfigPanel({
           <button
             type="button"
             onClick={onRegenerate}
-            disabled={disabled || isRegenerating}
+            disabled={disabled || isRegenerating || regenerateDisabled}
             className={[
               'inline-flex shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2',
               'text-sm font-medium text-muted',

@@ -37,7 +37,8 @@ async function emitMockThoughts(
 export class MockBacklogAdapter implements IBacklogLLMAdapter {
   async generateBacklog(
     wishes: Wish[],
-    transcription?: TranscriptionResult | null
+    transcription?: TranscriptionResult | null,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Epic[]> {
     return this.generateBacklogStream(wishes, () => {}, transcription);
   }
@@ -45,7 +46,8 @@ export class MockBacklogAdapter implements IBacklogLLMAdapter {
   async generateBacklogStream(
     wishes: Wish[],
     onThought: LLMThoughtCallback,
-    _transcription?: TranscriptionResult | null
+    _transcription?: TranscriptionResult | null,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Epic[]> {
     if (!wishes || wishes.length === 0) {
       throw new Error(

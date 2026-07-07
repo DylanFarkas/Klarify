@@ -8,6 +8,9 @@
 
 import { type NextRequest } from 'next/server';
 import { verifyRequestUser } from '@/lib/firebase-admin';
+import { getAiConfig, resolveUserPlan } from '@/lib/plans/plan-service';
+import { assertAiRegenerationAllowed } from '@/lib/plans/regeneration-guard';
+import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import type { Agent3Input } from '@/lib/types/workspace';
 import { validateAgent3Input, estimateBacklogStream } from '@/lib/services/agent-3-service';
@@ -29,12 +32,12 @@ import type {
 export type { Agent3EstimationResponse, Agent3SuggestionItem, LocalEpic };
 
 export async function POST(request: NextRequest) {
-  
   try {
-    // 1. Verificación de identidad obligatoria con Firebase Admin
-    await verifyRequestUser(request);
+    const uid = await verifyRequestUser(request);
+    const body = (await request.json()) as Agent3Input & { isRegeneration?: boolean };
 
-    const body = (await request.json()) as Agent3Input;
+    await assertAiRegenerationAllowed(uid, 'agent3', body.isRegeneration);
+    const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
     // 2. Validación de Entrada delegada al servicio (Idéntico al funcionamiento del Agente 2)
     const validation = validateAgent3Input(body);
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
             return emitter.runAction(
               'ACTION_ESTIMATE_STORIES',
               'Calculando Story Points (Fibonacci)...',
-              () => estimateBacklogStream(body.epics, emitter.bindThought())
+              () => estimateBacklogStream(body.epics, emitter.bindThought(), aiConfig)
             );
           }
         );
@@ -99,6 +102,10 @@ export async function POST(request: NextRequest) {
         { error: 'No autorizado', code: 'PROCESSING_ERROR' },
         { status: 401 }
       );
+    }
+
+    if (isPlanLimitError(error)) {
+      return Response.json(planErrorToJson(error), { status: 403 });
     }
 
     console.error('[Agent 3 Estimate] Critical Error:', error);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { AgentStepper } from './AgentStepper';
 import { AgentSidebarSettings } from './AgentSidebarSettings';
 import { NewSessionButton } from './NewSessionButton';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { WorkspaceGridBackground } from './WorkspaceGridBackground';
 
 interface AgentLayoutShellProps {
@@ -31,9 +32,13 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
         <AgentStepper currentStep={currentStep} />
 
         <div className="mt-8">
-          <AgentSidebarSettings />
+          <ProjectSwitcher />
         </div>
 
+        <div className="mt-3">
+          <AgentSidebarSettings />
+        </div>
+        
         <div className="mt-3">
           <NewSessionButton />
         </div>

@@ -27,13 +27,17 @@ async function emitMockThoughts(
 }
 
 export class MockEstimationAdapter implements IEstimationAdapter {
-  async estimateBacklog(epics: LocalEpic[]): Promise<Agent3SuggestionItem[]> {
+  async estimateBacklog(
+    epics: LocalEpic[],
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
+  ): Promise<Agent3SuggestionItem[]> {
     return mockEstimateStories(epics);
   }
 
   async estimateBacklogStream(
     epics: LocalEpic[],
-    onThought: LLMThoughtCallback
+    onThought: LLMThoughtCallback,
+    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]> {
     await emitMockThoughts(MOCK_ESTIMATION_THOUGHTS, onThought, ESTIMATION_DELAY_MS);
     return mockEstimateStories(epics);

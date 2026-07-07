@@ -28,8 +28,11 @@ const INITIAL_STATE: Agent5State = {
   error: null,
 };
 
-function resolveHydratedStatus(a5: Agent5State): Agent5Status {
-  if (a5.status === 'approved') return 'approved';
+function resolveHydratedStatus(a5: Agent5State, workspace: UserWorkspace): Agent5Status {
+  // Solo consolidado si existe agent6Input (approveAgent5); evita estado obsoleto.
+  if (a5.status === 'approved' && workspace.pipeline.agent6Input) {
+    return 'approved';
+  }
   if (a5.plan?.sprints.length) return 'review';
   return 'idle';
 }
@@ -63,6 +66,7 @@ export default function Agent5Page() {
     workspace,
     isLoading,
     sessionVersion,
+    plan,
     saveAgent5,
     approveAgent5,
   } = useWorkspace();
@@ -82,7 +86,7 @@ export default function Agent5Page() {
       setState({
         input: resolvedInput,
         plan,
-        status: resolveHydratedStatus({ ...a5, plan, input: resolvedInput }),
+        status: resolveHydratedStatus({ ...a5, plan, input: resolvedInput }, workspace),
         error: null,
       });
       setIsHydrated(true);
@@ -94,6 +98,9 @@ export default function Agent5Page() {
 
   useEffect(() => {
     if (!isHydrated) return;
+    // "approved" solo se persiste vía approveAgent5, no por autosave al hidratar.
+    if (state.status === 'approved') return;
+    if (!state.input && !state.plan) return;
     saveAgent5({
       input: state.input,
       plan: state.plan,
@@ -289,12 +296,22 @@ export default function Agent5Page() {
                 </div>
               }
               action={
-                <Link
-                  href="/agentes/dashboard"
-                  className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
-                >
-                  Dashboard
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href="/agentes/dashboard"
+                    className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
+                  >
+                    Dashboard
+                  </Link>
+                  {plan?.limits.executionBoard ? (
+                    <Link
+                      href="/agentes/board"
+                      className="rounded-xl border border-success/20 px-5 py-2.5 text-sm font-bold text-success/90 transition-colors hover:bg-success/10"
+                    >
+                      Ir al tablero
+                    </Link>
+                  ) : null}
+                </div>
               }
             />
           )}

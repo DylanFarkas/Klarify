@@ -232,19 +232,18 @@ export function processText(text: string): TranscriptionResult {
  * Evalúa si el contexto del usuario es suficiente para generar un backlog.
  */
 export async function analyzeContext(
-  transcription: TranscriptionResult
+  transcription: TranscriptionResult,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<ContextDiscovery> {
-  return llmAdapter.analyzeContext(transcription);
+  return llmAdapter.analyzeContext(transcription, aiConfig);
 }
 
-/**
- * Evalúa el contexto emitiendo pensamientos del LLM en tiempo real.
- */
 export async function analyzeContextStream(
   transcription: TranscriptionResult,
-  onThought: LLMThoughtCallback
+  onThought: LLMThoughtCallback,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<ContextDiscovery> {
-  return llmAdapter.analyzeContextStream(transcription, onThought);
+  return llmAdapter.analyzeContextStream(transcription, onThought, aiConfig);
 }
 
 /**
@@ -269,9 +268,15 @@ export async function extractWishesFromContextStream(
   discovery: ContextDiscovery,
   onThought: LLMThoughtCallback,
   answers: ClarificationAnswer[] = [],
-  skipped = false
+  skipped = false,
+  aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<{ wishes: Wish[]; enrichedContext: string }> {
   const enrichedContext = buildEnrichedContext(transcription, discovery, answers, skipped);
-  const wishes = await llmAdapter.extractWishesStream(transcription, enrichedContext, onThought);
+  const wishes = await llmAdapter.extractWishesStream(
+    transcription,
+    enrichedContext,
+    onThought,
+    aiConfig
+  );
   return { wishes, enrichedContext };
 }
