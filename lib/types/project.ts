@@ -3,6 +3,7 @@
  */
 
 import type { UserWorkspace } from '@/lib/types/workspace';
+import type { GithubExportRecord } from '@/lib/types/github-export';
 
 export type ProjectStatus = 'active' | 'locked';
 
@@ -13,6 +14,7 @@ export interface ProjectDocument {
   updatedAt: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
   workspace: UserWorkspace;
   lastAgent?: string;
+  githubExport?: GithubExportRecord;
 }
 
 export interface ProjectSummary {

@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeSettingsPanel } from '@/components/agents/shared/settings/ThemeSettingsPanel';
 import { GitHubConnectionPanel } from '@/components/agents/shared/settings/GitHubConnectionPanel';
 import { GeneralSettingsPanel } from '@/components/agents/shared/settings/GeneralSettingsPanel';
+import { GitHubExportUpgradeGate } from '@/components/agents/github/GitHubExportUpgradeGate';
+import { useWorkspace } from '@/hooks/useWorkspace';
 
 type SettingsTab = 'appearance' | 'integrations' | 'general';
 
@@ -46,6 +48,8 @@ const TABS: { id: SettingsTab; label: string; icon: ReactNode }[] = [
 
 export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsModalProps) {
   const { isGithubConnected } = useAuth();
+  const { plan } = useWorkspace();
+  const githubEnabled = plan?.limits.github ?? false;
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [mounted, setMounted] = useState(false);
 
@@ -174,7 +178,11 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
                   Conecta herramientas externas para exportar y gestionar tu backlog.
                 </p>
               </div>
-              <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
+              {githubEnabled ? (
+                <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
+              ) : (
+                <GitHubExportUpgradeGate />
+              )}
             </div>
           )}
 

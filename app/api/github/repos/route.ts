@@ -1,10 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyRequestUser } from "@/lib/firebase-admin";
+import { handleApiError } from "@/lib/api-error";
 import { fetchGithubRepos, getGithubIntegration } from "@/lib/github-integration";
+import { assertGithubExportAllowed } from "@/lib/plans/github-guard";
 
 export async function GET(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
+    await assertGithubExportAllowed(uid);
+
     const integration = await getGithubIntegration(uid);
 
     if (!integration?.accessToken) {
@@ -31,7 +35,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.error("GET /api/github/repos error:", error);
-    return NextResponse.json({ error: "Error al listar repositorios" }, { status: 500 });
+    return handleApiError(error, "Error al listar repositorios");
   }
 }

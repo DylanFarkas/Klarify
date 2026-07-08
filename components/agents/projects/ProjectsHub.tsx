@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { ProjectSummary } from '@/lib/types/project';
 import { PLAN_LIMITS } from '@/lib/plans/definitions';
 import { getProjectEntryPath } from '@/lib/utils/project-progress';
@@ -32,6 +33,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   const { isGithubConnected, githubUsername } = useAuth();
   const {
     plan,
+    workspace,
     projects,
     projectSlots,
     activeProjectId,
@@ -206,6 +208,10 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   }, [list]);
 
   const githubEnabled = plan?.limits.github ?? false;
+  const exportProject = activeProject ?? list.find((p) => p.id === activeProjectId) ?? null;
+  const canExportGithub = Boolean(
+    exportProject && workspace?.pipeline.agent6Input && exportProject.status === 'active'
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
@@ -274,44 +280,40 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
         </section>
       ) : null}
 
-      {/* <section className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <p className="text-sm font-semibold text-foreground">Configuración</p>
-          <p className="mt-1 text-xs text-muted">
-            Tema, integraciones y preferencias del workspace desde el panel lateral.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <p className="text-sm font-semibold text-foreground">GitHub</p>
-          <p className="mt-1 text-xs text-muted">
-            {githubEnabled
-              ? isGithubConnected
-                ? `Conectado como @${githubUsername ?? 'usuario'}`
-                : 'Conecta tu cuenta para exportar el backlog.'
-              : 'Disponible en el plan Pro.'}
-          </p>
-          {!githubEnabled ? (
+      <section className="rounded-2xl border border-border bg-surface/80 p-5 md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Exportar a GitHub</p>
+            <p className="mt-1 text-xs text-muted">
+              {githubEnabled
+                ? isGithubConnected
+                  ? `Conectado como @${githubUsername ?? 'usuario'}. Exporta el backlog a GitHub Projects.`
+                  : 'Conecta tu cuenta para exportar épicas, historias y sprints.'
+                : 'Disponible en el plan Pro.'}
+            </p>
+            {!canExportGithub && githubEnabled ? (
+              <p className="mt-2 text-xs text-amber-600">
+                Completa la planificación de sprints en el proyecto activo para habilitar la exportación.
+              </p>
+            ) : null}
+          </div>
+          {githubEnabled && exportProject ? (
+            <GitHubExportButton
+              projectId={exportProject.id}
+              projectName={exportProject.name}
+              canExport={canExportGithub}
+              variant="secondary"
+            />
+          ) : !githubEnabled ? (
             <Link
               href="/#pricing"
-              className="mt-2 inline-block text-xs font-medium text-primary underline-offset-2 hover:underline"
+              className="shrink-0 rounded-xl border border-primary/30 bg-primary/5 px-5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
             >
-              Ver planes
+              Ver plan Pro
             </Link>
           ) : null}
         </div>
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <p className="text-sm font-semibold text-foreground">Plan {plan ? planLabel(plan.id) : 'Free'}</p>
-          <p className="mt-1 text-xs text-muted">
-            {activeCount}/{maxActive} slots activos · {list.length}/{maxProjects} proyectos creados
-          </p>
-          <Link
-            href="/#pricing"
-            className="mt-2 inline-block text-xs font-medium text-primary underline-offset-2 hover:underline"
-          >
-            Mejorar plan
-          </Link>
-        </div>
-      </section> */}
+      </section>
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

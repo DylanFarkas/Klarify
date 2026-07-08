@@ -7,6 +7,7 @@ import { DashboardPipelinePanel } from './DashboardPipelinePanel';
 import { DashboardPriorityBuckets } from './DashboardPriorityBuckets';
 import { DashboardSecondaryMetrics } from './DashboardSecondaryMetrics';
 import { DashboardSprintStoriesTable } from './DashboardSprintStoriesTable';
+import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { DashboardMetrics } from './dashboardMetrics';
 import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
@@ -20,6 +21,9 @@ interface DashboardContentProps {
 	hasContent: boolean;
 	metrics: DashboardMetrics;
 	executionBoardEnabled: boolean;
+	projectId: string | null;
+	projectName: string;
+	canExportGithub: boolean;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -36,6 +40,9 @@ export function DashboardContent({
 	hasContent,
 	metrics,
 	executionBoardEnabled,
+	projectId,
+	projectName,
+	canExportGithub,
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
@@ -53,6 +60,23 @@ export function DashboardContent({
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
 			<DashboardHero hasContent={hasContent} metrics={metrics} />
+			{projectId ? (
+				<section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface/80 p-5 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<p className="text-sm font-semibold text-foreground">GitHub Projects</p>
+						<p className="mt-1 text-xs text-muted">
+							Exporta épicas, historias, criterios de aceptación, estimaciones, prioridades y sprints.
+						</p>
+					</div>
+					<GitHubExportButton
+						projectId={projectId}
+						projectName={projectName}
+						canExport={canExportGithub}
+						variant="secondary"
+						className="shrink-0"
+					/>
+				</section>
+			) : null}
 			<DashboardCoverageMetrics metrics={metrics} />
 
 			<section className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
