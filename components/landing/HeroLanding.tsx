@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { fetchWorkspace } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
+import { HeroPerspectiveGrid } from "@/components/landing/HeroPerspectiveGrid";
 
 const titleStart = "Transforma ideas en ";
 const titleHighlight = "backlogs ejecutables";
@@ -68,11 +68,10 @@ export function HeroLanding() {
   }, [typedLength]);
 
   return (
-    <div className="min-h-screen bg-white text-[#191c1d]">
-      <main className="overflow-hidden">
+    <div className="relative min-h-screen bg-white text-[#191c1d]">
+      <HeroPerspectiveGrid />
+      <main className="relative z-10 overflow-hidden">
         <section className="relative mx-auto max-w-360 px-5 pb-24 pt-10 text-center md:px-16 md:pt-22">
-          <div className="absolute left-1/2 top-20 z-0 h-72 w-72 -translate-x-1/2 rounded-full" />
-
           <div className="relative z-10 mb-4 pb-5 flex justify-center">
             <div>
               <span className="h-2 w-2 rounded-full" />
