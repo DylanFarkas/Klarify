@@ -272,7 +272,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
             <button
               type="button"
               onClick={() => void handleOpen(activeProject)}
-              className="shrink-0 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="shrink-0 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 cursor-pointer"
             >
               Continuar
             </button>
@@ -467,7 +467,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
                       <button
                         type="button"
                         onClick={() => void handleOpen(project)}
-                        className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                        className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 cursor-pointer"
                       >
                         Abrir
                       </button>
@@ -475,7 +475,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
                         <button
                           type="button"
                           onClick={() => void handleOpenBoard(project)}
-                          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-background"
+                          className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-background cursor-pointer"
                         >
                           Gestionar
                         </button>
@@ -486,7 +486,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
                     type="button"
                     onClick={() => void handleDelete(project)}
                     disabled={deletingId === project.id}
-                    className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                     aria-label={`Eliminar ${project.name}`}
                   >
                     {deletingId === project.id ? 'Eliminando...' : 'Eliminar'}
@@ -516,7 +516,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
             type="button"
             onClick={() => void handleCreate()}
             disabled={!canCreate || creating}
-            className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
           >
             {creating ? 'Creando...' : 'Crear proyecto'}
           </button>

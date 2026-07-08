@@ -1,6 +1,8 @@
+import { WorkspaceShootingStars } from './WorkspaceShootingStars';
+
 /**
  * Capa decorativa de fondo para el workspace de agentes.
- * Grid en profundidad con viñeta y textura — estilo premium sin saturar.
+ * Grid en profundidad con viñeta, textura y estrellas fugaces.
  */
 export function WorkspaceGridBackground() {
   return (
@@ -8,6 +10,7 @@ export function WorkspaceGridBackground() {
       <div className="workspace-grid__lines workspace-grid__lines--deep" />
       <div className="workspace-grid__lines workspace-grid__lines--near" />
       <div className="workspace-grid__dots" />
+      <WorkspaceShootingStars />
       <div className="workspace-grid__vignette" />
       <div className="workspace-grid__noise" />
     </div>

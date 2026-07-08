@@ -419,6 +419,72 @@
   opacity: var(--grid-dot-opacity);
 }
 
+/* Estrellas fugaces retro — trazas finas con cabeza luminosa sobre el grid */
+.workspace-grid__stars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 38%, black 25%, transparent 78%);
+}
+
+.workspace-grid__star {
+  --star-length: 72px;
+  --star-thickness: 1.5px;
+  --star-head: 3px;
+  --star-angle: -38deg;
+  --star-travel: 42vw;
+  position: absolute;
+  top: var(--star-top, 20%);
+  left: var(--star-left, 10%);
+  width: var(--star-length);
+  height: var(--star-thickness);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 18%, transparent) 35%,
+    color-mix(in srgb, var(--primary) 72%, white) 100%
+  );
+  opacity: 0;
+  transform: rotate(var(--star-angle)) translate3d(0, 0, 0);
+  transform-origin: right center;
+  will-change: transform, opacity;
+  animation: workspace-shooting-star var(--star-duration, 4.8s) linear both;
+  animation-delay: var(--star-delay, 0s);
+}
+
+.workspace-grid__star::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(var(--star-head) * -0.35);
+  width: var(--star-head);
+  height: var(--star-head);
+  border-radius: 50%;
+  translate: 0 -50%;
+  background: color-mix(in srgb, var(--primary) 85%, white);
+  box-shadow:
+    0 0 6px 1px color-mix(in srgb, var(--primary) 65%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+html[data-agent-theme="light"] .workspace-grid__star,
+.agent-workspace[data-theme="light"] .workspace-grid__star {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 12%, transparent) 40%,
+    color-mix(in srgb, var(--primary) 55%, white) 100%
+  );
+}
+
+html[data-agent-theme="light"] .workspace-grid__star::after,
+.agent-workspace[data-theme="light"] .workspace-grid__star::after {
+  box-shadow:
+    0 0 5px 1px color-mix(in srgb, var(--primary) 45%, transparent),
+    0 0 10px 2px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
 .workspace-grid__vignette {
   position: absolute;
   inset: 0;
@@ -444,6 +510,23 @@
 @keyframes workspace-grid-parallax-near {
   0% { transform: translate(0, 0); }
   100% { transform: translate(var(--grid-size), var(--grid-size)); }
+}
+
+@keyframes workspace-shooting-star {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--star-angle)) translate3d(0, 0, 0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  72% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--star-angle)) translate3d(var(--star-travel), 0, 0);
+  }
 }
 
 /* ── Hero de páginas de agentes — motivos por fase del pipeline ─────── */
@@ -660,6 +743,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .workspace-grid__lines,
+  .workspace-grid__star,
   .agent-modal-shell,
   .detail-modal-shell,
   .detail-modal-backdrop-in,
@@ -671,6 +755,10 @@
   .workspace-grid__lines--deep,
   .workspace-grid__lines--near {
     animation: none;
+  }
+
+  .workspace-grid__stars {
+    display: none;
   }
   [class*="animate-"] {
     animation: none !important;
