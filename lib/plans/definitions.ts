@@ -14,7 +14,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     backlogDetail: 'compact',
     allowedFileTypes: ['.txt', '.pdf'],
     github: false,
-    export: false,
+    export: 'manual',
     executionBoard: false,
     maxTeamMembers: 0,
   },

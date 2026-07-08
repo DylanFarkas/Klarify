@@ -7,6 +7,7 @@ import { DashboardPipelinePanel } from './DashboardPipelinePanel';
 import { DashboardPriorityBuckets } from './DashboardPriorityBuckets';
 import { DashboardSecondaryMetrics } from './DashboardSecondaryMetrics';
 import { DashboardSprintStoriesTable } from './DashboardSprintStoriesTable';
+import { ProjectExportPanel } from '@/components/agents/export/ProjectExportPanel';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { DashboardMetrics } from './dashboardMetrics';
 import type { UserStory } from '@/lib/types/agent-2';
@@ -61,20 +62,24 @@ export function DashboardContent({
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
 			<DashboardHero hasContent={hasContent} metrics={metrics} />
 			{projectId ? (
-				<section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface/80 p-5 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<p className="text-sm font-semibold text-foreground">GitHub Projects</p>
-						<p className="mt-1 text-xs text-muted">
-							Exporta épicas, historias, criterios de aceptación, estimaciones, prioridades y sprints.
-						</p>
+				<section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+					<ProjectExportPanel projectName={projectName} />
+					<div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-surface/80 p-5">
+						<div>
+							<p className="text-sm font-semibold text-foreground">GitHub Projects</p>
+							<p className="mt-1 text-xs text-muted">
+								Exporta épicas, historias, criterios de aceptación, estimaciones, prioridades y sprints
+								directamente a GitHub. Disponible en Pro.
+							</p>
+						</div>
+						<GitHubExportButton
+							projectId={projectId}
+							projectName={projectName}
+							canExport={canExportGithub}
+							variant="secondary"
+							className="shrink-0 self-start"
+						/>
 					</div>
-					<GitHubExportButton
-						projectId={projectId}
-						projectName={projectName}
-						canExport={canExportGithub}
-						variant="secondary"
-						className="shrink-0"
-					/>
 				</section>
 			) : null}
 			<DashboardCoverageMetrics metrics={metrics} />
