@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyRequestUser } from "@/lib/firebase-admin";
+import { handleApiError } from "@/lib/api-error";
 import { getGithubIntegration, removeGithubIntegration, saveGithubToken } from "@/lib/github-integration";
 
 export async function GET(request: NextRequest) {
@@ -16,13 +17,9 @@ export async function GET(request: NextRequest) {
       username: integration.username,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
-
-    if (message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    return NextResponse.json({ error: "Error al obtener estado de GitHub" }, { status: 500 });
+    return handleApiError(error, "Error al obtener estado de GitHub", {
+      unauthorizedMessage: "No autorizado",
+    });
   }
 }
 
@@ -52,8 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("POST /api/github/connect error:", error);
-    return NextResponse.json({ error: "Error al conectar GitHub" }, { status: 500 });
+    return handleApiError(error, "Error al conectar GitHub");
   }
 }
 
@@ -63,13 +59,8 @@ export async function DELETE(request: NextRequest) {
     await removeGithubIntegration(uid);
     return NextResponse.json({ disconnected: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
-
-    if (message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    console.error("DELETE /api/github/connect error:", error);
-    return NextResponse.json({ error: "Error al desconectar GitHub" }, { status: 500 });
+    return handleApiError(error, "Error al desconectar GitHub", {
+      unauthorizedMessage: "No autorizado",
+    });
   }
 }

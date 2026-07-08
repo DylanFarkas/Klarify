@@ -19,6 +19,7 @@ function createGithubProvider() {
   const provider = new GithubAuthProvider();
   provider.addScope("read:user");
   provider.addScope("repo");
+  provider.addScope("project");
   return provider;
 }
 

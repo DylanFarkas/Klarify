@@ -164,8 +164,8 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
           </div>
           <p className="mt-0.5 text-xs leading-relaxed text-subtle">
             {isGithubConnected
-              ? 'Por ahora solo se sincronizan repositorios.'
-              : 'Conecta tu cuenta para sincronizar repositorios.'}
+              ? 'Exporta backlogs a GitHub Projects. Reconecta si falta acceso a Projects.'
+              : 'Conecta tu cuenta para exportar el backlog a GitHub Projects.'}
           </p>
         </div>
       </div>

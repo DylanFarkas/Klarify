@@ -9,6 +9,7 @@ import { assertCanCreateProject, assertProjectSlotAccessible, ensureUserAccount,
 import type { PlanId } from '@/lib/plans/types';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { ProjectDocument, ProjectSlotsInfo, ProjectSummary, ProjectsListResponse } from '@/lib/types/project';
+import type { GithubExportRecord } from '@/lib/types/github-export';
 import { createEmptyWorkspace, type UserWorkspace } from '@/lib/types/workspace';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
@@ -594,6 +595,33 @@ export async function patchProjectWorkspaceFields(
   await projectDoc(uid, projectId).set(
     {
       ...fields,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function getProjectGithubExport(
+  uid: string,
+  projectId: string
+): Promise<GithubExportRecord | null> {
+  const doc = await projectDoc(uid, projectId).get();
+  if (!doc.exists) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+  const data = doc.data() as ProjectDocument;
+  return data.githubExport ?? null;
+}
+
+export async function saveProjectGithubExport(
+  uid: string,
+  projectId: string,
+  record: GithubExportRecord
+): Promise<void> {
+  await requireUnlockedProject(uid, projectId);
+  await projectDoc(uid, projectId).set(
+    {
+      githubExport: record,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }
