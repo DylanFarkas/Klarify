@@ -6,15 +6,15 @@ import { DashboardNextActionPanel } from './DashboardNextActionPanel';
 import { DashboardPipelinePanel } from './DashboardPipelinePanel';
 import { DashboardPriorityBuckets } from './DashboardPriorityBuckets';
 import { DashboardSecondaryMetrics } from './DashboardSecondaryMetrics';
-import { DashboardSprintStoriesTable } from './DashboardSprintStoriesTable';
 import { ProjectExportPanel } from '@/components/agents/export/ProjectExportPanel';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { DashboardMetrics } from './dashboardMetrics';
 import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { StoryPrioritization } from '@/lib/types/agent-4';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { SprintPlan } from '@/lib/types/agent-5';
-import { DashboardSprintPlanEditor } from './DashboardSprintPlanEditor';
+import { DashboardSprintPlan } from './DashboardSprintPlan';
 import { DashboardExecutionPanel } from './DashboardExecutionPanel';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
@@ -31,9 +31,10 @@ interface DashboardContentProps {
 		storyId: string,
 		updates: Partial<UserStory>,
 		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions
+		options?: UpdateDashboardUserStoryOptions,
+		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
-	onUpdateSprintPlan: (plan: SprintPlan) => Promise<void>;
+	onUpdateSprintPlan: (plan: SprintPlan) => void;
 	workspace: UserWorkspace;
 }
 
@@ -96,18 +97,9 @@ export function DashboardContent({
 
 			<DashboardPriorityBuckets metrics={metrics} />
 			<DashboardSecondaryMetrics metrics={metrics} />
-			{metrics.plan && metrics.framework && (
-				<DashboardSprintPlanEditor
-					plan={metrics.plan}
-					epics={metrics.epics}
-					estimations={metrics.estimations}
-					priorities={metrics.priorities}
-					framework={metrics.framework}
-					onPlanChange={onUpdateSprintPlan}
-				/>
-			)}
-			<DashboardSprintStoriesTable
+			<DashboardSprintPlan
 				epics={metrics.epics}
+				estimations={metrics.estimations}
 				framework={metrics.framework}
 				plan={metrics.plan}
 				rows={metrics.sprintStoryRows}
@@ -115,6 +107,7 @@ export function DashboardContent({
 				onCreateStory={onCreateStory}
 				onDeleteStory={onDeleteStory}
 				onEditStory={onEditStory}
+				onUpdateSprintPlan={onUpdateSprintPlan}
 			/>
 			{hasContent ? <DashboardEpicBreakdown metrics={metrics} /> : <DashboardEmptyState />}
 		</div>

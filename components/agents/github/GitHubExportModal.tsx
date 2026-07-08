@@ -7,6 +7,7 @@ import { authFetch } from '@/lib/api-client';
 import { slugifyRepoName } from '@/lib/github/repo-utils';
 import type { GithubExportResponse, GithubProjectSummary } from '@/lib/types/github-export';
 import { lockPageScroll } from '@/lib/utils/scroll-lock';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 
 interface GithubRepo {
   id: number;
@@ -74,12 +75,6 @@ export function GitHubExportModal({
       setSelectedProjectId('');
     }
   }, [open, projectName]);
-
-  useEffect(() => {
-    if (open && isGithubConnected) {
-      setStep('destination');
-    }
-  }, [open, isGithubConnected]);
 
   const loadRepos = useCallback(async () => {
     if (!user) return;
@@ -272,7 +267,7 @@ export function GitHubExportModal({
               type="button"
               onClick={onClose}
               disabled={exporting}
-              className="rounded-lg p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+              className="cursor-pointer rounded-lg p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
               aria-label="Cerrar"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -332,15 +327,16 @@ export function GitHubExportModal({
                     <p className="text-sm text-foreground">
                       Conectado como <span className="font-semibold">@{githubUsername}</span>
                     </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void (isGithubConnected ? setStep('destination') : handleConnect())}
-                    disabled={linking}
-                    className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                  >
-                    {linking ? 'Conectando…' : isGithubConnected ? 'Continuar' : 'Conectar GitHub'}
-                  </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleConnect()}
+                      disabled={linking}
+                      className=" cursor-pointer w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {linking ? 'Conectando…' : 'Conectar GitHub'}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -389,23 +385,20 @@ export function GitHubExportModal({
                       <label htmlFor="export-repo" className="text-sm font-semibold text-foreground">
                         Repositorio destino
                       </label>
-                      <select
+                      <DropdownSelect
                         id="export-repo"
                         value={selectedRepo}
-                        onChange={(event) => setSelectedRepo(event.target.value)}
+                        onChange={setSelectedRepo}
                         disabled={loadingRepos}
-                        className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
-                      >
-                        <option value="">
-                          {loadingRepos ? 'Cargando repositorios…' : 'Selecciona un repositorio'}
-                        </option>
-                        {repos.map((repo) => (
-                          <option key={repo.id} value={repo.full_name}>
-                            {repo.full_name}
-                            {repo.private ? ' (privado)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                        className="mt-2 cursor-pointer"
+                        placeholder={
+                          loadingRepos ? 'Cargando repositorios…' : 'Selecciona un repositorio'
+                        }
+                        options={repos.map((repo) => ({
+                          value: repo.full_name,
+                          label: `${repo.full_name}${repo.private ? ' (privado)' : ''}`,
+                        }))}
+                      />
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -511,22 +504,20 @@ export function GitHubExportModal({
                       <label htmlFor="existing-project" className="text-sm font-semibold text-foreground">
                         Project existente
                       </label>
-                      <select
+                      <DropdownSelect
                         id="existing-project"
                         value={selectedProjectId}
-                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                        onChange={setSelectedProjectId}
                         disabled={!isDestinationValid || loadingProjects}
-                        className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
-                      >
-                        <option value="">
-                          {loadingProjects ? 'Cargando projects…' : 'Selecciona un project'}
-                        </option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            #{project.number} - {project.title}
-                          </option>
-                        ))}
-                      </select>
+                        className="mt-2"
+                        placeholder={
+                          loadingProjects ? 'Cargando projects…' : 'Selecciona un project'
+                        }
+                        options={projects.map((project) => ({
+                          value: project.id,
+                          label: `#${project.number} - ${project.title}`,
+                        }))}
+                      />
                     </div>
                   )}
                 </div>
@@ -575,7 +566,7 @@ export function GitHubExportModal({
                   setStep(step === 'confirm' ? 'destination' : 'connection')
                 }
                 disabled={exporting}
-                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
+                className="cursor-pointer rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
               >
                 Atrás
               </button>
@@ -605,7 +596,7 @@ export function GitHubExportModal({
                     (projectMode === 'existing' && !selectedProjectId))) ||
                 (step === 'connection' && linking)
               }
-              className="ml-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer ml-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {exporting
                 ? 'Exportando…'

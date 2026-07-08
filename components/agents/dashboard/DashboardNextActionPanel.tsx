@@ -35,12 +35,12 @@ export function DashboardNextActionPanel({
 						Ir al tablero
 					</Link>
 				) : null}
-				<Link
+				{/* <Link
 					href="/agentes/1"
 					className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover"
 				>
 					Revisar desde el inicio
-				</Link>
+				</Link> */}
 			</div>
 
 			<div className="mt-6 grid gap-3 sm:grid-cols-2">

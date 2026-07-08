@@ -27,14 +27,19 @@ import type { WorkspacePlanSnapshot } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
-import type { Agent4State } from '@/lib/types/agent-4';
+import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
 import { buildInitialExecutionState } from '@/lib/board/board-utils';
+import {
+  normalizeSprintPlan,
+  withUpdatedSprintPlan,
+} from '@/lib/utils/sprint-plan-mutations';
 
 const SAVE_DEBOUNCE_MS = 500;
 const BULK_REORDER_DEBOUNCE_MS = 400;
+const SPRINT_PLAN_DEBOUNCE_MS = 350;
 
 export interface UpdateDashboardUserStoryOptions {
   epicId?: string;
@@ -48,6 +53,7 @@ export interface CreateDashboardUserStoryInput {
   description: string;
   acceptanceCriteria: string[];
   points: number;
+  category?: FrameworkCategory;
 }
 
 export interface UseWorkspaceResult {
@@ -84,9 +90,10 @@ export interface UseWorkspaceResult {
     storyId: string,
     updates: Partial<UserStory>,
     estimationUpdates?: Partial<StoryEstimation>,
-    options?: UpdateDashboardUserStoryOptions
+    options?: UpdateDashboardUserStoryOptions,
+    prioritizationUpdates?: Partial<StoryPrioritization>
   ) => Promise<void>;
-  updateSprintPlan: (plan: SprintPlan) => Promise<void>;
+  updateSprintPlan: (plan: SprintPlan) => void;
   initializeExecution: () => Promise<void>;
   upsertMember: (member: ProjectMemberInput) => Promise<void>;
   deleteMember: (memberId: string) => Promise<void>;
@@ -133,6 +140,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const pendingBulkReorder = useRef<
     { storyId: string; status: KanbanStatus; columnOrder: number }[] | null
   >(null);
+  const sprintPlanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSprintPlan = useRef<SprintPlan | null>(null);
+  const sprintPlanGeneration = useRef(0);
+  const storyExecutionGeneration = useRef(0);
   const lastPersistedAgent = useRef<string | null>(null);
   const lastFetchedRouteKey = useRef<string | null>(null);
   const sprintFilterRequestId = useRef(0);
@@ -147,6 +158,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     agent5Abort.current?.abort();
     if (bulkReorderTimer.current) clearTimeout(bulkReorderTimer.current);
     bulkReorderTimer.current = null;
+    if (sprintPlanTimer.current) clearTimeout(sprintPlanTimer.current);
+    sprintPlanTimer.current = null;
   }, []);
 
   const persistBulkReorder = useCallback(async () => {
@@ -169,8 +182,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!response.ok) {
       throw new Error('No se pudo guardar el orden del tablero');
     }
-    const result = (await response.json()) as { ok: boolean; workspace?: UserWorkspace };
-    if (result.workspace) setWorkspace(result.workspace);
+    await response.json();
+  }, [user]);
+
+  const persistSprintPlan = useCallback(async () => {
+    if (sprintPlanTimer.current) {
+      clearTimeout(sprintPlanTimer.current);
+      sprintPlanTimer.current = null;
+    }
+    const plan = pendingSprintPlan.current;
+    pendingSprintPlan.current = null;
+    if (!plan || !user) return;
+
+    const requestId = ++sprintPlanGeneration.current;
+    const response = await authFetch('/api/workspace', user, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'updateSprintPlan',
+        payload: { plan },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('No se pudo actualizar el plan de sprints');
+    }
+
+    await response.json();
+    if (requestId !== sprintPlanGeneration.current) return;
   }, [user]);
 
   const fetchWorkspace = useCallback(async (options?: { silent?: boolean }) => {
@@ -265,6 +304,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const switchProject = useCallback(
     async (projectId: string) => {
       if (!user) return;
+      await Promise.all([
+        persistBulkReorder().catch(() => undefined),
+        persistSprintPlan().catch(() => undefined),
+      ]);
       cancelPendingSaves();
       const response = await authFetch('/api/projects', user, {
         method: 'PATCH',
@@ -279,7 +322,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSessionVersion((v) => v + 1);
       await fetchWorkspace();
     },
-    [user, cancelPendingSaves, fetchWorkspace]
+    [user, cancelPendingSaves, fetchWorkspace, persistBulkReorder, persistSprintPlan]
   );
 
   const activateProjects = useCallback(
@@ -425,37 +468,61 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const flushOnUnload = () => {
-      if (!pendingBulkReorder.current || !user) return;
-      const payload = pendingBulkReorder.current;
-      pendingBulkReorder.current = null;
-      if (bulkReorderTimer.current) {
-        clearTimeout(bulkReorderTimer.current);
-        bulkReorderTimer.current = null;
-      }
-      const body = JSON.stringify({
-        action: 'bulkUpdateStoryExecutions',
-        payload: { updates: payload },
-      });
-      void user.getIdToken().then((token) => {
-        fetch('/api/workspace', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body,
-          keepalive: true,
+      if (!user) return;
+
+      const sendKeepalive = (body: string) => {
+        void user.getIdToken().then((token) => {
+          fetch('/api/workspace', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body,
+            keepalive: true,
+          });
         });
-      });
+      };
+
+      if (pendingBulkReorder.current) {
+        const payload = pendingBulkReorder.current;
+        pendingBulkReorder.current = null;
+        if (bulkReorderTimer.current) {
+          clearTimeout(bulkReorderTimer.current);
+          bulkReorderTimer.current = null;
+        }
+        sendKeepalive(
+          JSON.stringify({
+            action: 'bulkUpdateStoryExecutions',
+            payload: { updates: payload },
+          })
+        );
+      }
+
+      if (pendingSprintPlan.current) {
+        const plan = pendingSprintPlan.current;
+        pendingSprintPlan.current = null;
+        if (sprintPlanTimer.current) {
+          clearTimeout(sprintPlanTimer.current);
+          sprintPlanTimer.current = null;
+        }
+        sendKeepalive(
+          JSON.stringify({
+            action: 'updateSprintPlan',
+            payload: { plan },
+          })
+        );
+      }
     };
 
     window.addEventListener('pagehide', flushOnUnload);
     return () => {
       window.removeEventListener('pagehide', flushOnUnload);
       void persistBulkReorder().catch(() => undefined);
+      void persistSprintPlan().catch(() => undefined);
       cancelPendingSaves();
     };
-  }, [cancelPendingSaves, persistBulkReorder, user]);
+  }, [cancelPendingSaves, persistBulkReorder, persistSprintPlan, user]);
 
   const saveAgent1 = useCallback(
     (state: Agent1State) => {
@@ -719,7 +786,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       storyId: string,
       updates: Partial<UserStory>,
       estimationUpdates?: Partial<StoryEstimation>,
-      options?: UpdateDashboardUserStoryOptions
+      options?: UpdateDashboardUserStoryOptions,
+      prioritizationUpdates?: Partial<StoryPrioritization>
     ) => {
       if (!user) return;
       const response = await authFetch('/api/workspace', user, {
@@ -727,7 +795,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'updateUserStory',
-          payload: { storyId, updates, estimationUpdates, ...options },
+          payload: { storyId, updates, estimationUpdates, prioritizationUpdates, ...options },
         }),
       });
 
@@ -744,27 +812,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   const updateSprintPlan = useCallback(
-    async (plan: SprintPlan) => {
+    (plan: SprintPlan) => {
       if (!user) return;
-      const response = await authFetch('/api/workspace', user, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'updateSprintPlan',
-          payload: { plan },
-        }),
-      });
+      const normalizedPlan = normalizeSprintPlan(plan);
 
-      if (!response.ok) {
-        throw new Error('No se pudo actualizar el plan de sprints');
-      }
+      // Optimistic UI: la historia salta de sprint al instante.
+      setWorkspace((prev) => (prev ? withUpdatedSprintPlan(prev, normalizedPlan) : prev));
 
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
-      }
+      pendingSprintPlan.current = normalizedPlan;
+      if (sprintPlanTimer.current) clearTimeout(sprintPlanTimer.current);
+      sprintPlanTimer.current = setTimeout(() => {
+        void persistSprintPlan().catch(() => {
+          /* el siguiente cambio reintentará */
+        });
+      }, SPRINT_PLAN_DEBOUNCE_MS);
     },
-    [user]
+    [user, persistSprintPlan]
   );
 
   const createUserStory = useCallback(
@@ -835,6 +898,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       storyId: string,
       patch: Partial<{ status: KanbanStatus; assigneeId: string | null; columnOrder: number }>
     ) => {
+      const requestId = ++storyExecutionGeneration.current;
       setWorkspace((prev) => {
         if (!prev?.execution) return prev;
         const current = prev.execution.stories[storyId];
@@ -852,7 +916,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       });
 
       const ws = await runActionWithWorkspace('updateStoryExecution', { storyId, patch });
-      if (ws) setWorkspace(ws);
+      if (!ws?.execution || requestId !== storyExecutionGeneration.current) return;
+
+      const serverStory = ws.execution.stories[storyId];
+      if (!serverStory) return;
+
+      setWorkspace((prev) => {
+        if (!prev?.execution) return prev;
+        const local = prev.execution.stories[storyId];
+        if (!local) return prev;
+        // Conservar layout/campos locales; solo traer activity del servidor.
+        if (local.activity === serverStory.activity) return prev;
+        return {
+          ...prev,
+          execution: {
+            ...prev.execution,
+            stories: {
+              ...prev.execution.stories,
+              [storyId]: { ...local, activity: serverStory.activity },
+            },
+          },
+        };
+      });
     },
     [runActionWithWorkspace]
   );

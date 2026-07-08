@@ -104,7 +104,7 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
   const canAdd = criteria.length < MAX_ACCEPTANCE_CRITERIA;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 ml-8">
       <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
         Criterios de aceptación ({criteria.length}/{MAX_ACCEPTANCE_CRITERIA})
       </span>

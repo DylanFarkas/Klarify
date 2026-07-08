@@ -50,6 +50,10 @@ function buildStoryLayoutKey(stories: BoardStory[]): string {
     .join('|');
 }
 
+function buildColumnItemsKey(items: ColumnItems): string {
+  return KANBAN_COLUMNS.map((column) => `${column.id}:${items[column.id].join(',')}`).join('|');
+}
+
 function findColumn(storyId: string, items: ColumnItems): KanbanStatus | null {
   if (storyId.startsWith('column:')) {
     return storyId.replace('column:', '') as KanbanStatus;
@@ -172,8 +176,11 @@ export function KanbanBoard({
 
   useEffect(() => {
     if (isDraggingRef.current) return;
-    setColumnItems(toColumnItems(grouped));
-  }, [layoutKey, grouped]);
+    const next = toColumnItems(groupStoriesByColumn(stories));
+    setColumnItems((prev) =>
+      buildColumnItemsKey(prev) === buildColumnItemsKey(next) ? prev : next
+    );
+  }, [layoutKey, stories]);
 
   const activeItem = activeStoryId ? storiesById[activeStoryId] ?? null : null;
 

@@ -16,6 +16,7 @@ interface CategorySelectProps {
   value: FrameworkCategory | '';
   onChange: (category: FrameworkCategory) => void;
   disabled?: boolean;
+  className?: string;
 }
 
 export function CategorySelect({
@@ -23,6 +24,7 @@ export function CategorySelect({
   value,
   onChange,
   disabled,
+  className,
 }: CategorySelectProps) {
   const categories = getFrameworkCategories(framework);
   const labels = getFrameworkLabels(framework);
@@ -32,7 +34,10 @@ export function CategorySelect({
       disabled={disabled}
       value={value}
       onChange={(e) => onChange(e.target.value as FrameworkCategory)}
-      className="h-9 w-44 rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
+      className={[
+        'h-9 min-w-36 rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40',
+        className ?? 'w-44',
+      ].join(' ')}
     >
       <option value="">---</option>
       {categories.map((cat) => (

@@ -29,7 +29,7 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       <select
         value={filters.sprintFilter}
         onChange={(e) => onChange({ sprintFilter: e.target.value as BoardFiltersState['sprintFilter'] })}
-        className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
         aria-label="Filtrar por sprint"
       >
         <option value="all">Todo el backlog</option>
@@ -44,7 +44,7 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       <select
         value={filters.epicId}
         onChange={(e) => onChange({ epicId: e.target.value })}
-        className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
         aria-label="Filtrar por épica"
       >
         <option value="all">Todas las épicas</option>
@@ -58,7 +58,7 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       <select
         value={filters.assigneeId}
         onChange={(e) => onChange({ assigneeId: e.target.value as BoardFiltersState['assigneeId'] })}
-        className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
         aria-label="Filtrar por responsable"
       >
         <option value="all">Todos los responsables</option>

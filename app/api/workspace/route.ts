@@ -45,7 +45,7 @@ import {
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
-import type { Agent4State } from '@/lib/types/agent-4';
+import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 import type { KanbanStatus, ProjectMember, ProjectMemberRole } from '@/lib/types/execution';
@@ -89,6 +89,7 @@ interface PostBody {
         storyId: string;
         updates: Partial<UserStory>;
         estimationUpdates?: Partial<StoryEstimation>;
+        prioritizationUpdates?: Partial<StoryPrioritization>;
         epicId?: string;
         sprintId?: string | null;
       }
@@ -102,6 +103,7 @@ interface PostBody {
         description: string;
         acceptanceCriteria: string[];
         points: number;
+        category?: FrameworkCategory;
       }
     | {
         storyId: string;
@@ -209,6 +211,7 @@ export async function POST(request: NextRequest) {
           description?: string;
           acceptanceCriteria?: string[];
           points?: number;
+          category?: FrameworkCategory;
         };
         if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
@@ -220,6 +223,7 @@ export async function POST(request: NextRequest) {
           description: payload.description,
           acceptanceCriteria: payload.acceptanceCriteria ?? [],
           points: payload.points,
+          category: payload.category,
         });
         return NextResponse.json({ ok: true, workspace });
       }
@@ -236,6 +240,7 @@ export async function POST(request: NextRequest) {
           storyId?: string;
           updates?: Partial<UserStory>;
           estimationUpdates?: Partial<StoryEstimation>;
+          prioritizationUpdates?: Partial<StoryPrioritization>;
           epicId?: string;
           sprintId?: string | null;
         };
@@ -250,7 +255,8 @@ export async function POST(request: NextRequest) {
           {
             epicId: payload.epicId,
             sprintId: payload.sprintId,
-          }
+          },
+          payload.prioritizationUpdates
         );
         return NextResponse.json({ ok: true, workspace });
       }

@@ -50,7 +50,7 @@ export function GitHubExportButton({
         type="button"
         onClick={() => setModalOpen(true)}
         disabled={!canExport}
-        className={`${baseClasses} ${className}`}
+        className={`${baseClasses} ${className} cursor-pointer`}
         title={
           canExport
             ? 'Exportar backlog a GitHub Projects'

@@ -20,7 +20,7 @@ import { resolveUserPlan } from '@/lib/plans/plan-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
-import type { Agent4State } from '@/lib/types/agent-4';
+import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import {
   addStoryToSprintPlan,
@@ -97,6 +97,8 @@ export interface CreateUserStoryInput {
   description: string;
   acceptanceCriteria: string[];
   points: number;
+  /** Prioridad según el framework activo del Agente 4. */
+  category?: FrameworkCategory;
 }
 
 /**
@@ -211,6 +213,29 @@ function updateStoryEstimation(
 
   return {
     ...estimations,
+    [storyId]: {
+      ...current,
+      ...updates,
+      isModified: true,
+    },
+  };
+}
+
+function updateStoryPrioritization(
+  priorities: Record<string, StoryPrioritization>,
+  storyId: string,
+  updates?: Partial<StoryPrioritization>
+): Record<string, StoryPrioritization> {
+  if (!updates) return priorities;
+
+  const current = priorities[storyId] ?? {
+    category: 'must' as FrameworkCategory,
+    justification: '',
+    isModified: false,
+  };
+
+  return {
+    ...priorities,
     [storyId]: {
       ...current,
       ...updates,
@@ -569,7 +594,8 @@ export async function updateUserStoryAcrossWorkspace(
   storyId: string,
   updates: Partial<UserStory>,
   estimationUpdates?: Partial<StoryEstimation>,
-  options?: UpdateUserStoryOptions
+  options?: UpdateUserStoryOptions,
+  prioritizationUpdates?: Partial<StoryPrioritization>
 ): Promise<UserWorkspace> {
   const { workspace } = await getWorkspaceData(uid);
   const epics = workspace.agent2.epics;
@@ -619,6 +645,11 @@ export async function updateUserStoryAcrossWorkspace(
   };
 
   const agent3Estimations = updateStoryEstimation(workspace.agent3.estimations, storyId, estimationUpdates);
+  const agent4Priorities = updateStoryPrioritization(
+    workspace.agent4.priorities,
+    storyId,
+    prioritizationUpdates
+  );
   const updatedWorkspace: UserWorkspace = {
     ...workspace,
     agent2: {
@@ -637,6 +668,7 @@ export async function updateUserStoryAcrossWorkspace(
     },
     agent4: {
       ...workspace.agent4,
+      priorities: agent4Priorities,
       input: workspace.agent4.input
         ? {
             ...workspace.agent4.input,
@@ -660,6 +692,11 @@ export async function updateUserStoryAcrossWorkspace(
               workspace.agent5.input.estimations,
               storyId,
               estimationUpdates
+            ),
+            priorities: updateStoryPrioritization(
+              workspace.agent5.input.priorities,
+              storyId,
+              prioritizationUpdates
             ),
           }
         : null,
@@ -692,6 +729,11 @@ export async function updateUserStoryAcrossWorkspace(
               storyId,
               estimationUpdates
             ),
+            priorities: updateStoryPrioritization(
+              workspace.pipeline.agent5Input.priorities,
+              storyId,
+              prioritizationUpdates
+            ),
           }
         : null,
       agent6Input: workspace.pipeline.agent6Input
@@ -702,6 +744,11 @@ export async function updateUserStoryAcrossWorkspace(
               workspace.pipeline.agent6Input.estimations,
               storyId,
               estimationUpdates
+            ),
+            priorities: updateStoryPrioritization(
+              workspace.pipeline.agent6Input.priorities,
+              storyId,
+              prioritizationUpdates
             ),
             plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
           }
@@ -757,6 +804,13 @@ export async function createUserStoryAcrossWorkspace(
     justification: 'Estimacion creada manualmente desde el dashboard.',
     isModified: true,
   };
+  const prioritization: StoryPrioritization | null = input.category
+    ? {
+        category: input.category,
+        justification: 'Priorizacion creada manualmente desde el dashboard.',
+        isModified: true,
+      }
+    : null;
   const updatedAgent5Plan = workspace.agent5.plan
     ? addStoryToSprintPlan(workspace.agent5.plan, storyId, input.sprintId, input.points)
     : null;
@@ -786,6 +840,9 @@ export async function createUserStoryAcrossWorkspace(
     },
     agent4: {
       ...workspace.agent4,
+      priorities: prioritization
+        ? updateStoryPrioritization(workspace.agent4.priorities, storyId, prioritization)
+        : workspace.agent4.priorities,
       input: workspace.agent4.input
         ? {
             ...workspace.agent4.input,
@@ -810,6 +867,9 @@ export async function createUserStoryAcrossWorkspace(
               storyId,
               estimation
             ),
+            priorities: prioritization
+              ? updateStoryPrioritization(workspace.agent5.input.priorities, storyId, prioritization)
+              : workspace.agent5.input.priorities,
           }
         : null,
     },
@@ -841,6 +901,13 @@ export async function createUserStoryAcrossWorkspace(
               storyId,
               estimation
             ),
+            priorities: prioritization
+              ? updateStoryPrioritization(
+                  workspace.pipeline.agent5Input.priorities,
+                  storyId,
+                  prioritization
+                )
+              : workspace.pipeline.agent5Input.priorities,
           }
         : null,
       agent6Input: workspace.pipeline.agent6Input
@@ -852,6 +919,13 @@ export async function createUserStoryAcrossWorkspace(
               storyId,
               estimation
             ),
+            priorities: prioritization
+              ? updateStoryPrioritization(
+                  workspace.pipeline.agent6Input.priorities,
+                  storyId,
+                  prioritization
+                )
+              : workspace.pipeline.agent6Input.priorities,
             plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
           }
         : null,

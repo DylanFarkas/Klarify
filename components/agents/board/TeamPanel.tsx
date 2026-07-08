@@ -217,7 +217,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                   type="button"
                   disabled={atLimit}
                   onClick={() => setShowForm(true)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-bold text-muted transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-bold text-muted transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -239,7 +239,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
         onClick={handleToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex shrink-0 items-center gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-1.5 text-sm transition-colors hover:border-primary/30 hover:bg-surface-hover focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="cursor-pointer flex shrink-0 items-center gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-1.5 text-sm transition-colors hover:border-primary/30 hover:bg-surface-hover focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
       >
         <span className="flex items-center">
           {visibleAvatars.length > 0 ? (

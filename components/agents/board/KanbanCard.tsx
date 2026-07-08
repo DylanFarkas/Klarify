@@ -99,7 +99,7 @@ export function KanbanCard({
               compact
             />
           </div>
-          <p className="mt-1 line-clamp-2 text-sm font-semibold text-foreground">{item.story.title}</p>
+          <p className="mt-1 line-clamp-2 text-sm font-semibold text-foreground cursor-pointer">{item.story.title}</p>
           <p className="mt-0.5 line-clamp-1 text-[11px] text-subtle">{item.epicTitle}</p>
         </button>
       </div>

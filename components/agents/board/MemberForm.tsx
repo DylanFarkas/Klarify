@@ -39,7 +39,7 @@ export function MemberForm({ initial, compact = false, onSubmit, onCancel }: Mem
           id="member-name"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+          className="mt-1 w-full text-foreground rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
           required
         />
       </div>
@@ -52,7 +52,7 @@ export function MemberForm({ initial, compact = false, onSubmit, onCancel }: Mem
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+          className="mt-1 w-full rounded-lg text-foreground border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
         />
       </div>
       <div>
@@ -75,14 +75,14 @@ export function MemberForm({ initial, compact = false, onSubmit, onCancel }: Mem
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
-          className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+          className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:opacity-90"
         >
           {initial ? 'Guardar' : 'Añadir'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted hover:bg-surface-hover"
+          className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted hover:bg-surface-hover"
         >
           Cancelar
         </button>
