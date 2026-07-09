@@ -1,43 +1,69 @@
-const pricingPlans = [
+type PricingPlan = {
+  name: string;
+  price: string;
+  projects: string;
+  projectsLabel: string;
+  features: string[];
+  cta: string;
+  href: string;
+  highlighted?: boolean;
+};
+
+const pricingPlans: PricingPlan[] = [
+  {
+    name: "Free",
+    price: "$0",
+    projects: "1",
+    projectsLabel: "Proyecto",
+    features: [
+      "Pipeline completo de descubrimiento",
+      "Generación de backlog limitada en proyectos grandes",
+      "Sin exportación a GitHub",
+      "Sin herramientas de gestión",
+    ],
+    cta: "Empezar gratis",
+    href: "/login",
+  },
   {
     name: "Starter",
-    price: "$0",
-    period: "/mes",
-    features: ["5 Proyectos", "Agente Descubridor básico", "Exportación Manual"],
-    cta: "Empezar gratis",
+    price: "$5",
+    projects: "3",
+    projectsLabel: "Proyectos",
+    features: [
+      "Backlog ampliado con más detalle",
+      "Carga de audio para capturar contexto",
+      "Regeneración de resultados",
+      "Gestión de proyectos dentro de Klarify",
+      "Exportación manual",
+    ],
+    cta: "Elegir Starter",
+    href: "/login",
+    highlighted: true,
   },
   {
     name: "Pro",
-    price: "$49",
-    period: "/mes",
+    price: "$10",
+    projects: "10",
+    projectsLabel: "Proyectos",
     features: [
-      "Proyectos Ilimitados",
-      "Agentes Ilimitados",
-      "GitHub Export",
-      "Human-in-the-loop validation",
+      "Backlog detallado y estructurado",
+      "Gestión de proyectos dentro de Klarify",
+      "Integración con GitHub",
+      "Regeneración ilimitada",
+      "Mayor capacidad de procesamiento con IA",
     ],
-    cta: "Prueba 14 días",
-    highlighted: true,
-    badge: "Recomendado",
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    features: [
-      "SSO & Seguridad Avanzada",
-      "Agentes personalizados",
-      "Integración Jira On-Premise",
-      "Account Manager",
-    ],
-    cta: "Contactar ventas",
+    cta: "Elegir Pro",
+    href: "/login",
   },
 ];
 
-function CheckIcon() {
+function CheckIcon({ highlighted = false }: { highlighted?: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-5 w-5 shrink-0 text-[#005bbf]"
+      className={`mt-0.5 h-4 w-4 shrink-0 ${
+        highlighted ? "text-[#005bbf]" : "text-[#191c1d]/35"
+      }`}
       fill="none"
       viewBox="0 0 24 24"
     >
@@ -46,77 +72,133 @@ function CheckIcon() {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="2.2"
+        strokeWidth="1.75"
       />
     </svg>
   );
 }
 
-export function PricingPlans() {
+function MetricRow({
+  value,
+  label,
+  highlighted = false,
+}: {
+  value: string;
+  label: string;
+  highlighted?: boolean;
+}) {
   return (
-    <section aria-labelledby="pricing-title" className="bg-white px-5 py-24 md:px-16 md:py-30" id="pricing">
-      <div className="mx-auto max-w-360 text-center">
-        <h2
-          className="mb-4 text-3xl font-semibold leading-tight tracking-[-0.03em] text-[#191c1d] md:text-5xl"
-          id="pricing-title"
-        >
-          Planes para cada etapa
-        </h2>
-        <p className="mx-auto max-w-2xl text-base leading-7 text-[#5d616b] md:text-lg">
-          Escala tu equipo de desarrollo con inteligencia.
-        </p>
+    <div
+      className={`flex items-baseline justify-between gap-6 border-b py-5 ${
+        highlighted ? "border-[#005bbf]/15" : "border-[#191c1d]/10"
+      }`}
+    >
+      <span
+        className={`tracking-[-0.04em] ${
+          highlighted
+            ? "text-4xl font-semibold text-[#191c1d] md:text-5xl"
+            : "text-3xl font-semibold text-[#191c1d] md:text-4xl"
+        }`}
+      >
+        {value}
+      </span>
+      <span className="shrink-0 text-right text-[11px] font-medium uppercase tracking-[0.14em] text-[#191c1d]/45">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function PlanCard({ plan }: { plan: PricingPlan }) {
+  const isHighlighted = plan.highlighted;
+
+  return (
+    <article
+      className={`flex h-full flex-col ${
+        isHighlighted
+          ? "rounded-4xl border border-[#005bbf]/12 bg-[#edf4ff] px-7 py-9 shadow-[0_24px_60px_rgba(0,91,191,0.1)] md:px-9 md:py-11"
+          : "px-2 py-6 md:px-4 md:py-8"
+      }`}
+    >
+      <h1
+        className={`mb-8 text-2xl font-bold uppercase tracking-[0.2em] ${
+          isHighlighted ? "text-[#005bbf]" : "text-[#191c1d]/50"
+        }`}
+      >
+        {plan.name}
+      </h1>
+
+      <div className="mb-8">
+        <MetricRow highlighted={isHighlighted} label="Precio mensual" value={plan.price} />
+        <MetricRow
+          highlighted={isHighlighted}
+          label={plan.projectsLabel}
+          value={plan.projects}
+        />
       </div>
 
-      <div className="mx-auto mt-16 grid max-w-360 gap-8 md:grid-cols-3 md:items-start">
-        {pricingPlans.map((plan) => (
-          <article
-            className={`relative flex h-full flex-col rounded-3xl p-8 transition-all ${
-              plan.highlighted
-                ? "border-2 border-[#005bbf] bg-white shadow-[0_24px_70px_rgba(0,91,191,0.16)] md:-translate-y-4"
-                : "border border-[#dfe3ec] bg-white"
-            }`}
-            key={plan.name}
-          >
-            {plan.badge ? (
-              <div className="absolute right-8 top-0 -translate-y-1/2 rounded-full bg-[#005bbf] px-4 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
-                {plan.badge}
-              </div>
-            ) : null}
-
-            <h3 className="mb-2 text-lg font-bold text-[#191c1d]">{plan.name}</h3>
-            <div className="mb-6 flex items-baseline gap-1">
-              <span className="text-4xl font-bold tracking-[-0.03em] text-[#191c1d]">
-                {plan.price}
-              </span>
-              {plan.period ? <span className="text-[#5d616b]">{plan.period}</span> : null}
-            </div>
-
-            <ul className="mb-10 flex grow flex-col gap-4">
-              {plan.features.map((feature) => (
-                <li
-                  className={`flex items-center gap-3 text-sm text-[#191c1d] ${
-                    plan.highlighted && feature === "Agentes Ilimitados" ? "font-bold" : ""
-                  }`}
-                  key={feature}
-                >
-                  <CheckIcon />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            <a
-              className={`mt-auto flex w-full items-center justify-center rounded-xl py-3 font-bold transition-all ${
-                plan.highlighted
-                  ? "bg-[#005bbf] text-white shadow-md hover:opacity-90"
-                  : "border border-[#191c1d] text-[#191c1d] hover:bg-[#edeeef]"
-              }`}
-              href={plan.name === "Enterprise" ? "#" : "/login"}
-            >
-              {plan.cta}
-            </a>
-          </article>
+      <ul className="mb-10 flex grow flex-col gap-3.5">
+        {plan.features.map((feature) => (
+          <li className="flex items-start gap-3 text-[15px] leading-6 text-[#191c1d]/80" key={feature}>
+            <CheckIcon highlighted={isHighlighted} />
+            {feature}
+          </li>
         ))}
+      </ul>
+
+      <a
+        className={`mt-auto inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition-all ${
+          isHighlighted
+            ? "bg-[#005bbf] text-white hover:bg-[#004da3]"
+            : "border border-[#191c1d]/20 text-[#191c1d] hover:border-[#191c1d]/40 hover:bg-[#191c1d]/3"
+        }`}
+        href={plan.href}
+      >
+        {plan.cta}
+        <span aria-hidden="true">→</span>
+      </a>
+    </article>
+  );
+}
+
+export function PricingPlans() {
+  return (
+    <section
+      aria-labelledby="pricing-title"
+      className="bg-white px-5 py-24 md:px-16 md:py-32"
+      id="pricing"
+    >
+      <div className="mx-auto max-w-360">
+        <header className="mb-16 max-w-3xl md:mb-20">
+          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.22em] text-[#191c1d]/45">
+            Precios
+          </p>
+          <h2
+            className="text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#191c1d] md:text-5xl md:leading-[1.08]"
+            id="pricing-title"
+          >
+            Precios simples para equipos que quieren claridad desde el primer día
+          </h2>
+        </header>
+
+        <div className="grid gap-6 md:grid-cols-3 md:items-stretch md:gap-10 lg:gap-14">
+          {pricingPlans.map((plan) => (
+            <PlanCard key={plan.name} plan={plan} />
+          ))}
+        </div>
+
+        <p className="mt-12 flex items-center gap-2 text-sm text-[#191c1d]/45">
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M12 10v5M12 7h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+          </svg>
+          Todos los precios en USD. Puedes cambiar de plan en cualquier momento.
+        </p>
       </div>
     </section>
   );

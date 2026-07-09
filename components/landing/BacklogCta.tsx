@@ -1,6 +1,6 @@
 export function BacklogCta() {
   return (
-    <section aria-labelledby="backlog-cta-title" className="bg-white px-5 py-24 md:px-16 md:py-30">
+    <section aria-labelledby="backlog-cta-title" className="bg-white px-5 pt-24 pb-12 md:px-16 md:pt-30 md:pb-16">
       <div className="relative mx-auto max-w-360 overflow-hidden rounded-4xl bg-[#191c1d] px-8 py-16 text-center text-white shadow-[0_30px_90px_rgba(25,28,29,0.18)] md:px-20 md:py-24">
         <div className="relative z-10">
           <h2

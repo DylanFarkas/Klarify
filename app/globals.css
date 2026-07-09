@@ -172,6 +172,152 @@
   }
 }
 
+/* Impact metrics section */
+.impact-metrics__chart-wrap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.impact-metrics__chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.impact-metrics__grid-line {
+  stroke: rgba(255, 255, 255, 0.055);
+  stroke-width: 1;
+  stroke-dasharray: 10 12;
+  vector-effect: non-scaling-stroke;
+}
+
+.impact-metrics__grid-node {
+  fill: rgba(255, 255, 255, 0.2);
+}
+
+.impact-metrics__chart-line,
+.impact-metrics__chart-line-tail {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.impact-metrics__leader {
+  stroke: rgba(255, 255, 255, 0.32);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: all 0.7s ease;
+}
+
+.impact-metrics__leader-node {
+  fill: white;
+  opacity: 0.55;
+  transition: all 0.7s ease;
+}
+
+.impact-metrics__marker-idle-glow {
+  fill: #005bbf;
+  opacity: 0.16;
+}
+
+.impact-metrics__marker-idle-halo {
+  fill: #4f96e2;
+  opacity: 0.3;
+}
+
+.impact-metrics__marker-idle-core {
+  fill: #005bbf;
+}
+
+.impact-metrics__marker-bloom {
+  fill: #005bbf;
+  opacity: 0.22;
+}
+
+.impact-metrics__marker-halo {
+  fill: #005bbf;
+  opacity: 0.38;
+}
+
+.impact-metrics__marker-ring {
+  stroke: rgba(46, 64, 221, 0.8);
+}
+
+.impact-metrics__marker-core {
+  fill: #005bbf;
+}
+
+.impact-metrics__progress-fill {
+  width: 100%;
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .impact-metrics__progress-fill {
+    animation: impact-progress 6s linear forwards;
+  }
+}
+
+@keyframes impact-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .impact-metrics__marker-bloom,
+  .impact-metrics__marker-halo {
+    animation: impact-marker-pulse 2.6s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+
+  .impact-metrics__marker-ring {
+    animation: impact-marker-ring 2.6s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+}
+
+@keyframes impact-marker-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes impact-marker-ring {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact-metrics__marker-bloom,
+  .impact-metrics__marker-halo,
+  .impact-metrics__marker-ring {
+    animation: none;
+  }
+}
+
 @keyframes modalPopIn {
   from {
     opacity: 0;
@@ -854,6 +1000,66 @@ html[data-agent-theme="light"] .workspace-grid__star::after,
 @keyframes statusBadgePulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 40%, transparent); }
   50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+
+/* ── Landing footer  ── */
+
+.landing-footer__watermark {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -0.04em;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 58%;
+  overflow: hidden;
+  line-height: 0.78;
+}
+
+.landing-footer__watermark span {
+  display: inline-block;
+  padding-inline: 0.02em;
+  /* Móvil: más compacto */
+  font-size: clamp(5rem, 18vw, 9rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: transparent;
+  background-image:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.18) 1.15px, transparent 1.15px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  background-size: 5px 5px, 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Tablet / pantallas un poco angostas */
+@media (min-width: 640px) {
+  .landing-footer__watermark span {
+    font-size: clamp(4.5rem, 16vw, 10rem);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .landing-footer__watermark span {
+    font-size: clamp(5rem, 15vw, 11rem);
+  }
+
+  .landing-footer__watermark {
+    height: 50%;
+  }
+}
+
+/* Desktop ancho: tamaño completo */
+@media (min-width: 1024px) {
+  .landing-footer__watermark span {
+    font-size: clamp(7rem, 24vw, 22rem);
+  }
+}
+
+@media (min-width: 1280px) {
+  .landing-footer__watermark span {
+    font-size: clamp(7rem, 24vw, 25rem);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
