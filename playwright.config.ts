@@ -52,7 +52,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     // Fuerza mocks deterministas cuando Playwright arranca el servidor.
-    // Si reutilizas un `npm run dev` con GEMINI_API_KEY, el pipeline usará LLM real.
+    // Si se reutiliza un `npm run dev` con GEMINI_API_KEY, el pipeline usará LLM real.
     env: {
       ...process.env,
       GEMINI_API_KEY: '',
