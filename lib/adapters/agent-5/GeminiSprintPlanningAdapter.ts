@@ -84,7 +84,7 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
     }
 
     try {
-      console.log('[GeminiSprintPlanningAdapter] Iniciando planificación de sprints con Gemini...');
+      // console.log('[GeminiSprintPlanningAdapter] Iniciando planificación de sprints con Gemini...');
 
       const { systemInstruction, userPrompt } = this.buildPrompts(stories, config, framework);
 
@@ -99,11 +99,11 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
         throw new Error('Respuesta vacía de Gemini al planificar sprints.');
       }
 
-      console.log('[GEMINI SPRINT RESPONSE]:', responseText);
+      // console.log('[GEMINI SPRINT RESPONSE]:', responseText);
       const result = this.parseSprintPlanResponse(responseText, config, stories, framework);
-      console.log(
-        `[GeminiSprintPlanningAdapter] Planificación exitosa. Sprints: ${result.sprints.length}`
-      );
+      // console.log(
+      //   `[GeminiSprintPlanningAdapter] Planificación exitosa. Sprints: ${result.sprints.length}`
+      // );
 
       return result;
     } catch (error) {

@@ -28,7 +28,7 @@ export class OpenAIASRAdapter implements IASRAdapter {
     }
 
     try {
-      console.log(`[OpenAIASRAdapter] Iniciando transcripción de: ${file.name} (${file.size} bytes)`);
+      // console.log(`[OpenAIASRAdapter] Iniciando transcripción de: ${file.name} (${file.size} bytes)`);
 
       // Enviar el archivo a la API pidiendo verbose_json para obtener segmentos y duración
       const response = await this.openai.audio.transcriptions.create({
@@ -54,7 +54,7 @@ export class OpenAIASRAdapter implements IASRAdapter {
         })),
       };
 
-      console.log(`[OpenAIASRAdapter] Transcripción exitosa. Segmentos: ${mappedResult.segments.length}`);
+      // console.log(`[OpenAIASRAdapter] Transcripción exitosa. Segmentos: ${mappedResult.segments.length}`);
       return mappedResult;
 
     } catch (error) {

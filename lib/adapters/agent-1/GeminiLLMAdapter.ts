@@ -71,7 +71,7 @@ export class GeminiLLMAdapter implements ILLMAdapter {
     }
 
     try {
-      console.log('[GeminiLLMAdapter] Evaluando contexto...');
+      // console.log('[GeminiLLMAdapter] Evaluando contexto...');
 
       const systemInstruction = `Devuelve la respuesta estrictamente como un objeto JSON con esta forma exacta. No incluyas markdown ni texto extra.
 
@@ -123,9 +123,9 @@ ${transcription.fullText}
       const raw: RawAnalyzeResponse = JSON.parse(responseText);
       const questions = this.normalizeQuestions(raw.questions ?? []);
 
-      console.log(
-        `[GeminiLLMAdapter] Evaluación completada. Suficiente: ${raw.isSufficient}, Preguntas: ${questions.length}`
-      );
+      // console.log(
+      //   `[GeminiLLMAdapter] Evaluación completada. Suficiente: ${raw.isSufficient}, Preguntas: ${questions.length}`
+      // );
 
       return {
         isSufficient: Boolean(raw.isSufficient),
@@ -163,7 +163,7 @@ ${transcription.fullText}
     }
 
     try {
-      console.log('[GeminiLLMAdapter] Iniciando extracción de deseos con Gemini...');
+      // console.log('[GeminiLLMAdapter] Iniciando extracción de deseos con Gemini...');
 
       const contextBlock = enrichedContext?.trim()
         ? `\nCONTEXTO ENRIQUECIDO (incluye respuestas del cliente):\n"""\n${enrichedContext}\n"""`
@@ -220,7 +220,7 @@ ${contextBlock}
         }
       }
 
-      console.log(`[GeminiLLMAdapter] Extracción exitosa. Deseos encontrados: ${wishes.length}`);
+      // console.log(`[GeminiLLMAdapter] Extracción exitosa. Deseos encontrados: ${wishes.length}`);
       return wishes;
     } catch (error) {
       console.error('[GeminiLLMAdapter] Error al extraer deseos:', error);

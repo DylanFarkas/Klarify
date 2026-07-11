@@ -59,7 +59,7 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
     }
 
     try {
-      console.log('[GeminiEstimationAdapter] Iniciando análisis de estimación con Gemini...');
+      // console.log('[GeminiEstimationAdapter] Iniciando análisis de estimación con Gemini...');
 
       const { systemInstruction, userPrompt } = this.buildPrompts(epics);
 
@@ -73,9 +73,9 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
       if (!responseText) {
         throw new Error('Respuesta vacía de Gemini al estimar.');
       }
-      console.log('🔮 [GEMINI RESPONSE RAW]:', responseText);
+      // console.log('🔮 [GEMINI RESPONSE RAW]:', responseText);
       const result = this.parseEstimationResponse(responseText);
-      console.log(`[GeminiEstimationAdapter] Estimación exitosa. Historias procesadas: ${result.length}`);
+      // console.log(`[GeminiEstimationAdapter] Estimación exitosa. Historias procesadas: ${result.length}`);
       
       return result;
     } catch (error) {

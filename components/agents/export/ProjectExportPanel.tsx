@@ -30,10 +30,10 @@ const EXPORT_FORMATS: Array<{
     extension: '.md',
   },
   {
-    id: 'csv',
-    label: 'CSV',
-    description: 'Tablas organizadas para Excel o Google Sheets.',
-    extension: '.csv',
+    id: 'xlsx',
+    label: 'Excel',
+    description: 'Hojas organizadas con formato para Excel y Google Sheets.',
+    extension: '.xlsx',
   },
 ];
 
@@ -57,7 +57,7 @@ export function ProjectExportPanel({ projectName, className = '' }: ProjectExpor
     setDownloadingFormat(format);
     try {
       const payload = resolveProjectExport(workspace, projectName);
-      const result = buildProjectExport(payload, format);
+      const result = await buildProjectExport(payload, format);
       downloadProjectExport(result);
     } finally {
       setDownloadingFormat(null);

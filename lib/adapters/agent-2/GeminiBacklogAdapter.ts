@@ -64,7 +64,7 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
     }
 
     try {
-      console.log('[GeminiBacklogAdapter] Iniciando generación de backlog con Gemini...');
+      // console.log('[GeminiBacklogAdapter] Iniciando generación de backlog con Gemini...');
 
       const config = aiConfig ?? defaultAiConfig();
       const { systemInstruction, userPrompt } = this.buildPrompts(wishes, transcription, config);
@@ -82,9 +82,9 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
 
       const result = this.parseBacklogResponse(responseText);
       const storyCount = result.reduce((sum, e) => sum + e.userStories.length, 0);
-      console.log(
-        `[GeminiBacklogAdapter] Generación exitosa. Épicas: ${result.length}, Historias: ${storyCount}`
-      );
+      // console.log(
+      //   `[GeminiBacklogAdapter] Generación exitosa. Épicas: ${result.length}, Historias: ${storyCount}`
+      // );
       return result;
     } catch (error) {
       console.error('[GeminiBacklogAdapter] Error al generar backlog:', error);

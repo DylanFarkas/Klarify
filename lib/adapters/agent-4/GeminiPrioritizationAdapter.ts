@@ -69,7 +69,7 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
     }
 
     try {
-      console.log('[GeminiPrioritizationAdapter] Iniciando análisis de priorización con Gemini...');
+      // console.log('[GeminiPrioritizationAdapter] Iniciando análisis de priorización con Gemini...');
 
       const { systemInstruction, userPrompt } = this.buildPrompts(epics, framework);
 
@@ -83,11 +83,11 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
       if (!responseText) {
         throw new Error('Respuesta vacía de Gemini al priorizar.');
       }
-      console.log('📋 [GEMINI RESPONSE RAW]:', responseText);
+      // console.log('📋 [GEMINI RESPONSE RAW]:', responseText);
       const result = this.parsePrioritizationResponse(responseText, framework);
-      console.log(
-        `[GeminiPrioritizationAdapter] Priorización exitosa. Historias procesadas: ${result.length}`
-      );
+      // console.log(
+      //   `[GeminiPrioritizationAdapter] Priorización exitosa. Historias procesadas: ${result.length}`
+      // );
 
       return result;
     } catch (error) {

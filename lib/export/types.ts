@@ -1,5 +1,5 @@
 /**
- * @fileoverview Tipos para exportación de proyectos (JSON, Markdown, CSV).
+ * @fileoverview Tipos para exportación de proyectos (JSON, Markdown, Excel).
  */
 
 import type { Wish } from '@/lib/types/agent-1';
@@ -9,7 +9,7 @@ import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/a
 import type { PlannedSprint, SprintPlan, StoryDependency } from '@/lib/types/agent-5';
 import type { ExecutionState, KanbanStatus, ProjectMember } from '@/lib/types/execution';
 
-export type ProjectExportFormat = 'json' | 'markdown' | 'csv';
+export type ProjectExportFormat = 'json' | 'markdown' | 'xlsx';
 
 export interface ProjectExportStoryRow {
   storyId: string;
@@ -68,7 +68,10 @@ export interface ProjectExportPayload {
 }
 
 export interface ProjectExportResult {
-  content: string;
+  /** Present for text formats (JSON, Markdown). */
+  content?: string;
+  /** Present for binary formats (Excel). */
+  blob?: Blob;
   mimeType: string;
   extension: string;
   filename: string;
