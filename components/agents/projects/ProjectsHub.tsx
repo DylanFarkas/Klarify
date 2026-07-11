@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { ProjectSummary } from '@/lib/types/project';
 import { PLAN_LIMITS } from '@/lib/plans/definitions';
 import { getProjectEntryPath } from '@/lib/utils/project-progress';
+
+const PROJECT_NAME_MAX = 80;
 
 function formatDate(timestamp: number): string {
   return new Intl.DateTimeFormat('es', {
@@ -49,9 +51,11 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   const [activating, setActivating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSlotManager, setShowSlotManager] = useState(false);
   const [selectedActiveIds, setSelectedActiveIds] = useState<string[]>([]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const list = projects.length > 0 ? projects : initialProjects;
   const maxProjects = plan?.limits.maxProjects ?? PLAN_LIMITS.free.maxProjects;
@@ -60,6 +64,8 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   const lockedCount = projectSlots?.lockedCount ?? list.filter((p) => p.status === 'locked').length;
   const canChangeSelection = projectSlots?.canChangeSelection ?? false;
   const canCreate = list.length < maxProjects;
+  const trimmedName = newName.trim();
+  const canSubmitCreate = canCreate && trimmedName.length > 0 && !creating;
 
   const hasLockedProjects = lockedCount > 0;
 
@@ -73,6 +79,12 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
       setShowSlotManager(true);
     }
   }, [canChangeSelection]);
+
+  useEffect(() => {
+    if (canCreate && list.length === 0 && !isLoading) {
+      nameInputRef.current?.focus();
+    }
+  }, [canCreate, list.length, isLoading]);
 
   const selectionFull = selectedActiveIds.length >= maxActive;
 
@@ -134,21 +146,34 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
     [activeProjectId, router, switchProject]
   );
 
-  const handleCreate = useCallback(async () => {
-    if (!canCreate) return;
-    setCreating(true);
-    setError(null);
-    try {
-      await createProject(newName.trim() || undefined);
-      setNewName('');
-      await refreshProjects();
-      router.push('/agentes/1');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear el proyecto');
-    } finally {
-      setCreating(false);
-    }
-  }, [canCreate, createProject, newName, refreshProjects, router]);
+  const handleCreate = useCallback(
+    async (event?: FormEvent<HTMLFormElement>) => {
+      event?.preventDefault();
+      if (!canCreate || creating) return;
+
+      const name = newName.trim();
+      if (!name) {
+        setNameError('Escribe un nombre para el proyecto.');
+        nameInputRef.current?.focus();
+        return;
+      }
+
+      setCreating(true);
+      setError(null);
+      setNameError(null);
+      try {
+        // createProject ya actualiza la lista y el proyecto activo en contexto
+        await createProject(name);
+        setNewName('');
+        router.push('/agentes/1');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo crear el proyecto');
+        setCreating(false);
+        nameInputRef.current?.focus();
+      }
+    },
+    [canCreate, createProject, creating, newName, router]
+  );
 
   const handleSaveActivation = useCallback(async () => {
     if (selectedActiveIds.length === 0) {
@@ -213,6 +238,76 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
     exportProject && workspace?.pipeline.agent6Input && exportProject.status === 'active'
   );
 
+  const createSection = (
+    <section
+      className={`rounded-2xl border p-6 ${
+        list.length === 0 ? 'border-primary/30 bg-primary/5' : 'border-border bg-surface'
+      }`}
+    >
+      <h3 className="text-base font-semibold text-foreground">
+        {list.length === 0 ? 'Crea tu primer proyecto' : 'Nuevo proyecto'}
+      </h3>
+      <p className="mt-1 text-sm text-muted">
+        {list.length === 0
+          ? 'Dale un nombre y empieza el pipeline de agentes.'
+          : 'Inicia un pipeline independiente sin perder el progreso de tus otros proyectos.'}
+      </p>
+      <form
+        className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start"
+        onSubmit={(event) => void handleCreate(event)}
+        noValidate
+      >
+        <div className="min-w-0 flex-1">
+          <label htmlFor="new-project-name" className="sr-only">
+            Nombre del proyecto
+          </label>
+          <input
+            ref={nameInputRef}
+            id="new-project-name"
+            type="text"
+            value={newName}
+            onChange={(e) => {
+              setNewName(e.target.value);
+              if (nameError) setNameError(null);
+            }}
+            placeholder="Nombre del proyecto"
+            required
+            maxLength={PROJECT_NAME_MAX}
+            disabled={!canCreate || creating}
+            autoComplete="off"
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'new-project-name-error' : undefined}
+            className={`w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 ${
+              nameError ? 'border-red-300' : 'border-border'
+            }`}
+          />
+          {nameError ? (
+            <p id="new-project-name-error" className="mt-2 text-xs text-red-700">
+              {nameError}
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="submit"
+          disabled={!canSubmitCreate}
+          className="shrink-0 rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          {creating ? 'Creando...' : 'Crear proyecto'}
+        </button>
+      </form>
+      {!canCreate ? (
+        <p className="mt-3 text-xs text-muted">
+          Has alcanzado el límite de tu plan.{' '}
+          <Link href="/#pricing" className="font-medium text-primary underline-offset-2 hover:underline">
+            Mejorar plan
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-subtle">Pulsa Enter para crear.</p>
+      )}
+    </section>
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
       <header className="flex flex-col gap-2">
@@ -224,6 +319,8 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
           nuevo.
         </p>
       </header>
+
+      {list.length === 0 ? createSection : null}
 
       {list.length > 0 ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -280,40 +377,43 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-surface/80 p-5 md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Exportar a GitHub</p>
-            <p className="mt-1 text-xs text-muted">
-              {githubEnabled
-                ? isGithubConnected
-                  ? `Conectado como @${githubUsername ?? 'usuario'}. Exporta el backlog a GitHub Projects.`
-                  : 'Conecta tu cuenta para exportar épicas, historias y sprints.'
-                : 'Disponible en el plan Pro.'}
-            </p>
-            {!canExportGithub && githubEnabled ? (
-              <p className="mt-2 text-xs text-amber-600">
-                Completa la planificación de sprints en el proyecto activo para habilitar la exportación.
+      {list.length > 0 ? (
+        <section className="rounded-2xl border border-border bg-surface/80 p-5 md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Exportar a GitHub</p>
+              <p className="mt-1 text-xs text-muted">
+                {githubEnabled
+                  ? isGithubConnected
+                    ? `Conectado como @${githubUsername ?? 'usuario'}. Exporta el backlog a GitHub Projects.`
+                    : 'Conecta tu cuenta para exportar épicas, historias y sprints.'
+                  : 'Disponible en el plan Pro.'}
               </p>
+              {!canExportGithub && githubEnabled ? (
+                <p className="mt-2 text-xs text-amber-600">
+                  Completa la planificación de sprints en el proyecto activo para habilitar la
+                  exportación.
+                </p>
+              ) : null}
+            </div>
+            {githubEnabled && exportProject ? (
+              <GitHubExportButton
+                projectId={exportProject.id}
+                projectName={exportProject.name}
+                canExport={canExportGithub}
+                variant="secondary"
+              />
+            ) : !githubEnabled ? (
+              <Link
+                href="/#pricing"
+                className="shrink-0 rounded-xl border border-primary/30 bg-primary/5 px-5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+              >
+                Ver plan Pro
+              </Link>
             ) : null}
           </div>
-          {githubEnabled && exportProject ? (
-            <GitHubExportButton
-              projectId={exportProject.id}
-              projectName={exportProject.name}
-              canExport={canExportGithub}
-              variant="secondary"
-            />
-          ) : !githubEnabled ? (
-            <Link
-              href="/#pricing"
-              className="shrink-0 rounded-xl border border-primary/30 bg-primary/5 px-5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-            >
-              Ver plan Pro
-            </Link>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -405,13 +505,9 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
         </section>
       ) : null}
 
-      <section className="grid gap-4">
-        {list.length === 0 && !isLoading ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/50 px-6 py-12 text-center">
-            <p className="text-muted">Aún no tienes proyectos. Crea el primero para empezar.</p>
-          </div>
-        ) : (
-          list.map((project) => {
+      {list.length > 0 ? (
+        <section className="grid gap-4">
+          {list.map((project) => {
             const isLocked = project.status === 'locked';
             return (
               <article
@@ -494,42 +590,11 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
                 </div>
               </article>
             );
-          })
-        )}
-      </section>
+          })}
+        </section>
+      ) : null}
 
-      <section className="rounded-2xl border border-border bg-surface p-6">
-        <h3 className="text-base font-semibold text-foreground">Nuevo proyecto</h3>
-        <p className="mt-1 text-sm text-muted">
-          Inicia un pipeline independiente sin perder el progreso de tus otros proyectos.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nombre del proyecto (opcional)"
-            disabled={!canCreate || creating}
-            className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-primary"
-          />
-          <button
-            type="button"
-            onClick={() => void handleCreate()}
-            disabled={!canCreate || creating}
-            className="rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-          >
-            {creating ? 'Creando...' : 'Crear proyecto'}
-          </button>
-        </div>
-        {!canCreate ? (
-          <p className="mt-3 text-xs text-muted">
-            Has alcanzado el límite de tu plan.{' '}
-            <Link href="/#pricing" className="font-medium text-primary underline-offset-2 hover:underline">
-              Mejorar plan
-            </Link>
-          </p>
-        ) : null}
-      </section>
+      {list.length > 0 ? createSection : null}
     </div>
   );
 }

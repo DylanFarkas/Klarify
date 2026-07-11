@@ -171,11 +171,19 @@ function buildSlotsInfo(
  * Ajusta proyectos activos/bloqueados al límite del plan efectivo.
  * - Si caben todos → desbloquea automáticamente (upgrade).
  * - Si hay demasiados activos → bloquea excedentes (downgrade).
+ * Devuelve la lista final de proyectos (evita un segundo fetchAllProjects en listProjects).
  */
-export async function syncProjectSlots(uid: string): Promise<void> {
-  const plan = await resolveUserPlan(uid);
+export async function syncProjectSlots(
+  uid: string,
+  options?: {
+    plan?: Awaited<ReturnType<typeof resolveUserPlan>>;
+    projects?: ProjectSummary[];
+    preferredActiveId?: string | null;
+  }
+): Promise<ProjectSummary[]> {
+  const plan = options?.plan ?? (await resolveUserPlan(uid));
   const maxActive = plan.limits.maxProjects;
-  const projects = await fetchAllProjects(uid);
+  let projects = options?.projects ?? (await fetchAllProjects(uid));
   const total = projects.length;
   const lockedProjects = projects.filter((p) => p.status === 'locked');
   const activeProjects = projects.filter((p) => p.status === 'active');
@@ -187,17 +195,20 @@ export async function syncProjectSlots(uid: string): Promise<void> {
     }
     await batch.commit();
     await clearSlotSelectionConfirmation(uid);
-    return;
+    return fetchAllProjects(uid);
   }
 
   if (activeProjects.length <= maxActive) {
-    return;
+    return projects;
   }
 
-  const userSnapshot = await userDoc(uid).get();
-  const preferredId =
-    (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
-      ?.activeProjectId ?? null;
+  let preferredId = options?.preferredActiveId ?? null;
+  if (preferredId === null && options?.preferredActiveId === undefined) {
+    const userSnapshot = await userDoc(uid).get();
+    preferredId =
+      (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
+        ?.activeProjectId ?? null;
+  }
 
   const ranked = [...activeProjects].sort((a, b) => {
     if (a.id === preferredId) return -1;
@@ -227,6 +238,8 @@ export async function syncProjectSlots(uid: string): Promise<void> {
       );
     }
   }
+
+  return fetchAllProjects(uid);
 }
 
 export async function requireUnlockedProject(uid: string, projectId: string): Promise<void> {
@@ -243,9 +256,7 @@ export async function requireUnlockedProject(uid: string, projectId: string): Pr
  * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
  */
 export async function readActiveProjectId(uid: string): Promise<string | null> {
-  await ensureUserAccount(uid);
-
-  const userSnapshot = await userDoc(uid).get();
+  const userSnapshot = await ensureUserAccount(uid);
   const preferredId =
     (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
       ?.activeProjectId ?? null;
@@ -341,32 +352,46 @@ export async function getProjectWorkspace(
   return normalizeWorkspace(data.workspace);
 }
 
-export async function listProjects(uid: string): Promise<ProjectsListResponse> {
-  await ensureUserAccount(uid);
-  await syncProjectSlots(uid);
+export async function listProjects(uid: string): Promise<
+  ProjectsListResponse & { plan: Awaited<ReturnType<typeof resolveUserPlan>> }
+> {
+  const [userSnapshot, projects] = await Promise.all([
+    ensureUserAccount(uid),
+    fetchAllProjects(uid),
+  ]);
+  const plan = await resolveUserPlan(uid, userSnapshot);
 
-  const plan = await resolveUserPlan(uid);
-  const projects = await fetchAllProjects(uid);
-  const userSnapshot = await userDoc(uid).get();
   const prefs = userSnapshot.data()?.preferences as
     | { activeProjectId?: string; slotSelectionConfirmedForPlan?: string }
     | undefined;
-  const activeProjectId = prefs?.activeProjectId ?? null;
+  const preferredActiveId = prefs?.activeProjectId ?? null;
+
+  const syncedProjects = await syncProjectSlots(uid, {
+    plan,
+    projects,
+    preferredActiveId,
+  });
+
   const confirmedForPlan = getSlotSelectionConfirmedForPlan(prefs);
 
   return {
-    projects,
-    activeProjectId,
-    slots: buildSlotsInfo(projects, plan.limits.maxProjects, plan.id, confirmedForPlan),
+    projects: syncedProjects,
+    activeProjectId: preferredActiveId,
+    slots: buildSlotsInfo(syncedProjects, plan.limits.maxProjects, plan.id, confirmedForPlan),
+    plan,
   };
 }
 
-export async function createProject(uid: string, name?: string): Promise<ProjectSummary> {
+export async function createProject(uid: string, name: string): Promise<ProjectSummary> {
+  const projectName = name.trim();
+  if (!projectName) {
+    throw new Error('PROJECT_NAME_REQUIRED');
+  }
+
   const { projects } = await listProjects(uid);
   await assertCanCreateProject(uid, projects.length);
 
   const projectId = generateProjectId();
-  const projectName = name?.trim() || `Proyecto ${projects.length + 1}`;
 
   await projectDoc(uid, projectId).set({
     name: projectName,

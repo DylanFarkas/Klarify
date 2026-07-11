@@ -69,7 +69,7 @@ export interface UseWorkspaceResult {
   /** Recarga el workspace desde Firestore (p. ej. al entrar a un agente) */
   refreshWorkspace: (options?: { silent?: boolean }) => Promise<void>;
   refreshProjects: () => Promise<void>;
-  createProject: (name?: string) => Promise<ProjectSummary>;
+  createProject: (name: string) => Promise<ProjectSummary>;
   switchProject: (projectId: string) => Promise<void>;
   activateProjects: (projectIds: string[]) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
@@ -274,13 +274,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const bootstrapWorkspace = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Esperar ambas cargas: si solo esperamos workspace, la UI muestra
+      // "sin proyectos" mientras /api/projects sigue en vuelo.
+      await Promise.all([fetchWorkspace({ silent: true }), refreshProjects()]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, fetchWorkspace, refreshProjects]);
+
   const createProject = useCallback(
-    async (name?: string) => {
+    async (name: string) => {
       if (!user) throw new Error('No autenticado');
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error('El nombre del proyecto es obligatorio');
       const response = await authFetch('/api/projects', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: trimmed }),
       });
       if (!response.ok) {
         const err = (await response.json().catch(() => ({}))) as { error?: string };
@@ -403,9 +418,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    void fetchWorkspace();
-    void refreshProjects();
-  }, [fetchWorkspace, refreshProjects]);
+    if (!user) {
+      setWorkspace(null);
+      setProjects([]);
+      setProjectSlots(null);
+      setActiveProjectId(null);
+      setPlan(null);
+      setIsLoading(false);
+      return;
+    }
+    void bootstrapWorkspace();
+  }, [user, bootstrapWorkspace]);
 
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;

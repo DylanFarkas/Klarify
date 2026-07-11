@@ -2,7 +2,7 @@
  * @fileoverview Servicio de planes — resolución, cuotas y configuración de IA.
  */
 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { DEFAULT_PLAN_ID, getPlanLimits } from '@/lib/plans/definitions';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
@@ -68,10 +68,10 @@ function normalizeSubscription(raw: Partial<UserSubscription> | undefined): User
   };
 }
 
-export async function ensureUserAccount(uid: string): Promise<void> {
+export async function ensureUserAccount(uid: string): Promise<DocumentSnapshot> {
   const snapshot = await userDoc(uid).get();
   if (snapshot.exists && snapshot.data()?.subscription) {
-    return;
+    return snapshot;
   }
 
   await userDoc(uid).set(
@@ -81,11 +81,15 @@ export async function ensureUserAccount(uid: string): Promise<void> {
     },
     { merge: true }
   );
+
+  return userDoc(uid).get();
 }
 
-export async function resolveUserPlan(uid: string): Promise<PlanSnapshot> {
-  await ensureUserAccount(uid);
-  const snapshot = await userDoc(uid).get();
+export async function resolveUserPlan(
+  uid: string,
+  preloadedSnapshot?: DocumentSnapshot
+): Promise<PlanSnapshot> {
+  const snapshot = preloadedSnapshot ?? (await ensureUserAccount(uid));
   const data = snapshot.data();
   const subscription = normalizeSubscription(
     data?.subscription as Partial<UserSubscription> | undefined

@@ -7,15 +7,20 @@ import { useWorkspace } from '@/hooks/useWorkspace';
 export default function ProyectosPage() {
   const { projects, isLoading } = useWorkspace();
 
-  return (
-    <WorkspaceHomeShell>
-      {isLoading && projects.length === 0 ? (
+  // Mantener el loader hasta hidratar proyectos: evita el flash de "sin proyectos".
+  if (isLoading) {
+    return (
+      <WorkspaceHomeShell>
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
         </div>
-      ) : (
-        <ProjectsHub initialProjects={projects} />
-      )}
+      </WorkspaceHomeShell>
+    );
+  }
+
+  return (
+    <WorkspaceHomeShell>
+      <ProjectsHub initialProjects={projects} />
     </WorkspaceHomeShell>
   );
 }

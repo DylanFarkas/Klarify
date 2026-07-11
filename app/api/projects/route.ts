@@ -34,6 +34,10 @@ function handleError(error: unknown, fallback: string): NextResponse {
     return NextResponse.json({ error: 'Debes seleccionar al menos un proyecto' }, { status: 400 });
   }
 
+  if (message === 'PROJECT_NAME_REQUIRED') {
+    return NextResponse.json({ error: 'El nombre del proyecto es obligatorio' }, { status: 400 });
+  }
+
   if (isPlanLimitError(error)) {
     return NextResponse.json(planErrorToJson(error), { status: 403 });
   }
@@ -54,10 +58,7 @@ function planPayload(plan: Awaited<ReturnType<typeof resolveUserPlan>>) {
 export async function GET(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const [{ projects, activeProjectId, slots }, plan] = await Promise.all([
-      listProjects(uid),
-      resolveUserPlan(uid),
-    ]);
+    const { projects, activeProjectId, slots, plan } = await listProjects(uid);
 
     return NextResponse.json({
       projects,
@@ -74,7 +75,11 @@ export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
     const body = (await request.json().catch(() => ({}))) as { name?: string };
-    const project = await createProject(uid, body.name);
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name) {
+      return NextResponse.json({ error: 'El nombre del proyecto es obligatorio' }, { status: 400 });
+    }
+    const project = await createProject(uid, name);
     const plan = await resolveUserPlan(uid);
     const { slots } = await listProjects(uid);
 

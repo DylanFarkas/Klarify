@@ -8,7 +8,7 @@
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
-import { checkAndIncrementRegeneration } from '@/lib/plans/plan-service';
+import { checkAndIncrementRegeneration, resolveUserPlan, ensureUserAccount } from '@/lib/plans/plan-service';
 import type { RegenerationAgent } from '@/lib/plans/types';
 import {
   getProjectWorkspace,
@@ -16,7 +16,6 @@ import {
   readActiveProjectId,
 } from '@/lib/project-service';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
-import { resolveUserPlan } from '@/lib/plans/plan-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
@@ -533,7 +532,8 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
   const projectId = await readActiveProjectId(uid);
 
   if (!projectId) {
-    const [snapshot, plan] = await Promise.all([userDoc(uid).get(), resolveUserPlan(uid)]);
+    const snapshot = await ensureUserAccount(uid);
+    const plan = await resolveUserPlan(uid, snapshot);
     const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
     return {
       workspace: createEmptyWorkspace(),
@@ -550,11 +550,11 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     };
   }
 
-  const [snapshot, plan, workspace] = await Promise.all([
-    userDoc(uid).get(),
-    resolveUserPlan(uid),
+  const [snapshot, workspace] = await Promise.all([
+    ensureUserAccount(uid),
     getProjectWorkspace(uid, projectId),
   ]);
+  const plan = await resolveUserPlan(uid, snapshot);
   const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
 
   return {

@@ -1006,7 +1006,7 @@ function EditableStoryRow({
 					<button
 						type="button"
 						onClick={onCancel}
-						className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+						className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 					>
 						Cancelar
 					</button>
@@ -1049,7 +1049,7 @@ function EditableStoryRow({
 						}}
 						disabled={isSaveDisabled}
 						className={[
-							'rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
+							'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
 							isSaveDisabled
 								? 'cursor-not-allowed bg-disabled text-disabled-text'
 								: 'bg-primary text-white hover:bg-primary-hover',
@@ -1191,7 +1191,7 @@ function CreateStoryPanel({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+					className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 				>
 					Cancelar
 				</button>
@@ -1216,7 +1216,7 @@ function CreateStoryPanel({
 					}}
 					disabled={isSaveDisabled}
 					className={[
-						'rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
+						'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
 						isSaveDisabled
 							? 'cursor-not-allowed bg-disabled text-disabled-text'
 							: 'bg-primary text-white hover:bg-primary-hover',
