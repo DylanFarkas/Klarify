@@ -9,7 +9,7 @@ import { GitHubExportButton } from '@/components/agents/github/GitHubExportButto
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import type { ProjectSummary } from '@/lib/types/project';
 import { PLAN_LIMITS } from '@/lib/plans/definitions';
-import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import { errorMessage, notifyError, notifyPromise, notifySuccess } from '@/lib/notifications/toast';
 import { getProjectEntryPath } from '@/lib/utils/project-progress';
 
 const PROJECT_NAME_MAX = 80;
@@ -189,10 +189,14 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
     setActivating(true);
     setError(null);
     try {
-      await activateProjects(selectedActiveIds);
+      await notifyPromise(activateProjects(selectedActiveIds), {
+        loading: 'Activando proyectos…',
+        success: 'Proyectos activos actualizados',
+        error: (err) => errorMessage(err, 'No se pudieron activar los proyectos'),
+      });
       setShowSlotManager(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron activar los proyectos');
+    } catch {
+      // Toast de error ya mostrado por notifyPromise
     } finally {
       setActivating(false);
     }
@@ -503,8 +507,8 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
               type="button"
               onClick={() => void handleSaveActivation()}
               disabled={activating || selectedActiveIds.length === 0}
-              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
+              className="cursor-pointer rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            > 
               {activating ? 'Guardando...' : 'Confirmar selección'}
             </button>
             <Link

@@ -69,6 +69,34 @@ export interface GithubExportResponse {
   warnings?: string[];
 }
 
+/** Fases del proceso de exportación (para feedback en UI). */
+export type GithubExportPhase =
+  | 'preparing'
+  | 'repository'
+  | 'project'
+  | 'fields'
+  | 'labels'
+  | 'milestones'
+  | 'epics'
+  | 'stories'
+  | 'saving';
+
+export interface GithubExportProgressEvent {
+  type: 'progress';
+  phase: GithubExportPhase;
+  label: string;
+  /** Índice actual dentro de la fase (1-based cuando hay total). */
+  current?: number;
+  total?: number;
+  /** Detalle opcional (p. ej. título de la historia). */
+  detail?: string;
+}
+
+export type GithubExportStreamEvent =
+  | GithubExportProgressEvent
+  | { type: 'done'; payload: GithubExportResponse }
+  | { type: 'error'; error: string; code?: string };
+
 export interface GithubProjectSummary {
   id: string;
   number: number;

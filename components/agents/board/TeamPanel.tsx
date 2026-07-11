@@ -6,7 +6,7 @@ import type { ProjectMember } from '@/lib/types/execution';
 import { MEMBER_ROLE_LABELS, type ProjectMemberInput } from '@/lib/types/execution';
 import { memberInitials } from '@/lib/board/board-utils';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
-import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import { errorMessage, notifyPromise } from '@/lib/notifications/toast';
 import { MemberForm } from './MemberForm';
 
 interface TeamPanelProps {
@@ -113,27 +113,27 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
 
   const handleCreate = async (data: ProjectMemberInput) => {
     try {
-      await onUpsert(data);
-      setShowForm(false);
-      notifySuccess({
-        title: 'Miembro añadido',
-        description: data.displayName,
+      await notifyPromise(onUpsert(data), {
+        loading: { title: 'Añadiendo miembro…', description: data.displayName },
+        success: { title: 'Miembro añadido', description: data.displayName },
+        error: (err) => errorMessage(err, 'No se pudo añadir el miembro'),
       });
-    } catch (err) {
-      notifyError(errorMessage(err, 'No se pudo añadir el miembro'));
+      setShowForm(false);
+    } catch {
+      // Toast de error ya mostrado por notifyPromise
     }
   };
 
   const handleEdit = async (member: ProjectMember, data: ProjectMemberInput) => {
     try {
-      await onUpsert({ ...member, ...data });
-      setEditingId(null);
-      notifySuccess({
-        title: 'Miembro actualizado',
-        description: data.displayName,
+      await notifyPromise(onUpsert({ ...member, ...data }), {
+        loading: { title: 'Actualizando miembro…', description: data.displayName },
+        success: { title: 'Miembro actualizado', description: data.displayName },
+        error: (err) => errorMessage(err, 'No se pudo actualizar el miembro'),
       });
-    } catch (err) {
-      notifyError(errorMessage(err, 'No se pudo actualizar el miembro'));
+      setEditingId(null);
+    } catch {
+      // Toast de error ya mostrado por notifyPromise
     }
   };
 
@@ -147,13 +147,13 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
     if (!confirmed) return;
 
     try {
-      await onDelete(member.id);
-      notifySuccess({
-        title: 'Miembro eliminado',
-        description: member.displayName,
+      await notifyPromise(onDelete(member.id), {
+        loading: { title: 'Eliminando miembro…', description: member.displayName },
+        success: { title: 'Miembro eliminado', description: member.displayName },
+        error: (err) => errorMessage(err, 'No se pudo eliminar el miembro'),
       });
-    } catch (err) {
-      notifyError(errorMessage(err, 'No se pudo eliminar el miembro'));
+    } catch {
+      // Toast de error ya mostrado por notifyPromise
     }
   };
 

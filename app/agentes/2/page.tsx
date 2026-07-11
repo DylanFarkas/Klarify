@@ -21,7 +21,7 @@ import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
-import { notifySuccess } from '@/lib/notifications/toast';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
 const INITIAL_STATE: Agent2State = {
   input: null,
@@ -333,12 +333,20 @@ export default function Agent2Page() {
 
   const handleApprove = useCallback(async () => {
     const sourceWishIds = state.input?.wishes.map((w) => w.id) ?? [];
-    await approveAgent2({
-      epics: state.epics,
-      sourceWishIds,
-      approvedAt: Date.now(),
-    });
-    setState((prev) => ({ ...prev, status: 'approved' }));
+    try {
+      await approveAgent2({
+        epics: state.epics,
+        sourceWishIds,
+        approvedAt: Date.now(),
+      });
+      setState((prev) => ({ ...prev, status: 'approved' }));
+      notifySuccess({
+        title: 'Backlog aprobado',
+        description: 'Listo para estimar en el Agente 3.',
+      });
+    } catch (err) {
+      notifyError(errorMessage(err, 'No se pudo aprobar el backlog'));
+    }
   }, [state.epics, state.input, approveAgent2]);
 
   const isApprovable =

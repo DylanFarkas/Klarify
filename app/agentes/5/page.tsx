@@ -20,6 +20,7 @@ import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/Agen
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import type { Agent5Input, UserWorkspace } from '@/lib/types/workspace';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
 const INITIAL_STATE: Agent5State = {
   input: null,
@@ -132,11 +133,18 @@ export default function Agent5Page() {
         approvedAt: Date.now(),
       });
       setState((prev) => ({ ...prev, status: 'approved' }));
+      notifySuccess({
+        title: 'Plan de sprints consolidado',
+        description: 'Puedes revisar el resumen en el dashboard.',
+      });
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Error al consolidar plan de sprints';
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Error al consolidar plan de sprints',
+        error: message,
       }));
+      notifyError(errorMessage(error, 'Error al consolidar plan de sprints'));
     } finally {
       setIsApproving(false);
     }

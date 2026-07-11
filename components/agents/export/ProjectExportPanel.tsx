@@ -86,7 +86,7 @@ export function ProjectExportPanel({ projectName, className = '' }: ProjectExpor
               type="button"
               onClick={() => handleExport(format.id)}
               disabled={!canExport || downloadingFormat !== null}
-              className="flex flex-col items-start gap-2 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer flex flex-col items-start gap-2 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
               title={
                 canExport
                   ? `Descargar ${format.label}`

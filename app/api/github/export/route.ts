@@ -4,6 +4,7 @@ import { handleApiError } from '@/lib/api-error';
 import { exportProjectToGithub, mapGithubExportError } from '@/lib/github/export-service';
 import { getProjectGithubExport } from '@/lib/project-service';
 import type { GithubExportRepoTarget, GithubExportRequest } from '@/lib/types/github-export';
+import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
 
 function resolveRepoTarget(body: GithubExportRequest): GithubExportRepoTarget | null {
   if (body.repo?.mode) {
@@ -27,17 +28,32 @@ export async function POST(request: NextRequest) {
     }
 
     const existingExport = await getProjectGithubExport(uid, body.projectId);
+    const { stream, send, close } = createNdjsonStream();
 
-    const result = await exportProjectToGithub({
-      uid,
-      projectId: body.projectId,
-      repo,
-      destination: body.destination,
-      options: body.options,
-      existingExport,
-    });
+    void (async () => {
+      try {
+        const result = await exportProjectToGithub({
+          uid,
+          projectId: body.projectId,
+          repo,
+          destination: body.destination,
+          options: body.options,
+          existingExport,
+          onProgress: (event) => {
+            send({ type: 'progress', ...event });
+          },
+        });
 
-    return NextResponse.json(result);
+        send({ type: 'done', payload: result });
+      } catch (error) {
+        const mapped = mapGithubExportError(error);
+        send({ type: 'error', error: mapped.message, code: mapped.code });
+      } finally {
+        close();
+      }
+    })();
+
+    return ndjsonStreamResponse(stream);
   } catch (error) {
     const mapped = mapGithubExportError(error);
     if (mapped.status !== 500) {

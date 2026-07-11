@@ -19,6 +19,7 @@ import { EstimationWorkspace } from '@/components/agents/agent-3/EstimationWorks
 import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
 const INITIAL_STATE: Agent3State = {
   input: null,
@@ -115,11 +116,18 @@ export default function Agent3Page() {
         approvedAt: Date.now(),
       });
       setState((prev) => ({ ...prev, status: 'approved' }));
+      notifySuccess({
+        title: 'Estimaciones consolidadas',
+        description: 'Listo para priorizar en el Agente 4.',
+      });
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Error al consolidar estimaciones';
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Error al consolidar estimaciones',
+        error: message,
       }));
+      notifyError(errorMessage(error, 'Error al consolidar estimaciones'));
     } finally {
       setIsApproving(false);
     }

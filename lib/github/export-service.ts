@@ -46,12 +46,18 @@ import { getProjectWorkspace, saveProjectGithubExport } from '@/lib/project-serv
 import type {
   GithubExportDestination,
   GithubExportOptions,
+  GithubExportPhase,
+  GithubExportProgressEvent,
   GithubExportRecord,
   GithubExportRepoTarget,
   GithubExportResponse,
   GithubIssueMapping,
 } from '@/lib/types/github-export';
 import type { Agent6Input } from '@/lib/types/workspace';
+
+export type GithubExportProgressCallback = (
+  event: Omit<GithubExportProgressEvent, 'type'>
+) => void;
 
 const EXPORT_LABEL = 'klarify-export';
 const STORY_LABEL = 'klarify:story';
@@ -67,6 +73,15 @@ export class GithubExportError extends Error {
   }
 }
 
+function reportProgress(
+  onProgress: GithubExportProgressCallback | undefined,
+  phase: GithubExportPhase,
+  label: string,
+  extras?: { current?: number; total?: number; detail?: string }
+): void {
+  onProgress?.({ phase, label, ...extras });
+}
+
 export async function exportProjectToGithub(params: {
   uid: string;
   projectId: string;
@@ -74,8 +89,12 @@ export async function exportProjectToGithub(params: {
   destination: GithubExportDestination;
   options?: GithubExportOptions;
   existingExport?: GithubExportRecord | null;
+  onProgress?: GithubExportProgressCallback;
 }): Promise<GithubExportResponse> {
-  const { uid, projectId, repo: repoTarget, destination, options, existingExport } = params;
+  const { uid, projectId, repo: repoTarget, destination, options, existingExport, onProgress } =
+    params;
+
+  reportProgress(onProgress, 'preparing', 'Preparando exportación…');
 
   await assertGithubExportAllowed(uid);
 
@@ -96,6 +115,12 @@ export async function exportProjectToGithub(params: {
   const accessToken = integration.accessToken;
   const warnings: string[] = [];
 
+  reportProgress(
+    onProgress,
+    'repository',
+    repoTarget.mode === 'create' ? 'Creando repositorio…' : 'Verificando repositorio…'
+  );
+
   const { fullName: repoFullName, created: repoCreated, htmlUrl: repoUrl } =
     await resolveExportRepository(accessToken, integration.username, repoTarget);
 
@@ -113,6 +138,9 @@ export async function exportProjectToGithub(params: {
   const backlog = buildExportableBacklog(agent6Input);
   const createEpicIssues = options?.createEpicIssues ?? true;
   const createMilestones = options?.createMilestones ?? true;
+  const epicTotal = createEpicIssues ? backlog.epics.length : 0;
+  const storyTotal = backlog.stories.length;
+  const sprintTotal = createMilestones ? backlog.sprints.length : 0;
 
   if (repoCreated) {
     warnings.push(`Se creó el repositorio ${repoFullName}.`);
@@ -122,6 +150,12 @@ export async function exportProjectToGithub(params: {
 
   let githubProjectId: string;
   let githubProjectUrl: string;
+
+  reportProgress(
+    onProgress,
+    'project',
+    destination.mode === 'create' ? 'Creando GitHub Project…' : 'Vinculando GitHub Project…'
+  );
 
   if (destination.mode === 'create') {
     if (!destination.projectTitle?.trim()) {
@@ -143,6 +177,8 @@ export async function exportProjectToGithub(params: {
     githubProjectUrl = await getProjectUrl(accessToken, githubProjectId);
   }
 
+  reportProgress(onProgress, 'fields', 'Configurando campos del project…');
+
   let fieldIds: ProjectFieldIds;
   if (destination.mode === 'create') {
     fieldIds = await setupProjectCustomFields(
@@ -155,6 +191,7 @@ export async function exportProjectToGithub(params: {
     fieldIds = resolveProjectFieldIds(fields);
   }
 
+  reportProgress(onProgress, 'labels', 'Preparando etiquetas…');
   await ensureLabel(accessToken, owner, repo, EXPORT_LABEL, '0e8a16');
   await ensureLabel(accessToken, owner, repo, STORY_LABEL, '1d76db');
 
@@ -183,8 +220,16 @@ export async function exportProjectToGithub(params: {
 
   if (createMilestones) {
     const existingMilestones = await listMilestones(accessToken, owner, repo);
+    let sprintIndex = 0;
     for (const sprint of backlog.sprints) {
+      sprintIndex += 1;
       const title = buildSprintMilestoneTitle(sprint);
+      reportProgress(onProgress, 'milestones', 'Creando milestones de sprint…', {
+        current: sprintIndex,
+        total: sprintTotal,
+        detail: title,
+      });
+
       const prior = milestoneMappings[sprint.id];
       const found = existingMilestones.find((m) => m.number === prior?.number || m.title === title);
 
@@ -205,7 +250,15 @@ export async function exportProjectToGithub(params: {
   }
 
   if (createEpicIssues) {
+    let epicIndex = 0;
     for (const epic of backlog.epics) {
+      epicIndex += 1;
+      reportProgress(onProgress, 'epics', 'Exportando épicas…', {
+        current: epicIndex,
+        total: epicTotal,
+        detail: epic.title,
+      });
+
       const epicLabel = `${EPIC_LABEL_PREFIX}${epic.id}`;
       await ensureLabel(accessToken, owner, repo, epicLabel, '5319e7');
 
@@ -244,8 +297,16 @@ export async function exportProjectToGithub(params: {
     }
   }
 
+  let storyIndex = 0;
   for (const exportable of backlog.stories) {
     const { story, epic, sprint } = exportable;
+    storyIndex += 1;
+    reportProgress(onProgress, 'stories', 'Exportando historias…', {
+      current: storyIndex,
+      total: storyTotal,
+      detail: `${story.id}: ${story.title}`,
+    });
+
     const storyLabel = `klarify:${story.id}`;
     await ensureLabel(accessToken, owner, repo, storyLabel, 'fbca04');
 
@@ -301,6 +362,8 @@ export async function exportProjectToGithub(params: {
 
     await delay(75);
   }
+
+  reportProgress(onProgress, 'saving', 'Guardando registro de exportación…');
 
   const exportRecord: GithubExportRecord = {
     repoFullName,

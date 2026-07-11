@@ -1,13 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { authFetch } from '@/lib/api-client';
+import { buildExportableBacklog } from '@/lib/github/export-mapper';
+import {
+  consumeGithubExportStream,
+  EXPORT_PHASE_LABELS,
+  phaseStatus,
+  toProgressState,
+  type ExportProgressState,
+} from '@/lib/github/export-progress';
 import { slugifyRepoName } from '@/lib/github/repo-utils';
-import type { GithubExportResponse, GithubProjectSummary } from '@/lib/types/github-export';
+import type {
+  GithubExportPhase,
+  GithubExportResponse,
+  GithubProjectSummary,
+} from '@/lib/types/github-export';
 import { lockPageScroll } from '@/lib/utils/scroll-lock';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
+import { notifyAction } from '@/lib/notifications/toast';
 
 interface GithubRepo {
   id: number;
@@ -27,6 +41,16 @@ interface GitHubExportModalProps {
   canExport: boolean;
 }
 
+const VISIBLE_PHASES: GithubExportPhase[] = [
+  'repository',
+  'project',
+  'fields',
+  'milestones',
+  'epics',
+  'stories',
+  'saving',
+];
+
 export function GitHubExportModal({
   open,
   onClose,
@@ -35,6 +59,7 @@ export function GitHubExportModal({
   canExport,
 }: GitHubExportModalProps) {
   const { user, isGithubConnected, githubUsername, linkGithub } = useAuth();
+  const { workspace } = useWorkspace();
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<WizardStep>('connection');
   const [repos, setRepos] = useState<GithubRepo[]>([]);
@@ -51,9 +76,21 @@ export function GitHubExportModal({
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [linking, setLinking] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState<ExportProgressState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scopeError, setScopeError] = useState(false);
   const [result, setResult] = useState<GithubExportResponse | null>(null);
+
+  const exportCounts = useMemo(() => {
+    const agent6 = workspace?.pipeline.agent6Input;
+    if (!agent6) return null;
+    const backlog = buildExportableBacklog(agent6);
+    return {
+      epics: backlog.epics.length,
+      stories: backlog.stories.length,
+      sprints: backlog.sprints.length,
+    };
+  }, [workspace]);
 
   useEffect(() => {
     setMounted(true);
@@ -66,6 +103,7 @@ export function GitHubExportModal({
       setScopeError(false);
       setResult(null);
       setExporting(false);
+      setProgress(null);
       setRepoMode('existing');
       setSelectedRepo('');
       setNewRepoName(slugifyRepoName(projectName));
@@ -176,6 +214,11 @@ export function GitHubExportModal({
 
     setExporting(true);
     setError(null);
+    setProgress({
+      phase: 'preparing',
+      label: 'Preparando exportación…',
+      percent: 2,
+    });
 
     try {
       const response = await authFetch('/api/github/export', user, {
@@ -200,21 +243,43 @@ export function GitHubExportModal({
         }),
       });
 
-      const data = (await response.json()) as GithubExportResponse & {
-        error?: string;
-        code?: string;
-      };
-
       if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
         if (data.code === 'GITHUB_SCOPE_REQUIRED') {
           setScopeError(true);
         }
         throw new Error(data.error ?? 'Error al exportar');
       }
 
+      const data = await consumeGithubExportStream(response, (event) => {
+        setProgress(toProgressState(event));
+      });
+
+      setProgress((prev) => (prev ? { ...prev, percent: 100, label: 'Exportación completada' } : prev));
       setResult(data);
+      notifyAction({
+        title: 'Exportación completada',
+        description: data.repoFullName,
+        button: {
+          title: 'Abrir en GitHub',
+          onClick: () => {
+            window.open(data.repoUrl, '_blank', 'noopener,noreferrer');
+          },
+        },
+      });
     } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code?: string }).code)
+          : undefined;
+      if (code === 'GITHUB_SCOPE_REQUIRED') {
+        setScopeError(true);
+      }
       setError(err instanceof Error ? err.message : 'Error al exportar');
+      setProgress(null);
     } finally {
       setExporting(false);
     }
@@ -234,11 +299,6 @@ export function GitHubExportModal({
   }, [open, exporting, onClose]);
 
   if (!open || !mounted) return null;
-
-  const storyCount =
-    canExport && step === 'confirm'
-      ? 'El backlog consolidado se exportará completo.'
-      : null;
 
   return createPortal(
     <div className="fixed inset-0 z-100 flex items-end justify-center p-0 sm:items-center sm:p-4">
@@ -525,32 +585,45 @@ export function GitHubExportModal({
 
               {step === 'confirm' && (
                 <div className="space-y-4">
-                  <p className="text-sm text-muted">
-                    Se exportará el backlog completo de <strong>{projectName}</strong> a{' '}
-                    <strong>{targetRepoFullName}</strong>
-                    {repoMode === 'create' ? ' (repositorio nuevo)' : ''}.
-                  </p>
-                  <ul className="space-y-2 rounded-xl border border-border bg-elevated px-4 py-3 text-sm text-foreground">
-                    {repoMode === 'create' ? <li>Repositorio nuevo con README inicial</li> : null}
-                    <li>Épicas como issues con etiqueta dedicada</li>
-                    <li>Historias con criterios de aceptación en el body</li>
-                    <li>Story points, prioridad y sprint en campos del project</li>
-                    <li>Milestones por sprint en el repositorio</li>
-                  </ul>
-                  {storyCount ? <p className="text-xs text-muted">{storyCount}</p> : null}
-                  {exporting ? (
-                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <Spinner />
-                        <p className="text-sm font-medium text-foreground">
-                          Exportando… esto puede tardar unos segundos.
+                  {!exporting ? (
+                    <>
+                      <p className="text-sm text-muted">
+                        Se exportará el backlog completo de <strong>{projectName}</strong> a{' '}
+                        <strong>{targetRepoFullName}</strong>
+                        {repoMode === 'create' ? ' (repositorio nuevo)' : ''}.
+                      </p>
+
+                      {exportCounts ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          <StatChip label="Épicas" value={exportCounts.epics} />
+                          <StatChip label="Historias" value={exportCounts.stories} />
+                          <StatChip label="Sprints" value={exportCounts.sprints} />
+                        </div>
+                      ) : null}
+
+                      <ul className="space-y-2 rounded-xl border border-border bg-elevated px-4 py-3 text-sm text-foreground">
+                        {repoMode === 'create' ? <li>Repositorio nuevo con README inicial</li> : null}
+                        <li>Épicas como issues con etiqueta dedicada</li>
+                        <li>Historias con criterios de aceptación en el body</li>
+                        <li>Story points, prioridad y sprint en campos del project</li>
+                        <li>Milestones por sprint en el repositorio</li>
+                      </ul>
+
+                      {exportCounts && exportCounts.stories > 15 ? (
+                        <p className="text-xs text-muted">
+                          Con {exportCounts.stories} historias la exportación puede tardar uno o
+                          dos minutos. Verás el avance paso a paso.
                         </p>
-                      </div>
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
-                        <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
-                      </div>
-                    </div>
-                  ) : null}
+                      ) : (
+                        <p className="text-xs text-muted">
+                          El proceso muestra el avance en tiempo real mientras crea issues en
+                          GitHub.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <ExportProgressPanel progress={progress} />
+                  )}
                 </div>
               )}
             </>
@@ -599,7 +672,9 @@ export function GitHubExportModal({
               className="cursor-pointer ml-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {exporting
-                ? 'Exportando…'
+                ? progress?.current != null && progress.total != null
+                  ? `${progress.current}/${progress.total}`
+                  : `${progress?.percent ?? 0}%`
                 : step === 'confirm'
                   ? 'Exportar ahora'
                   : 'Continuar'}
@@ -669,6 +744,128 @@ function ExportSuccess({
       </button>
     </div>
   );
+}
+
+function StatChip({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-elevated px-3 py-2.5 text-center">
+      <p className="text-lg font-bold tabular-nums text-foreground">{value}</p>
+      <p className="text-[11px] text-muted">{label}</p>
+    </div>
+  );
+}
+
+function ExportProgressPanel({ progress }: { progress: ExportProgressState | null }) {
+  const rawPhase = progress?.phase ?? 'preparing';
+  const activePhase =
+    rawPhase === 'preparing' ? 'repository' : rawPhase === 'labels' ? 'fields' : rawPhase;
+  const percent = progress?.percent ?? 2;
+
+  return (
+    <div className="space-y-4" aria-live="polite" aria-busy="true">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4">
+        <div className="flex items-start gap-3">
+          <Spinner />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              {progress?.label ?? 'Exportando…'}
+            </p>
+            {progress?.detail ? (
+              <p className="mt-1 truncate text-xs text-muted" title={progress.detail}>
+                {progress.detail}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-muted">
+                No cierres esta ventana. Con muchos issues puede tardar un poco.
+              </p>
+            )}
+          </div>
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+            {percent}%
+          </span>
+        </div>
+
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-border">
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+
+        {progress?.current != null && progress.total != null ? (
+          <p className="mt-2 text-xs tabular-nums text-muted">
+            {progress.current} de {progress.total}
+            {rawPhase === 'stories'
+              ? ' historias'
+              : rawPhase === 'epics'
+                ? ' épicas'
+                : rawPhase === 'milestones'
+                  ? ' milestones'
+                  : ''}
+          </p>
+        ) : null}
+      </div>
+
+      <ul className="space-y-1.5">
+        {VISIBLE_PHASES.map((phase) => {
+          const status = phaseStatus(phase, activePhase);
+          const isCountable =
+            (phase === 'milestones' || phase === 'epics' || phase === 'stories') &&
+            progress?.phase === phase &&
+            progress.current != null &&
+            progress.total != null;
+
+          return (
+            <li
+              key={phase}
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm ${
+                status === 'active'
+                  ? 'bg-primary/5 text-foreground'
+                  : status === 'done'
+                    ? 'text-muted'
+                    : 'text-subtle'
+              }`}
+            >
+              <PhaseIcon status={status} />
+              <span className="flex-1 font-medium">
+                {phase === 'fields' ? 'Campos y etiquetas' : EXPORT_PHASE_LABELS[phase]}
+              </span>
+              {isCountable ? (
+                <span className="text-xs tabular-nums text-muted">
+                  {progress.current}/{progress.total}
+                </span>
+              ) : null}
+              {status === 'done' ? (
+                <span className="text-[11px] text-emerald-600">Listo</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function PhaseIcon({ status }: { status: 'pending' | 'active' | 'done' }) {
+  if (status === 'done') {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (status === 'active') {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center">
+        <Spinner />
+      </span>
+    );
+  }
+
+  return <span className="h-5 w-5 rounded-full border border-border" aria-hidden="true" />;
 }
 
 function Spinner() {

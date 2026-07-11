@@ -26,6 +26,7 @@ import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import { getFrameworkLabels } from '@/lib/constants/agent-4';
 import type { Agent4Input, UserWorkspace } from '@/lib/types/workspace';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
 const INITIAL_STATE: Agent4State = {
   input: null,
@@ -166,14 +167,20 @@ export default function Agent4Page() {
         approvedAt: Date.now(),
       });
       setState((prev) => ({ ...prev, status: 'approved' }));
+      notifySuccess({
+        title: 'Priorización consolidada',
+        description: 'Listo para planificar sprints en el Agente 5.',
+      });
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error al consolidar priorizaciones';
       setState((prev) => ({
         ...prev,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Error al consolidar priorizaciones',
+        error: message,
       }));
+      notifyError(errorMessage(error, 'Error al consolidar priorizaciones'));
     } finally {
       setIsApproving(false);
     }
