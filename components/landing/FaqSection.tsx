@@ -138,7 +138,7 @@ export function FaqSection() {
             FAQ
           </p>
           <h2
-            className="text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-[#191c1d] md:text-5xl md:leading-[1.08]"
+            className="text-3xl font-light leading-[1.12] tracking-[-0.03em] text-[#191c1d] md:text-5xl md:leading-[1.08]"
             id="faq-title"
           >
             Preguntas frecuentes

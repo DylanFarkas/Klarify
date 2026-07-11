@@ -71,6 +71,9 @@ export function Navbar() {
                     <a className="text-sm font-medium text-[#5d616b] transition-colors hover:text-[#005bbf]" href="#">
                         Precios
                     </a>
+                    <Link className="text-sm font-medium text-[#5d616b] transition-colors hover:text-[#005bbf]" href="/manual">
+                        Manual
+                    </Link>
                     <a className="text-sm font-medium text-[#5d616b] transition-colors hover:text-[#005bbf]" href="#">
                         Recursos
                     </a>

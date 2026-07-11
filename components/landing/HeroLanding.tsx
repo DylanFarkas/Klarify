@@ -85,7 +85,7 @@ export function HeroLanding() {
             </div>
           </div>
 
-          <h1 className="relative z-10 mx-auto mb-8 min-h-42 max-w-7xl text-4xl leading-tight tracking-[-0.04em] text-[#191c1d] md:min-h-54 md:text-6xl md:leading-[1.12] lg:text-8xl">
+          <h1 className="relative z-10 mx-auto mb-8 min-h-42 max-w-7xl text-4xl leading-tight tracking-[-0.04em] text-[#191c1d] md:min-h-54 md:text-6xl md:leading-[1.12] lg:text-8xl font-light">
             {titleParts.start}
             <span className="italic text-[#005bbf]">{titleParts.highlight}</span>
             {titleParts.end}
