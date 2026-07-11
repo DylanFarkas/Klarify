@@ -37,6 +37,7 @@ import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThi
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { notifySuccess } from '@/lib/notifications/toast';
 
 // ---------------------------------------------------------------------------
 // Utilidades locales
@@ -393,6 +394,7 @@ export default function Agent1Page() {
         w.id === id ? { ...w, text: newText, isEdited: true } : w
       ),
     }));
+    notifySuccess('Deseo actualizado');
   }, []);
 
   const handleDeleteWish = useCallback((id: string) => {
@@ -400,6 +402,7 @@ export default function Agent1Page() {
       ...prev,
       wishes: prev.wishes.filter((w) => w.id !== id),
     }));
+    notifySuccess('Deseo eliminado');
   }, []);
 
   const handleAddWish = useCallback((text: string) => {
@@ -413,6 +416,7 @@ export default function Agent1Page() {
       };
       return { ...prev, wishes: [...prev.wishes, newWish] };
     });
+    notifySuccess('Deseo creado');
   }, []);
 
   // ── Handler: Aprobar deseos ───────────────────────────────────

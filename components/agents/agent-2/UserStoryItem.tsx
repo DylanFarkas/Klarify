@@ -17,6 +17,7 @@ import { AcceptanceCriteriaEditor } from './AcceptanceCriteriaEditor';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 
 interface UserStoryItemProps {
   /** La Historia de Usuario a renderizar */
@@ -32,6 +33,7 @@ interface UserStoryItemProps {
 }
 
 export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: UserStoryItemProps) {
+  const confirm = useConfirm();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(story.title);
   const [editDescription, setEditDescription] = useState(story.description);
@@ -77,7 +79,15 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
     setIsEditing(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: `¿Eliminar ${story.id}?`,
+      description: `"${story.title}" se eliminará del backlog. Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
     setIsDeleting(true);
     setTimeout(() => onDelete(story.id), 200);
   };
@@ -241,7 +251,7 @@ export function UserStoryItem({ story, onEdit, onDelete, isApproved, index }: Us
                 Editar
               </button>
               <button
-                onClick={handleDelete}
+                onClick={() => void handleDelete()}
                 className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">

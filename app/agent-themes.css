@@ -1,5 +1,16 @@
 /* Tokens semánticos del workspace de agentes — heredados por html y .agent-workspace */
 
+/* Acentos de estado de Sileo — heredan tokens del tema activo */
+html[data-agent-theme],
+.agent-workspace {
+  --sileo-state-success: var(--success);
+  --sileo-state-error: var(--danger);
+  --sileo-state-info: var(--primary);
+  --sileo-state-action: var(--primary);
+  --sileo-state-warning: #f59e0b;
+  --sileo-state-loading: var(--foreground-muted);
+}
+
 html[data-agent-theme="light"],
 .agent-workspace[data-theme="light"] {
   --grid-size: 52px;

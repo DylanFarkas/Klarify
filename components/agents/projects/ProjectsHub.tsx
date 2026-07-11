@@ -6,8 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import type { ProjectSummary } from '@/lib/types/project';
 import { PLAN_LIMITS } from '@/lib/plans/definitions';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 import { getProjectEntryPath } from '@/lib/utils/project-progress';
 
 const PROJECT_NAME_MAX = 80;
@@ -32,6 +34,7 @@ interface ProjectsHubProps {
 
 export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const { isGithubConnected, githubUsername } = useAuth();
   const {
     plan,
@@ -165,9 +168,12 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
         // createProject ya actualiza la lista y el proyecto activo en contexto
         await createProject(name);
         setNewName('');
+        notifySuccess({ title: 'Proyecto creado', description: name });
         router.push('/agentes/1');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo crear el proyecto');
+        const message = errorMessage(err, 'No se pudo crear el proyecto');
+        setError(message);
+        notifyError(message);
         setCreating(false);
         nameInputRef.current?.focus();
       }
@@ -194,9 +200,12 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
 
   const handleDelete = useCallback(
     async (project: ProjectSummary) => {
-      const confirmed = window.confirm(
-        `¿Eliminar "${project.name}"? Se borrará todo el progreso del pipeline y no se puede deshacer.`
-      );
+      const confirmed = await confirm({
+        title: `¿Eliminar "${project.name}"?`,
+        description: 'Se borrará todo el progreso del pipeline y no se puede deshacer.',
+        confirmLabel: 'Eliminar',
+        variant: 'danger',
+      });
       if (!confirmed) return;
 
       setDeletingId(project.id);
@@ -204,13 +213,16 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
       try {
         await deleteProject(project.id);
         await refreshProjects();
+        notifySuccess({ title: 'Proyecto eliminado', description: project.name });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo eliminar el proyecto');
+        const message = errorMessage(err, 'No se pudo eliminar el proyecto');
+        setError(message);
+        notifyError(message);
       } finally {
         setDeletingId(null);
       }
     },
-    [deleteProject, refreshProjects]
+    [confirm, deleteProject, refreshProjects]
   );
 
   const slotManagerHint = useMemo(() => {

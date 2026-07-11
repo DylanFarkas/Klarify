@@ -23,6 +23,8 @@ import { SprintPlanningConfigPanel } from './SprintPlanningConfigPanel';
 import { SprintBoard } from './SprintBoard';
 import { SprintTimeline } from './SprintTimeline';
 import { EmptySprintPlanningStartState } from './EmptySprintPlanningStartState';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
+import { notifySuccess } from '@/lib/notifications/toast';
 
 interface SprintPlanningWorkspaceProps {
   input: Agent5Input;
@@ -47,6 +49,7 @@ export function SprintPlanningWorkspace({
   isApproving,
   onError,
 }: SprintPlanningWorkspaceProps) {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { canRegenerate } = useWorkspace();
   const { entries, reset, consumeStream } = useAgentActivity();
@@ -152,14 +155,21 @@ export function SprintPlanningWorkspace({
   }, [plan, onPlanChange]);
 
   const handleDeleteSprint = useCallback(
-    (sprintIndex: number) => {
+    async (sprintIndex: number) => {
       if (!plan) return;
       const nextPlan = deleteEmptySprintAtIndex(plan, sprintIndex);
       if (!nextPlan) return;
-      if (!window.confirm('¿Eliminar este sprint vacío?')) return;
+      const confirmed = await confirm({
+        title: '¿Eliminar este sprint vacío?',
+        description: 'El sprint se quitará del plan. Esta acción no se puede deshacer.',
+        confirmLabel: 'Eliminar',
+        variant: 'danger',
+      });
+      if (!confirmed) return;
       onPlanChange(nextPlan);
+      notifySuccess('Sprint eliminado');
     },
-    [plan, onPlanChange]
+    [plan, onPlanChange, confirm]
   );
 
   const isApprovable = hasPlan && plan.sprints.every((s) => s.sprintGoal.trim().length > 0);

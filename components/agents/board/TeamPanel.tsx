@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import type { ProjectMember } from '@/lib/types/execution';
 import { MEMBER_ROLE_LABELS, type ProjectMemberInput } from '@/lib/types/execution';
 import { memberInitials } from '@/lib/board/board-utils';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 import { MemberForm } from './MemberForm';
 
 interface TeamPanelProps {
@@ -37,6 +39,7 @@ function computePopoverPosition(rect: DOMRect) {
 }
 
 export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanelProps) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, maxHeight: 480 });
@@ -108,6 +111,52 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
     }
   };
 
+  const handleCreate = async (data: ProjectMemberInput) => {
+    try {
+      await onUpsert(data);
+      setShowForm(false);
+      notifySuccess({
+        title: 'Miembro añadido',
+        description: data.displayName,
+      });
+    } catch (err) {
+      notifyError(errorMessage(err, 'No se pudo añadir el miembro'));
+    }
+  };
+
+  const handleEdit = async (member: ProjectMember, data: ProjectMemberInput) => {
+    try {
+      await onUpsert({ ...member, ...data });
+      setEditingId(null);
+      notifySuccess({
+        title: 'Miembro actualizado',
+        description: data.displayName,
+      });
+    } catch (err) {
+      notifyError(errorMessage(err, 'No se pudo actualizar el miembro'));
+    }
+  };
+
+  const handleDelete = async (member: ProjectMember) => {
+    const confirmed = await confirm({
+      title: `¿Eliminar a ${member.displayName}?`,
+      description: 'Se quitará del equipo y dejará de estar asignado a historias.',
+      confirmLabel: 'Eliminar',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      await onDelete(member.id);
+      notifySuccess({
+        title: 'Miembro eliminado',
+        description: member.displayName,
+      });
+    } catch (err) {
+      notifyError(errorMessage(err, 'No se pudo eliminar el miembro'));
+    }
+  };
+
   const popover =
     open && mounted
       ? createPortal(
@@ -145,10 +194,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                         key={member.id}
                         initial={member}
                         compact
-                        onSubmit={async (data) => {
-                          await onUpsert({ ...member, ...data });
-                          setEditingId(null);
-                        }}
+                        onSubmit={(data) => handleEdit(member, data)}
                         onCancel={() => setEditingId(null)}
                       />
                     ) : (
@@ -173,7 +219,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                               setShowForm(false);
                               setEditingId(member.id);
                             }}
-                            className="rounded-md p-1 text-subtle hover:bg-background hover:text-foreground"
+                            className="cursor-pointer rounded-md p-1 text-subtle hover:bg-background hover:text-foreground"
                             aria-label={`Editar ${member.displayName}`}
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -182,8 +228,8 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDelete(member.id)}
-                            className="rounded-md p-1 text-subtle hover:bg-danger/10 hover:text-danger"
+                            onClick={() => void handleDelete(member)}
+                            className="cursor-pointer rounded-md p-1 text-subtle hover:bg-danger/10 hover:text-danger"
                             aria-label={`Eliminar ${member.displayName}`}
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -201,10 +247,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                 <div className="mt-2">
                   <MemberForm
                     compact
-                    onSubmit={async (data) => {
-                      await onUpsert(data);
-                      setShowForm(false);
-                    }}
+                    onSubmit={handleCreate}
                     onCancel={() => setShowForm(false)}
                   />
                 </div>

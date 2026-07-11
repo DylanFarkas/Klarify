@@ -20,6 +20,8 @@ import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrat
 import type { Agent2GenerateResponse } from '@/lib/types/agent-2';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
+import { notifySuccess } from '@/lib/notifications/toast';
 
 const INITIAL_STATE: Agent2State = {
   input: null,
@@ -106,6 +108,7 @@ function mergeStories(oldStories: UserStory[], newStories: UserStory[]): UserSto
 export default function Agent2Page() {
   const router = useRouter();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const { workspace, isLoading, sessionVersion, saveAgent2, approveAgent2, canRegenerate } = useWorkspace();
   const [state, setState] = useState<Agent2State>(INITIAL_STATE);
   const { entries, reset, consumeStream } = useAgentActivity();
@@ -197,9 +200,13 @@ export default function Agent2Page() {
   const handleRegenerate = useCallback(async () => {
     if (!state.input || !user) return;
 
-    const confirmed = window.confirm(
-      'Se generará un nuevo backlog. Los cambios manuales y las historias que hayas editado se conservarán.'
-    );
+    const confirmed = await confirm({
+      title: '¿Regenerar el backlog?',
+      description:
+        'Se generará un nuevo backlog. Los cambios manuales y las historias que hayas editado se conservarán.',
+      confirmLabel: 'Regenerar',
+      variant: 'primary',
+    });
     if (!confirmed) return;
 
     setState((prev) => ({ ...prev, status: 'generating', error: null }));
@@ -226,6 +233,7 @@ export default function Agent2Page() {
         epics: mergedEpics,
         status: 'review',
       }));
+      notifySuccess('Backlog regenerado');
     } catch (error) {
       setState((prev) => ({
         ...prev,
@@ -233,7 +241,7 @@ export default function Agent2Page() {
         error: error instanceof Error ? error.message : 'Error desconocido al regenerar.',
       }));
     }
-  }, [state.input, state.epics, user, reset, consumeStream]);
+  }, [state.input, state.epics, user, reset, consumeStream, confirm]);
 
   const handleEditEpic = useCallback((id: string, updates: Partial<Epic>) => {
     setState((prev) => ({
@@ -242,6 +250,7 @@ export default function Agent2Page() {
         epic.id === id ? { ...epic, ...updates, isEdited: true } : epic
       ),
     }));
+    notifySuccess('Épica actualizada');
   }, []);
 
   const handleEditStory = useCallback((id: string, updates: Partial<UserStory>) => {
@@ -254,6 +263,9 @@ export default function Agent2Page() {
         ),
       })),
     }));
+    const onlyCriteria =
+      Object.keys(updates).length === 1 && updates.acceptanceCriteria !== undefined;
+    notifySuccess(onlyCriteria ? 'Criterios de aceptación actualizados' : 'HU actualizada');
   }, []);
 
   const handleDeleteEpic = useCallback((id: string) => {
@@ -261,6 +273,7 @@ export default function Agent2Page() {
       ...prev,
       epics: prev.epics.filter((epic) => epic.id !== id),
     }));
+    notifySuccess('Épica eliminada');
   }, []);
 
   const handleDeleteStory = useCallback((id: string) => {
@@ -271,6 +284,7 @@ export default function Agent2Page() {
         userStories: epic.userStories.filter((story) => story.id !== id),
       })),
     }));
+    notifySuccess(`${id} eliminada`);
   }, []);
 
   const handleAddEpic = useCallback(
@@ -286,6 +300,7 @@ export default function Agent2Page() {
         };
         return { ...prev, epics: [...prev.epics, newEpic] };
       });
+      notifySuccess('Épica creada');
     },
     []
   );
@@ -311,6 +326,7 @@ export default function Agent2Page() {
           ),
         };
       });
+      notifySuccess('HU creada');
     },
     []
   );

@@ -114,7 +114,7 @@ export function DetailModal({
               type="button"
               onClick={handleClose}
               className={[
-                'absolute right-3 top-3 rounded-lg p-2 text-muted',
+                'cursor-pointer absolute right-3 top-3 rounded-lg p-2 text-muted',
                 'transition-colors hover:bg-surface-hover hover:text-foreground',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
               ].join(' ')}

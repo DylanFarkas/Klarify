@@ -44,6 +44,8 @@ import {
 } from '@/lib/utils/sprint-plan-mutations';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
 import { ExecutionStatusBadge } from './ExecutionStatusBadge';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
+import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
 const ALLOWED_STORY_POINTS = FIBONACCI_SCALE;
 
@@ -102,6 +104,7 @@ export function DashboardSprintStoriesTable({
 	isCreating: controlledCreating,
 	onCreatingChange,
 }: DashboardSprintStoriesTableProps) {
+	const confirm = useConfirm();
 	const [detailRow, setDetailRow] = useState<DashboardSprintStoryRow | null>(null);
 	const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
 	const [internalCreating, setInternalCreating] = useState(false);
@@ -149,6 +152,53 @@ export function DashboardSprintStoriesTable({
 		[onUpdateSprintPlan]
 	);
 
+	const handleCreateStory = useCallback(
+		async (input: CreateDashboardUserStoryInput) => {
+			try {
+				await onCreateStory(input);
+				notifySuccess('HU creada');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo crear la HU'));
+				throw err;
+			}
+		},
+		[onCreateStory]
+	);
+
+	const handleEditStory = useCallback(
+		async (
+			storyId: string,
+			updates: Partial<UserStory>,
+			estimationUpdates?: Partial<StoryEstimation>,
+			options?: UpdateDashboardUserStoryOptions,
+			prioritizationUpdates?: Partial<StoryPrioritization>
+		) => {
+			try {
+				await onEditStory(storyId, updates, estimationUpdates, options, prioritizationUpdates);
+				const onlyCriteria =
+					Object.keys(updates).length === 1 && updates.acceptanceCriteria !== undefined;
+				notifySuccess(onlyCriteria ? 'Criterios de aceptación actualizados' : 'HU actualizada');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo guardar la HU'));
+				throw err;
+			}
+		},
+		[onEditStory]
+	);
+
+	const handleDeleteStory = useCallback(
+		async (storyId: string) => {
+			try {
+				await onDeleteStory(storyId);
+				notifySuccess(`${storyId} eliminada`);
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo eliminar la HU'));
+				throw err;
+			}
+		},
+		[onDeleteStory]
+	);
+
 	const handleMoveStory = useCallback(
 		(storyId: string, fromSprintId: string | null, toSprintId: string | null) => {
 			const current = planRef.current;
@@ -166,15 +216,22 @@ export function DashboardSprintStoriesTable({
 	}, [persistPlan]);
 
 	const handleDeleteSprint = useCallback(
-		(sprintIndex: number) => {
+		async (sprintIndex: number) => {
 			const current = planRef.current;
 			if (!current) return;
 			const nextPlan = deleteEmptySprintAtIndex(current, sprintIndex);
 			if (!nextPlan) return;
-			if (!window.confirm('¿Eliminar este sprint vacío?')) return;
+			const confirmed = await confirm({
+				title: '¿Eliminar este sprint vacío?',
+				description: 'El sprint se quitará del plan. Esta acción no se puede deshacer.',
+				confirmLabel: 'Eliminar',
+				variant: 'danger',
+			});
+			if (!confirmed) return;
 			persistPlan(nextPlan);
+			notifySuccess('Sprint eliminado');
 		},
-		[persistPlan]
+		[confirm, persistPlan]
 	);
 
 	const handleGoalChange = useCallback(
@@ -236,7 +293,7 @@ export function DashboardSprintStoriesTable({
 			sprintOptions={sprintOptions}
 			onCancel={() => setIsCreating(false)}
 			onCreate={async (input) => {
-				await onCreateStory(input);
+				await handleCreateStory(input);
 				setIsCreating(false);
 			}}
 		/>
@@ -317,8 +374,8 @@ export function DashboardSprintStoriesTable({
 							canManagePlan={canManagePlan}
 							capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
 							onCancelEdit={() => setEditingStoryId(null)}
-							onDeleteStory={onDeleteStory}
-							onEditStory={onEditStory}
+							onDeleteStory={handleDeleteStory}
+							onEditStory={handleEditStory}
 							onOpenDetail={setDetailRow}
 							onStartEdit={setEditingStoryId}
 							onEditSprint={
@@ -773,6 +830,7 @@ function StoryReadOnlyRow({
 	onOpenDetail: () => void;
 	onStartEdit: () => void;
 }) {
+	const confirm = useConfirm();
 	const [isDeleting, setIsDeleting] = useState(false);
 	const dragId = `story:${row.story.id}`;
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -849,7 +907,12 @@ function StoryReadOnlyRow({
 					<button
 						type="button"
 						onClick={async () => {
-							const confirmed = window.confirm(`Eliminar ${row.story.id}: ${row.story.title}?`);
+							const confirmed = await confirm({
+								title: `¿Eliminar ${row.story.id}?`,
+								description: `"${row.story.title}" se eliminará del backlog. Esta acción no se puede deshacer.`,
+								confirmLabel: 'Eliminar',
+								variant: 'danger',
+							});
 							if (!confirmed) return;
 							setIsDeleting(true);
 							try {

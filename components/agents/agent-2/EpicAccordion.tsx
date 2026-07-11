@@ -5,7 +5,6 @@
  * y lista de HUs expandible. Controla expand/collapse via estado local.
  *
  * Patrón de hover-reveal replicado de WishItem.tsx (group + opacity).
- * Confirmación de eliminación via window.confirm (patrón simple, sin modal).
  *
  * Cumple CA2 (vista jerárquica colapsable) y CA3 (HITL: editar/eliminar épicas).
  */
@@ -14,6 +13,7 @@
 
 import { useState } from 'react';
 import type { Epic } from '@/lib/types/agent-2';
+import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import { EpicHeader } from './EpicHeader';
 import { UserStoryList } from './UserStoryList';
 
@@ -46,12 +46,16 @@ export function EpicAccordion({
   isApproved,
   index,
 }: EpicAccordionProps) {
+  const confirm = useConfirm();
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const handleDelete = () => {
-    const confirmed = window.confirm(
-      `¿Eliminar la épica "${epic.title}" y todas sus historias? Esta acción no se puede deshacer.`
-    );
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: `¿Eliminar la épica "${epic.title}"?`,
+      description: 'Se eliminarán también todas sus historias. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      variant: 'danger',
+    });
     if (confirmed) {
       onDeleteEpic(epic.id);
     }
@@ -119,7 +123,7 @@ export function EpicAccordion({
         {!isApproved && (
           <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
             <button
-              onClick={handleDelete}
+              onClick={() => void handleDelete()}
               className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-muted hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">

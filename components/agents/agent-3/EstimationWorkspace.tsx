@@ -18,6 +18,7 @@ import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton'
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { errorMessage, notifyError } from '@/lib/notifications/toast';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 
@@ -305,7 +306,7 @@ export function EstimationWorkspace({
     } catch (error) {
       console.error('Error en la conexión con el Agente 3:', error);
       onStatusChange('idle');
-      alert(error instanceof Error ? error.message : 'Error al procesar la estimación.');
+      notifyError(errorMessage(error, 'Error al procesar la estimación.'));
     }
   }, [input, user, consumeStream, reset, onEstimationsChange, onStatusChange]);
 
