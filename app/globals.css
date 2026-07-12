@@ -1,26 +1,1127 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "./agent-themes.css";
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--foreground-muted);
+  --color-muted-foreground: var(--foreground-muted);
+  --color-subtle: var(--foreground-subtle);
+  --color-body: var(--foreground-body);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-disabled: var(--disabled);
+  --color-disabled-text: var(--disabled-text);
+  --color-elevated: var(--elevated);
+  --color-icon-muted: var(--icon-muted);
+  --color-placeholder: var(--placeholder);
+  --color-step-future-border: var(--step-future-border);
+  --color-step-future-text: var(--step-future-text);
+  --color-code-bg: var(--code-bg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --font-sans: var(--font-google-sans-flex);
+}
+
+@layer utilities {
+  .typewriter-caret {
+    display: inline-block;
+    width: 0.08em;
+    height: 0.9em;
+    margin-left: 0.12em;
+    background: #005BBF;
+    vertical-align: -0.08em;
+    animation: caret-blink 1s steps(1, end) infinite;
   }
 }
 
-body {
-  background: var(--background);
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── Hero landing — grid 3D en perspectiva (modo claro) ─────────────── */
+
+.hero-perspective-grid {
+  --hero-grid-line: rgba(25, 28, 29, 0.11);
+  --hero-grid-line-soft: rgba(25, 28, 29, 0.07);
+  --hero-grid-accent: #005bbf;
+  --hero-grid-marker: rgba(25, 28, 29, 0.3);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.hero-perspective-grid__wire {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-perspective-grid__frame {
+  stroke: var(--hero-grid-line);
+  stroke-width: 1;
+}
+
+.hero-perspective-grid__subdiv {
+  stroke: var(--hero-grid-line-soft);
+  stroke-width: 1;
+}
+
+.hero-perspective-grid__ray {
+  stroke: var(--hero-grid-line);
+  stroke-width: 1;
+}
+
+.hero-perspective-grid__ray--soft {
+  stroke: var(--hero-grid-line-soft);
+}
+
+.hero-perspective-grid__marker rect {
+  fill: none;
+  stroke: var(--hero-grid-marker);
+  stroke-width: 1.25;
+}
+
+.hero-perspective-grid__marker path {
+  stroke: var(--hero-grid-marker);
+  stroke-width: 1.25;
+  stroke-linecap: square;
+}
+
+.hero-perspective-grid__path path {
+  stroke: var(--hero-grid-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+  opacity: 0.75;
+}
+
+.hero-perspective-grid__path rect {
+  fill: var(--hero-grid-accent);
+  stroke: none;
+  opacity: 0.8;
+}
+
+.hero-perspective-grid__nodes circle {
+  fill: var(--hero-grid-marker);
+  opacity: 0.45;
+}
+
+.hero-perspective-grid__fade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 48% 38% at 50% 45%,
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(255, 255, 255, 0.78) 32%,
+      rgba(255, 255, 255, 0.25) 58%,
+      transparent 74%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.5) 0%,
+      transparent 14%,
+      transparent 84%,
+      rgba(255, 255, 255, 0.82) 100%
+    ),
+    linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.22) 0%,
+      transparent 12%,
+      transparent 88%,
+      rgba(255, 255, 255, 0.22) 100%
+    );
+}
+
+@media (max-width: 768px) {
+  .hero-perspective-grid__path,
+  .hero-perspective-grid__marker {
+    opacity: 0.45;
+  }
+
+  .hero-perspective-grid__fade {
+    background:
+      radial-gradient(
+        ellipse 72% 48% at 50% 42%,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(255, 255, 255, 0.8) 38%,
+        transparent 72%
+      ),
+      linear-gradient(to bottom, transparent 72%, rgba(255, 255, 255, 0.85) 100%);
+  }
+}
+
+/* Impact metrics section */
+.impact-metrics__chart-wrap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.impact-metrics__chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.impact-metrics__grid-line {
+  stroke: rgba(255, 255, 255, 0.055);
+  stroke-width: 1;
+  stroke-dasharray: 10 12;
+  vector-effect: non-scaling-stroke;
+}
+
+.impact-metrics__grid-node {
+  fill: rgba(255, 255, 255, 0.2);
+}
+
+.impact-metrics__chart-line,
+.impact-metrics__chart-line-tail {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.impact-metrics__leader {
+  stroke: rgba(255, 255, 255, 0.32);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: all 0.7s ease;
+}
+
+.impact-metrics__leader-node {
+  fill: white;
+  opacity: 0.55;
+  transition: all 0.7s ease;
+}
+
+.impact-metrics__marker-idle-glow {
+  fill: #005bbf;
+  opacity: 0.16;
+}
+
+.impact-metrics__marker-idle-halo {
+  fill: #4f96e2;
+  opacity: 0.3;
+}
+
+.impact-metrics__marker-idle-core {
+  fill: #005bbf;
+}
+
+.impact-metrics__marker-bloom {
+  fill: #005bbf;
+  opacity: 0.22;
+}
+
+.impact-metrics__marker-halo {
+  fill: #005bbf;
+  opacity: 0.38;
+}
+
+.impact-metrics__marker-ring {
+  stroke: rgba(46, 64, 221, 0.8);
+}
+
+.impact-metrics__marker-core {
+  fill: #005bbf;
+}
+
+.impact-metrics__progress-fill {
+  width: 100%;
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .impact-metrics__progress-fill {
+    animation: impact-progress 6s linear forwards;
+  }
+}
+
+@keyframes impact-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .impact-metrics__marker-bloom,
+  .impact-metrics__marker-halo {
+    animation: impact-marker-pulse 2.6s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+
+  .impact-metrics__marker-ring {
+    animation: impact-marker-ring 2.6s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+}
+
+@keyframes impact-marker-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes impact-marker-ring {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact-metrics__marker-bloom,
+  .impact-metrics__marker-halo,
+  .impact-metrics__marker-ring {
+    animation: none;
+  }
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Modal de detalle de historias ─────────────────────────────────── */
+
+.detail-modal-shell {
+  padding: 1px;
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--primary) 42%, transparent) 0%,
+    color-mix(in srgb, var(--border-strong) 50%, transparent) 40%,
+    color-mix(in srgb, var(--primary) 22%, transparent) 100%
+  );
+  box-shadow:
+    0 28px 90px color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 0 48px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.detail-modal-backdrop-in {
+  animation: detailBackdropIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.detail-modal-backdrop-out {
+  animation: detailBackdropOut 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.detail-modal-panel-in {
+  animation: detailPanelIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.detail-modal-panel-out {
+  animation: detailPanelOut 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.detail-section-in {
+  animation: detailSectionIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.detail-modal-scroll {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* ── Date picker (react-day-picker) ───────────────────────────────── */
+
+.date-picker-popover {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: color-mix(in srgb, var(--primary) 14%, transparent);
+  --rdp-day-height: 2.25rem;
+  --rdp-day-width: 2.25rem;
+  --rdp-day_button-height: 2.25rem;
+  --rdp-day_button-width: 2.25rem;
+}
+
+.date-picker-popover .rdp-klarify {
+  width: 100%;
+  margin: 0;
+}
+
+.date-picker-popover .rdp-month_caption {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-picker-popover .rdp-caption_label {
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+.date-picker-popover .rdp-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.date-picker-popover .rdp-button_previous,
+.date-picker-popover .rdp-button_next {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--foreground-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.date-picker-popover .rdp-button_previous:hover,
+.date-picker-popover .rdp-button_next:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.date-picker-popover .rdp-weekday {
+  padding-bottom: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--foreground-muted);
+}
+
+.date-picker-popover .rdp-month_grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.date-picker-popover .rdp-day_button {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.date-picker-popover .rdp-day_button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.date-picker-popover .rdp-selected .rdp-day_button {
+  background: var(--primary);
+  color: #fff;
+}
+
+.date-picker-popover .rdp-selected .rdp-day_button:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.date-picker-popover .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.date-picker-popover .rdp-outside .rdp-day_button {
+  color: color-mix(in srgb, var(--foreground-muted) 70%, transparent);
+}
+
+.date-picker-popover .rdp-disabled .rdp-day_button {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.date-picker-popover .rdp-chevron {
+  fill: currentColor;
+}
+
+@keyframes detailBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes detailBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes detailPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes detailPanelOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(12px);
+  }
+}
+
+@keyframes detailSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Modal de actividad del agente (estética tecnológica) ──────────── */
+
+.agent-modal-shell {
+  padding: 1px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 55%, transparent) 0%,
+    color-mix(in srgb, var(--border-strong) 60%, transparent) 35%,
+    color-mix(in srgb, var(--primary) 30%, transparent) 70%,
+    color-mix(in srgb, var(--border-strong) 60%, transparent) 100%
+  );
+  background-size: 200% 200%;
+  animation: agentBorderFlow 6s ease infinite;
+  box-shadow:
+    0 24px 80px color-mix(in srgb, var(--foreground) 14%, transparent),
+    0 0 40px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+@keyframes agentBorderFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.agent-feed {
+  background-color: var(--surface);
+}
+
+.agent-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--surface) 70%, transparent) 50%,
+    transparent 100%
+  );
+  animation: agentProgressShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes agentProgressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(220%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-modal-shell { animation: none; }
+  .agent-progress-shimmer { animation: none; }
+}
+
+@keyframes activitySlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animaciones del workspace de agentes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(200%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes wizardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes wizardSlideInBack {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Grid dinámico del workspace de agentes ─────────────────────────── */
+
+.workspace-grid {
+  z-index: 0;
+}
+
+.workspace-grid__lines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  mask-image: radial-gradient(ellipse 88% 78% at 50% 36%, black 18%, transparent 74%);
+}
+
+.workspace-grid__lines--deep {
+  background-size: calc(var(--grid-size) * 2) calc(var(--grid-size) * 2);
+  opacity: calc(var(--grid-line-opacity) * 0.45);
+  animation: workspace-grid-parallax-deep 80s linear infinite;
+}
+
+.workspace-grid__lines--near {
+  background-size: var(--grid-size) var(--grid-size);
+  opacity: var(--grid-line-opacity);
+  animation: workspace-grid-parallax-near 55s linear infinite reverse;
+}
+
+.workspace-grid__dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  mask-image: radial-gradient(ellipse 72% 62% at 50% 40%, black 8%, transparent 70%);
+  opacity: var(--grid-dot-opacity);
+}
+
+/* Estrellas fugaces retro — trazas finas con cabeza luminosa sobre el grid */
+.workspace-grid__stars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 38%, black 25%, transparent 78%);
+}
+
+.workspace-grid__star {
+  --star-length: 72px;
+  --star-thickness: 1.5px;
+  --star-head: 3px;
+  --star-angle: -38deg;
+  --star-travel: 42vw;
+  position: absolute;
+  top: var(--star-top, 20%);
+  left: var(--star-left, 10%);
+  width: var(--star-length);
+  height: var(--star-thickness);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 18%, transparent) 35%,
+    color-mix(in srgb, var(--primary) 72%, white) 100%
+  );
+  opacity: 0;
+  transform: rotate(var(--star-angle)) translate3d(0, 0, 0);
+  transform-origin: right center;
+  will-change: transform, opacity;
+  animation: workspace-shooting-star var(--star-duration, 4.8s) linear both;
+  animation-delay: var(--star-delay, 0s);
+}
+
+.workspace-grid__star::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(var(--star-head) * -0.35);
+  width: var(--star-head);
+  height: var(--star-head);
+  border-radius: 50%;
+  translate: 0 -50%;
+  background: color-mix(in srgb, var(--primary) 85%, white);
+  box-shadow:
+    0 0 6px 1px color-mix(in srgb, var(--primary) 65%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+html[data-agent-theme="light"] .workspace-grid__star,
+.agent-workspace[data-theme="light"] .workspace-grid__star {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 12%, transparent) 40%,
+    color-mix(in srgb, var(--primary) 55%, white) 100%
+  );
+}
+
+html[data-agent-theme="light"] .workspace-grid__star::after,
+.agent-workspace[data-theme="light"] .workspace-grid__star::after {
+  box-shadow:
+    0 0 5px 1px color-mix(in srgb, var(--primary) 45%, transparent),
+    0 0 10px 2px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.workspace-grid__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 95% 85% at 50% 40%, transparent 35%, var(--grid-vignette) 100%);
+  opacity: 0.9;
+}
+
+.workspace-grid__noise {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grid-noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: soft-light;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 38%, black 20%, transparent 72%);
+}
+
+@keyframes workspace-grid-parallax-deep {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(calc(var(--grid-size) * 2), calc(var(--grid-size) * 2)); }
+}
+
+@keyframes workspace-grid-parallax-near {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(var(--grid-size), var(--grid-size)); }
+}
+
+@keyframes workspace-shooting-star {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--star-angle)) translate3d(0, 0, 0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  72% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--star-angle)) translate3d(var(--star-travel), 0, 0);
+  }
+}
+
+/* ── Hero de páginas de agentes — motivos por fase del pipeline ─────── */
+
+.agent-hero {
+  --hero-accent: color-mix(in srgb, var(--primary) 55%, transparent);
+  --hero-motif-opacity: 0.88;
+}
+
+.agent-hero::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--hero-accent) 28%,
+    var(--hero-accent) 72%,
+    transparent 100%
+  );
+  border-radius: 0 2px 2px 0;
+}
+
+.agent-hero__motif {
+  position: relative;
+  flex-shrink: 0;
+  width: 6.5rem;
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--hero-motif-opacity);
+}
+
+.agent-hero__motif-glow {
+  position: absolute;
+  inset: -18% -8%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--primary) 22%, transparent) 0%,
+    transparent 72%
+  );
+  filter: blur(10px);
+  opacity: 0.9;
+}
+
+.agent-hero__motif-svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.agent-hero__capture-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-capture-bar 2.8s ease-in-out infinite;
+}
+
+.agent-hero__capture-scan {
+  animation: hero-capture-scan 5s linear infinite;
+}
+
+.agent-hero__structure-card--back {
+  animation: hero-structure-float 7s ease-in-out infinite;
+}
+
+.agent-hero__structure-card--mid {
+  animation: hero-structure-float 7s ease-in-out infinite 0.35s;
+}
+
+.agent-hero__structure-card--front {
+  animation: hero-structure-float 7s ease-in-out infinite 0.7s;
+}
+
+.agent-hero__structure-line {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: hero-structure-line 4.5s ease-out infinite;
+}
+
+.agent-hero__measure-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  fill: var(--primary);
+  fill-opacity: 0.75;
+}
+
+.agent-hero__measure-block {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-measure-pulse 3.2s ease-in-out infinite;
+}
+
+.agent-hero__order-lane {
+  animation: hero-order-slide 4.8s ease-in-out infinite;
+}
+
+.agent-hero__order-highlight {
+  animation: hero-order-highlight 3.6s ease-in-out infinite;
+}
+
+.agent-hero__overview-panel {
+  animation: hero-overview-float 5.5s ease-in-out infinite;
+}
+
+.agent-hero__overview-metric {
+  animation: hero-overview-float 5.5s ease-in-out infinite;
+}
+
+.agent-hero__overview-spark {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: hero-overview-spark 4.2s ease-out infinite;
+}
+
+.agent-hero__overview-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-overview-bar 2.8s ease-in-out infinite;
+}
+
+@keyframes hero-capture-bar {
+  0%, 100% { transform: scaleY(0.72); opacity: 0.55; }
+  35% { transform: scaleY(1); opacity: 1; }
+  65% { transform: scaleY(0.86); opacity: 0.78; }
+}
+
+@keyframes hero-capture-scan {
+  0% { stroke-dashoffset: 0; opacity: 0.15; }
+  50% { opacity: 0.45; }
+  100% { stroke-dashoffset: -28; opacity: 0.15; }
+}
+
+@keyframes hero-structure-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes hero-structure-line {
+  0%, 20% { stroke-dashoffset: 48; opacity: 0.2; }
+  45%, 70% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -12; opacity: 0.35; }
+}
+
+@keyframes hero-measure-pulse {
+  0%, 100% { transform: scaleY(0.92); }
+  50% { transform: scaleY(1.04); }
+}
+
+@keyframes hero-order-slide {
+  0%, 100% { transform: translateX(0); opacity: 0.82; }
+  50% { transform: translateX(3px); opacity: 1; }
+}
+
+@keyframes hero-order-highlight {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.65; }
+}
+
+@keyframes hero-overview-float {
+  0%, 100% { transform: translateY(0); opacity: 0.92; }
+  50% { transform: translateY(-1.5px); opacity: 1; }
+}
+
+@keyframes hero-overview-spark {
+  0%, 15% { stroke-dashoffset: 48; opacity: 0.35; }
+  45%, 70% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -10; opacity: 0.55; }
+}
+
+@keyframes hero-overview-bar {
+  0%, 100% { transform: scaleY(0.82); opacity: 0.65; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-hero__motif *,
+  .agent-hero__motif::before,
+  .agent-hero__motif::after {
+    animation: none !important;
+  }
+}
+
+/* Zona de captura — Agente 1 */
+.agent-capture-drop::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--primary) 50%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.agent-capture-drop:hover::before,
+.agent-capture-drop:focus-within::before {
+  opacity: 1;
+}
+
+/* ── Agente 2 — Animaciones de UI mejoradas ─────────────────────────── */
+
+@keyframes heroGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1) translate(0, 0); }
+  33% { opacity: 0.8; transform: scale(1.05) translate(4px, -4px); }
+  66% { opacity: 0.6; transform: scale(0.95) translate(-4px, 4px); }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes celebrationPop {
+  0% { opacity: 0; transform: scale(0.7); }
+  50% { transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmerPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes checkmarkDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes statusBadgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 40%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+
+/* ── Landing footer  ── */
+
+.landing-footer__watermark {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -0.04em;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 58%;
+  overflow: hidden;
+  line-height: 0.78;
+}
+
+.landing-footer__watermark span {
+  display: inline-block;
+  padding-inline: 0.02em;
+  /* Móvil: más compacto */
+  font-size: clamp(5rem, 18vw, 9rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: transparent;
+  background-image:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.18) 1.15px, transparent 1.15px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  background-size: 5px 5px, 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Tablet / pantallas un poco angostas */
+@media (min-width: 640px) {
+  .landing-footer__watermark span {
+    font-size: clamp(4.5rem, 16vw, 10rem);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .landing-footer__watermark span {
+    font-size: clamp(5rem, 15vw, 11rem);
+  }
+
+  .landing-footer__watermark {
+    height: 50%;
+  }
+}
+
+/* Desktop ancho: tamaño completo */
+@media (min-width: 1024px) {
+  .landing-footer__watermark span {
+    font-size: clamp(7rem, 24vw, 22rem);
+  }
+}
+
+@media (min-width: 1280px) {
+  .landing-footer__watermark span {
+    font-size: clamp(7rem, 24vw, 25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-grid__lines,
+  .workspace-grid__star,
+  .agent-modal-shell,
+  .detail-modal-shell,
+  .detail-modal-backdrop-in,
+  .detail-modal-backdrop-out,
+  .detail-modal-panel-in,
+  .detail-modal-panel-out,
+  .detail-section-in,
+  .agent-progress-shimmer,
+  .workspace-grid__lines--deep,
+  .workspace-grid__lines--near {
+    animation: none;
+  }
+
+  .workspace-grid__stars {
+    display: none;
+  }
+  [class*="animate-"] {
+    animation: none !important;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
