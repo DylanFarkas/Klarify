@@ -10,7 +10,7 @@ export function DashboardHero({ hasContent, metrics }: DashboardHeroProps) {
 	return (
 		<AgentPageHero
 			step={6}
-			variant="measure"
+			variant="overview"
 			title="Dashboard del workspace"
 			description="Un resumen vivo del proyecto: captura inicial, backlog, estimaciones, prioridades y plan de sprints en un solo lugar."
 			statusBadge={<DashboardStatusBadge hasContent={hasContent} completionCount={metrics.completionCount} />}

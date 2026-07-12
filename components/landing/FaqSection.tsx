@@ -129,7 +129,7 @@ export function FaqSection() {
   return (
     <section
       aria-labelledby="faq-title"
-      className="bg-white px-5 py-24 md:px-16 md:py-32"
+      className="scroll-mt-20 bg-white px-5 py-24 md:px-16 md:py-32"
       id="faq"
     >
       <div className="mx-auto max-w-360">

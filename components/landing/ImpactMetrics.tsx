@@ -277,7 +277,7 @@ export function ImpactMetrics() {
   return (
     <section
       aria-labelledby="impact-metrics-title"
-      className="impact-metrics relative overflow-hidden bg-[#050505] text-white"
+      className="impact-metrics relative scroll-mt-20 overflow-hidden bg-[#050505] text-white"
       id="impacto"
     >
       <div className="relative min-h-screen mx-auto max-w-390 px-5 py-16 sm:py-20 md:px-16 md:py-24">

@@ -52,7 +52,7 @@ export function ProductDemoVideo() {
   return (
     <section
       aria-labelledby="product-demo-title"
-      className="bg-black px-5 py-24 text-white md:px-16 md:py-32"
+      className="scroll-mt-20 bg-black px-5 py-24 text-white md:px-16 md:py-32"
       id="producto"
     >
       <div className="mx-auto grid max-w-360 items-start gap-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14 xl:gap-20">

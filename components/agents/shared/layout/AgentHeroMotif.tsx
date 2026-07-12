@@ -1,4 +1,4 @@
-export type AgentHeroVariant = 'capture' | 'structure' | 'measure' | 'order';
+export type AgentHeroVariant = 'capture' | 'structure' | 'measure' | 'order' | 'overview';
 
 const CAPTURE_BARS = [0.42, 0.68, 0.88, 0.72, 1, 0.58, 0.82, 0.48, 0.76] as const;
 const MEASURE_BLOCKS = [
@@ -8,6 +8,13 @@ const MEASURE_BLOCKS = [
   { label: '5', height: 52 },
 ] as const;
 const ORDER_LANES = [1, 0.78, 0.56, 0.38] as const;
+const OVERVIEW_SPARK = [
+  { x: 10, y: 34 },
+  { x: 18, y: 28 },
+  { x: 26, y: 30 },
+  { x: 34, y: 18 },
+  { x: 42, y: 22 },
+] as const;
 
 interface AgentHeroMotifProps {
   variant: AgentHeroVariant;
@@ -21,6 +28,7 @@ export function AgentHeroMotif({ variant }: AgentHeroMotifProps) {
       {variant === 'structure' && <StructureMotif />}
       {variant === 'measure' && <MeasureMotif />}
       {variant === 'order' && <OrderMotif />}
+      {variant === 'overview' && <OverviewMotif />}
     </div>
   );
 }
@@ -254,6 +262,174 @@ function OrderMotif() {
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+function OverviewMotif() {
+  const sparkPath = OVERVIEW_SPARK.map((point, index) =>
+    `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`
+  ).join(' ');
+
+  return (
+    <svg
+      className="agent-hero__motif-svg"
+      viewBox="0 0 96 72"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Panel principal con sparkline */}
+      <g className="agent-hero__overview-panel" style={{ animationDelay: '0ms' }}>
+        <rect
+          x="2"
+          y="4"
+          width="52"
+          height="40"
+          rx="8"
+          fill="color-mix(in srgb, var(--primary) 8%, transparent)"
+          stroke="var(--primary)"
+          strokeWidth="1.5"
+          strokeOpacity="0.55"
+        />
+        <path
+          className="agent-hero__overview-spark"
+          d={sparkPath}
+          stroke="var(--primary)"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity="0.85"
+        />
+        <circle
+          cx={OVERVIEW_SPARK[OVERVIEW_SPARK.length - 1].x}
+          cy={OVERVIEW_SPARK[OVERVIEW_SPARK.length - 1].y}
+          r="2.25"
+          fill="var(--primary)"
+          fillOpacity="0.9"
+        />
+        <line
+          x1="10"
+          y1="14"
+          x2="28"
+          y2="14"
+          stroke="var(--primary)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeOpacity="0.35"
+        />
+      </g>
+
+      {/* KPI superior derecho */}
+      <g className="agent-hero__overview-panel" style={{ animationDelay: '120ms' }}>
+        <rect
+          x="60"
+          y="4"
+          width="34"
+          height="18"
+          rx="6"
+          fill="var(--primary)"
+          fillOpacity="0.16"
+          stroke="var(--primary)"
+          strokeWidth="1.25"
+          strokeOpacity="0.45"
+        />
+        <circle cx="70" cy="13" r="3" fill="var(--primary)" fillOpacity="0.7" />
+        <line
+          x1="78"
+          y1="11"
+          x2="88"
+          y2="11"
+          stroke="var(--primary)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeOpacity="0.55"
+        />
+        <line
+          x1="78"
+          y1="16"
+          x2="84"
+          y2="16"
+          stroke="var(--primary)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeOpacity="0.3"
+        />
+      </g>
+
+      {/* Mini barras inferior derecho */}
+      <g className="agent-hero__overview-panel" style={{ animationDelay: '240ms' }}>
+        <rect
+          x="60"
+          y="26"
+          width="34"
+          height="18"
+          rx="6"
+          fill="color-mix(in srgb, var(--primary) 6%, transparent)"
+          stroke="var(--primary)"
+          strokeWidth="1.25"
+          strokeOpacity="0.4"
+        />
+        {[0.45, 0.7, 1, 0.55].map((scale, index) => {
+          const barHeight = 8 * scale;
+          const x = 66 + index * 6;
+          return (
+            <rect
+              key={index}
+              className="agent-hero__overview-bar"
+              style={{ animationDelay: `${index * 140}ms` }}
+              x={x}
+              y={38 - barHeight}
+              width="3.5"
+              height={barHeight}
+              rx="1.5"
+              fill="var(--primary)"
+              fillOpacity={0.35 + index * 0.12}
+            />
+          );
+        })}
+      </g>
+
+      {/* Fila de métricas inferiores */}
+      {[0, 1, 2].map((index) => (
+        <g
+          key={index}
+          className="agent-hero__overview-metric"
+          style={{ animationDelay: `${180 + index * 100}ms` }}
+        >
+          <rect
+            x={2 + index * 32}
+            y="50"
+            width="28"
+            height="18"
+            rx="5"
+            fill="var(--primary)"
+            fillOpacity={0.1 + index * 0.06}
+            stroke="var(--primary)"
+            strokeWidth="1.1"
+            strokeOpacity={0.3 + index * 0.1}
+          />
+          <line
+            x1={8 + index * 32}
+            y1="57"
+            x2={18 + index * 32}
+            y2="57"
+            stroke="var(--primary)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeOpacity={0.55 - index * 0.08}
+          />
+          <line
+            x1={8 + index * 32}
+            y1="62"
+            x2={22 + index * 32}
+            y2="62"
+            stroke="var(--primary)"
+            strokeWidth="1.25"
+            strokeLinecap="round"
+            strokeOpacity="0.25"
+          />
+        </g>
+      ))}
     </svg>
   );
 }

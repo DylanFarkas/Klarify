@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type {
   ClarificationAnswer,
   ClarifyingCategory,
@@ -245,7 +245,6 @@ export function ClarifyingQuestionsPanel({
     getInitialQuestionIndex(questions, answers)
   );
   const [slideDirection, setSlideDirection] = useState<'forward' | 'back'>('forward');
-  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const phase = resolvePhase(showIntro, questionIndex, totalQuestions);
   const currentQuestion = phase === 'question' ? questions[questionIndex] : null;
@@ -265,12 +264,6 @@ export function ClarifyingQuestionsPanel({
   const currentAnswerValid = currentQuestion
     ? isAnswerValid(currentQuestion.id, answers)
     : false;
-
-  useEffect(() => {
-    return () => {
-      if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-    };
-  }, []);
 
   const goForward = useCallback(() => {
     setSlideDirection('forward');
@@ -310,19 +303,8 @@ export function ClarifyingQuestionsPanel({
           customText: optionId === OTHER_OPTION_ID ? prev?.customText ?? '' : undefined,
         },
       ]);
-
-      if (optionId !== OTHER_OPTION_ID && phase === 'question' && questionId === currentQuestion?.id) {
-        if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
-        autoAdvanceRef.current = setTimeout(() => {
-          setSlideDirection('forward');
-          setQuestionIndex((i) => {
-            const next = i + 1;
-            return next <= totalQuestions ? next : i;
-          });
-        }, 450);
-      }
     },
-    [answers, onAnswerChange, isProcessing, phase, currentQuestion?.id, totalQuestions]
+    [answers, onAnswerChange, isProcessing]
   );
 
   const handleCustomTextChange = (questionId: string, customText: string) => {

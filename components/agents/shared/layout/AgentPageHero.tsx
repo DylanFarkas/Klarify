@@ -18,6 +18,7 @@ const VARIANT_LABELS: Record<AgentHeroVariant, string> = {
   structure: 'Estructura',
   measure: 'Medición',
   order: 'Orden',
+  overview: 'Resumen',
 };
 
 export function AgentPageHero({
