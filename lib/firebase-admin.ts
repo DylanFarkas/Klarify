@@ -3,28 +3,50 @@ import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { type NextRequest } from "next/server";
 
-function getAdminApp(): App {
-  if (getApps().length > 0) {
-    return getApps()[0];
-  }
-
+function parseServiceAccount() {
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!serviceAccountKey) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is not set");
   }
 
-  const serviceAccount = JSON.parse(serviceAccountKey) as {
+  // Vercel sometimes wraps the value in extra quotes when pasted from .env
+  const normalized = serviceAccountKey.trim().replace(/^['"]|['"]$/g, "");
+
+  let serviceAccount: {
     project_id: string;
     client_email: string;
     private_key: string;
   };
 
+  try {
+    serviceAccount = JSON.parse(normalized) as typeof serviceAccount;
+  } catch {
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Paste the full service account JSON as a single-line env var in Vercel."
+    );
+  }
+
+  if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT_KEY is missing project_id, client_email, or private_key"
+    );
+  }
+
+  // Vercel stores \n as literal characters; Firebase needs real newlines
+  return {
+    projectId: serviceAccount.project_id,
+    clientEmail: serviceAccount.client_email,
+    privateKey: serviceAccount.private_key.replace(/\\n/g, "\n"),
+  };
+}
+
+function getAdminApp(): App {
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
+
   return initializeApp({
-    credential: cert({
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key,
-    }),
+    credential: cert(parseServiceAccount()),
   });
 }
 
