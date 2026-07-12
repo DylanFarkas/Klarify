@@ -201,7 +201,7 @@ export function Navbar() {
                   onClick={goToMyAgent}
                   className="hidden text-sm font-bold text-[#005bbf] hover:underline sm:inline"
                 >
-                  Ir a mi Agente
+                  Volver al workspace
                 </button>
                 <button
                   onClick={handleLogout}
@@ -277,7 +277,7 @@ export function Navbar() {
                 onClick={goToMyAgent}
                 className="rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#005bbf] cursor-pointer"
               >
-                Ir a mi Agente
+                Volver al workspace
               </button>
               <button
                 onClick={handleLogout}
