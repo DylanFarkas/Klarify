@@ -91,7 +91,7 @@ Límites definidos en `lib/plans/definitions.ts`:
 
 | | Free | Starter | Pro |
 |--|------|---------|-----|
-| Proyectos | 1 | 5 | 10 |
+| Proyectos | 1 | 3 | 10 |
 | Archivos | `.txt`, `.pdf` | + audio | + audio |
 | Tablero Kanban | — | ✓ | ✓ |
 | Export | Manual | Manual | Completo |
