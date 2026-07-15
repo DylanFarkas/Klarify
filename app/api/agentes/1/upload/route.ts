@@ -7,6 +7,7 @@
  */
 
 import { type NextRequest } from 'next/server';
+import { ENABLE_FILE_UPLOAD } from '@/lib/constants/agent-1';
 import { validateFile, processFile, processText } from '@/lib/services/agent-1-service';
 import type { Agent1UploadResponse, Agent1ErrorResponse } from '@/lib/types/agent-1';
 import { verifyRequestUser } from '@/lib/firebase-admin';
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
     if (text && typeof text === 'string') {
       transcription = processText(text);
     } else if (file && file instanceof File) {
+      if (!ENABLE_FILE_UPLOAD) {
+        return Response.json(
+          { error: 'La carga de archivos no está disponible por el momento.', code: 'INVALID_TYPE' } satisfies Agent1ErrorResponse,
+          { status: 403 }
+        );
+      }
       const validation = validateFile(file.name, file.size, file.type);
       if (!validation.valid) {
         return Response.json(

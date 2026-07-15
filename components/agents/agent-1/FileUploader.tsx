@@ -1,11 +1,9 @@
 /**
- * @fileoverview FileUploader — Zona de carga de archivos con drag & drop.
+ * @fileoverview FileUploader — Entrada de contexto (archivos, voz y texto).
  *
- * Componente principal de entrada del Agente 1. Permite al usuario
- * arrastrar o seleccionar archivos (.mp3, .wav, .txt, .pdf) con
- * validación en cliente (tipo + tamaño ≤ 50 MB).
- *
- * Muestra estados visuales para: idle, dragging, uploading, error.
+ * Componente principal de entrada del Agente 1. La opción de archivos es
+ * visible siempre, pero mientras ENABLE_FILE_UPLOAD sea false muestra un
+ * aviso de "funcionalidad en prueba" en lugar de procesar el archivo.
  */
 
 'use client';
@@ -13,11 +11,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ALLOWED_EXTENSIONS,
+  ENABLE_FILE_UPLOAD,
   MAX_FILE_SIZE_BYTES,
   MAX_FILE_SIZE_LABEL,
   FILE_INPUT_ACCEPT,
   formatFileSize,
 } from '@/lib/constants/agent-1';
+import { DetailModal } from '@/components/agents/shared/DetailModal';
 
 interface FileUploaderProps {
   /** Callback cuando el usuario selecciona un archivo válido */
@@ -34,6 +34,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
   const [isDragging, setIsDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [showUploadNotice, setShowUploadNotice] = useState(false);
   
   // ── Estado de grabación en vivo ──
   const [isRecording, setIsRecording] = useState(false);
@@ -92,6 +93,17 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
     [validateFile, onFileSelect]
   );
 
+  // ── Intención de subir archivo ─────────────────────────────────
+  // Mientras la carga esté deshabilitada, mostramos el aviso de
+  // funcionalidad en prueba en lugar de abrir el selector.
+  const handleUploadIntent = useCallback(() => {
+    if (!ENABLE_FILE_UPLOAD) {
+      setShowUploadNotice(true);
+      return;
+    }
+    fileInputRef.current?.click();
+  }, []);
+
   // ── Drag & Drop ────────────────────────────────────────────────
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -110,6 +122,10 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
+      if (!ENABLE_FILE_UPLOAD) {
+        setShowUploadNotice(true);
+        return;
+      }
       const file = e.dataTransfer.files[0];
       if (file) handleFile(file);
     },
@@ -247,7 +263,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             onDrop={handleDrop}
             onClick={() => {
               if (!isProcessing && !isRecording) {
-                fileInputRef.current?.click();
+                handleUploadIntent();
               }
             }}
             className={[
@@ -273,7 +289,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
               aria-hidden="true"
             />
 
-            {/* Estado: Procesando */}
+            {/* Estado: Procesando archivo */}
             {isProcessing && selectedFileName && (
               <div className="relative z-10 flex flex-col items-center gap-5">
                 <div className="h-14 w-14 animate-spin rounded-full border-2 border-border border-t-primary" />
@@ -369,7 +385,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                   id="file-select-button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    fileInputRef.current?.click();
+                    handleUploadIntent();
                   }}
                   className={[
                     'mx-auto inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-3',
@@ -404,7 +420,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             {/* Subir Archivo */}
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleUploadIntent}
               className={[
                 'group rounded-2xl border border-border bg-surface p-6 text-left',
                 'transition-all duration-200 cursor-pointer',
@@ -485,6 +501,68 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
+
+      {/* ── Aviso: carga de archivos en prueba ─────────────────── */}
+      <DetailModal
+        open={showUploadNotice}
+        onClose={() => setShowUploadNotice(false)}
+        eyebrow="Funcionalidad en prueba"
+        title="La carga de archivos llegará muy pronto"
+        maxWidth="md"
+      >
+        <div className="flex flex-col gap-5">
+          <p className="text-sm leading-relaxed text-muted">
+            Estamos desarrollando el MVP de Klarify y la carga de archivos
+            (.mp3, .wav, .txt, .pdf) todavía está en proceso de prueba.
+            Mientras tanto, puedes compartir el contexto de tu proyecto
+            grabando audio en vivo o escribiendo el texto directamente.
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowUploadNotice(false);
+                startRecording();
+              }}
+              className={[
+                'group rounded-xl border border-border bg-surface p-4 text-left',
+                'transition-all duration-200 cursor-pointer',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/15">
+                <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <h5 className="mb-1 text-sm font-bold text-foreground">Grabar Audio</h5>
+              <p className="text-xs text-muted">Captura una reunión en vivo ahora mismo.</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowUploadNotice(false);
+                onTranscriptionComplete?.('');
+              }}
+              className={[
+                'group rounded-xl border border-border bg-surface p-4 text-left',
+                'transition-all duration-200 cursor-pointer',
+                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-hover">
+                <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+              </div>
+              <h5 className="mb-1 text-sm font-bold text-foreground">Escribir Texto</h5>
+              <p className="text-xs text-muted">Pega minutas de reunión o notas rápidas.</p>
+            </button>
+          </div>
+        </div>
+      </DetailModal>
     </div>
   );
 }
