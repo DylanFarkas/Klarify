@@ -628,7 +628,7 @@ export default function Agent1Page() {
                     onClick={handleReset}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium text-muted transition-all hover:border-border-strong hover:bg-surface-hover hover:text-foreground cursor-pointer sm:w-auto"
                   >
-                    Subir otro archivo
+                    Empezar de nuevo
                   </button>
                   <ApproveButton
                     onClick={handleApprove}

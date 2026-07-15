@@ -11,7 +11,7 @@ import { AgentLayout } from '@/components/agents/shared/layout/AgentLayout';
 export const metadata: Metadata = {
   title: 'Agente 1 — Ingesta de Contexto | Klarify',
   description:
-    'Carga el audio o documentos de tu reunión con el cliente para transcribir y extraer necesidades automáticamente.',
+    'Graba audio en vivo o escribe el contexto de tu reunión con el cliente para extraer necesidades automáticamente.',
 };
 
 export default function Agent1Layout({
