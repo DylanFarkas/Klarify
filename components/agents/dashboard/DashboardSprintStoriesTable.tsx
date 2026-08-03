@@ -349,17 +349,17 @@ export function DashboardSprintStoriesTable({
 		) : null;
 
 	const tableBody = hasContent ? (
-		<div className="overflow-x-auto">
-			<table className="w-full min-w-[980px] border-collapse text-left">
+		<div className="@container min-w-0">
+			<table className="w-full table-fixed border-collapse text-left">
 				<thead className="border-b border-border bg-surface-muted/60">
 					<tr className="text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">
-						<th className="px-6 py-3">ID</th>
-						<th className="px-4 py-3">HU</th>
-						<th className="px-4 py-3">Epica</th>
-						<th className="px-4 py-3">SP</th>
-						<th className="px-4 py-3">Prioridad</th>
-						<th className="px-4 py-3">Estado</th>
-						<th className="px-4 py-3 text-right">Acciones</th>
+						<th className="hidden w-24 px-3 py-3 @3xl:table-cell @3xl:px-4">ID</th>
+						<th className="min-w-0 px-3 py-3 @lg:px-4">HU</th>
+						<th className="hidden w-[18%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
+						<th className="w-12 px-2 py-3 @lg:w-14 @lg:px-3">SP</th>
+						<th className="w-[6.75rem] px-2 py-3 @xl:w-[8rem] @xl:px-3">Prioridad</th>
+						<th className="hidden w-[5.5rem] px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
+						<th className="w-[5.75rem] px-2 py-3 text-right @lg:w-[6.75rem] @lg:px-3">Acciones</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -480,11 +480,11 @@ export function DashboardSprintStoriesTable({
 	);
 
 	if (embedded) {
-		return <div>{tableContent}</div>;
+		return <div className="min-w-0">{tableContent}</div>;
 	}
 
 	return (
-		<section className="rounded-2xl border border-border bg-surface/80 shadow-sm">
+		<section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface/80 shadow-sm">
 			<div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-5">
 				<div>
 					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Plan de sprints</p>
@@ -716,8 +716,8 @@ function SprintGroupRows({
 					isOver ? 'bg-primary/10 ring-2 ring-inset ring-primary/20' : '',
 				].join(' ')}
 			>
-				<td colSpan={7} className="px-6 py-3">
-					<div className="flex flex-wrap items-center gap-3">
+				<td colSpan={7} className="px-3 py-3 @lg:px-6">
+					<div className="flex flex-wrap items-center gap-2 @lg:gap-3">
 						<div className="min-w-0 flex-1">
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="text-sm font-bold text-foreground">{group.label}</span>
@@ -731,19 +731,19 @@ function SprintGroupRows({
 								<button
 									type="button"
 									onClick={onEditSprint}
-									className="mt-0.5 block max-w-2xl cursor-pointer truncate text-left text-xs text-muted transition-colors hover:text-primary"
+									className="mt-0.5 block max-w-full cursor-pointer truncate text-left text-xs text-muted transition-colors hover:text-primary @2xl:max-w-2xl"
 									title="Editar sprint"
 								>
 									{group.meta}
 								</button>
 							) : (
-								<span className="mt-0.5 block text-xs text-muted">{group.meta}</span>
+								<span className="mt-0.5 block truncate text-xs text-muted">{group.meta}</span>
 							)}
 						</div>
 
 						{!group.isUnassigned && (
 							<div
-								className="h-2 w-20 shrink-0 overflow-hidden rounded-full bg-surface-muted sm:w-24"
+								className="h-2 w-14 shrink-0 overflow-hidden rounded-full bg-surface-muted @md:w-20 @xl:w-24"
 								title={`${group.velocitySp}/${capacitySp} SP`}
 							>
 								<div
@@ -753,7 +753,7 @@ function SprintGroupRows({
 							</div>
 						)}
 
-						<span className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold text-foreground">
+						<span className="shrink-0 rounded-full border border-border bg-surface px-2 py-1 text-[11px] font-bold text-foreground @lg:px-2.5 @lg:text-xs">
 							{group.rows.length} HU · {group.velocitySp} SP
 						</span>
 
@@ -775,7 +775,7 @@ function SprintGroupRows({
 			</tr>
 			{group.rows.length === 0 ? (
 				<tr className={isOver ? 'bg-primary/5' : ''}>
-					<td colSpan={7} className="px-6 py-6 text-center text-xs text-muted">
+					<td colSpan={7} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
 						{canManagePlan
 							? group.isUnassigned
 								? 'Suelta historias aquí para desasignarlas'
@@ -854,12 +854,15 @@ function StoryReadOnlyRow({
 				isDragging ? 'bg-surface-muted/50' : '',
 			].join(' ')}
 		>
-			<td className="px-6 py-4 align-top">
-				<div className="flex items-center gap-2">
-					{canDrag && (
+			<td className="hidden px-3 py-3 align-top @3xl:table-cell @3xl:px-4 @3xl:py-4">
+				<span className="font-mono text-xs font-bold text-muted">{row.story.id}</span>
+			</td>
+			<td className="min-w-0 px-3 py-3 align-top @lg:px-4 @lg:py-4">
+				<div className="flex items-start gap-2">
+					{canDrag ? (
 						<button
 							type="button"
-							className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted/50 transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
+							className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-muted/50 transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
 							aria-label="Arrastrar historia"
 							{...listeners}
 							{...attributes}
@@ -868,39 +871,57 @@ function StoryReadOnlyRow({
 								<path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
 							</svg>
 						</button>
-					)}
-					<span className="font-mono text-xs font-bold text-muted">{row.story.id}</span>
+					) : null}
+					<div className="min-w-0 flex-1">
+						<span className="mb-0.5 block font-mono text-[11px] font-bold text-muted @3xl:hidden">
+							{row.story.id}
+						</span>
+						<p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.story.title}>
+							{row.story.title}
+						</p>
+						<p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted @2xl:line-clamp-2">
+							{row.story.description}
+						</p>
+						<p className="mt-1 truncate text-xs text-muted @2xl:hidden" title={row.epicTitle}>
+							{row.epicTitle}
+						</p>
+						<div className="mt-1.5 @xl:hidden">
+							<ExecutionStatusBadge status={row.executionStatus} />
+						</div>
+					</div>
 				</div>
 			</td>
-			<td className="max-w-[380px] px-4 py-4 align-top">
-				<p className="text-sm font-semibold text-foreground">{row.story.title}</p>
-				<p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">{row.story.description}</p>
+			<td className="hidden min-w-0 px-3 py-3 align-top text-sm text-muted @2xl:table-cell @2xl:px-4 @2xl:py-4">
+				<span className="line-clamp-2" title={row.epicTitle}>
+					{row.epicTitle}
+				</span>
 			</td>
-			<td className="px-4 py-4 align-top text-sm text-muted">{row.epicTitle}</td>
-			<td className="px-4 py-4 align-top">
-				<span className="rounded-lg border border-border bg-surface px-2 py-1 text-xs font-bold text-foreground">
+			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
+				<span className="inline-flex min-w-8 justify-center rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold text-foreground @lg:px-2">
 					{row.estimation?.points ?? 0}
 				</span>
 			</td>
-			<td className="px-4 py-4 align-top">
+			<td className="min-w-0 px-2 py-3 align-top @xl:px-3 @xl:py-4">
 				{framework && row.prioritization ? (
-					<CategoryBadge framework={framework} category={row.prioritization.category} />
+					<div className="max-w-full overflow-hidden [&_span]:max-w-full [&_span]:truncate">
+						<CategoryBadge framework={framework} category={row.prioritization.category} />
+					</div>
 				) : (
 					<span className="text-xs text-muted">N/D</span>
 				)}
 			</td>
-			<td className="px-4 py-4 align-top">
+			<td className="hidden px-2 py-3 align-top @xl:table-cell @xl:px-3 @xl:py-4">
 				<ExecutionStatusBadge status={row.executionStatus} />
 			</td>
-			<td className="px-4 py-4 align-top">
-				<div className="flex justify-end gap-1.5">
+			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
+				<div className="flex justify-end gap-0.5 @lg:gap-1.5">
 					<ViewDetailsButton onClick={onOpenDetail} label="Ver HU en detalle" />
 					<button
 						type="button"
 						onClick={onStartEdit}
 						aria-label="Editar HU"
 						title="Editar HU"
-						className=" cursor-pointer inline-flex items-center justify-center rounded-lg p-1.5 text-muted transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+						className="cursor-pointer inline-flex items-center justify-center rounded-lg p-1.5 text-muted transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
 					>
 						<EditIcon />
 					</button>
@@ -977,13 +998,14 @@ function EditableStoryRow({
 
 	return (
 		<tr className="border-b border-primary/20 bg-primary/5">
-			<td className="px-6 py-4 align-top">
+			<td className="hidden px-3 py-3 align-top @3xl:table-cell @3xl:px-4 @3xl:py-4">
 				<span className="font-mono text-xs font-bold text-primary">{row.story.id}</span>
 			</td>
-			<td colSpan={6} className="px-4 py-4">
-				<div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+			<td colSpan={6} className="px-3 py-3 @lg:px-4 @lg:py-4">
+				<span className="mb-3 block font-mono text-xs font-bold text-primary @3xl:hidden">{row.story.id}</span>
+				<div className="grid gap-4 @3xl:grid-cols-[1fr_1.1fr]">
 					<div className="flex flex-col gap-3">
-						<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid gap-3 @md:grid-cols-2 @3xl:grid-cols-3">
 							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
 								Epica
 								<select

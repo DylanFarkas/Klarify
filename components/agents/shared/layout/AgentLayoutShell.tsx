@@ -15,7 +15,7 @@ interface AgentLayoutShellProps {
 
 export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLayoutShellProps) {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-full min-h-0 bg-background text-foreground">
       <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-surface px-6 py-8 overflow-y-auto scrollbar-gutter-stable">
         <div className="mb-8">
           <Link

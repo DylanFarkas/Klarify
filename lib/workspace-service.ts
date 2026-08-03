@@ -9,6 +9,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { checkAndIncrementRegeneration, resolveUserPlan, ensureUserAccount } from '@/lib/plans/plan-service';
+import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { RegenerationAgent } from '@/lib/plans/types';
 import {
   getProjectWorkspace,
@@ -312,6 +313,103 @@ function generateUserStoryId(workspace: UserWorkspace): string {
     }, 0);
 
   return `HU-${String(maxId + 1).padStart(3, '0')}`;
+}
+
+function generateEpicIdFromWorkspace(workspace: UserWorkspace): string {
+  const maxId = collectEpics(workspace).reduce((max, epic) => {
+    const match = epic.id.match(/^EPIC-(\d+)$/i);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  return `EPIC-${String(maxId + 1).padStart(3, '0')}`;
+}
+
+function transformEpicsInWorkspace(
+  workspace: UserWorkspace,
+  transform: (epics: Epic[]) => Epic[]
+): UserWorkspace {
+  const mapInputEpics = <T extends { epics: Epic[] } | null | undefined>(
+    input: T
+  ): T => {
+    if (!input) return input;
+    return { ...input, epics: transform(input.epics) };
+  };
+
+  return {
+    ...workspace,
+    agent2: {
+      ...workspace.agent2,
+      epics: transform(workspace.agent2.epics),
+    },
+    agent3: {
+      ...workspace.agent3,
+      input: mapInputEpics(workspace.agent3.input),
+    },
+    agent4: {
+      ...workspace.agent4,
+      input: mapInputEpics(workspace.agent4.input),
+    },
+    agent5: {
+      ...workspace.agent5,
+      input: mapInputEpics(workspace.agent5.input),
+    },
+    pipeline: {
+      agent2Input: workspace.pipeline.agent2Input,
+      agent3Input: mapInputEpics(workspace.pipeline.agent3Input),
+      agent4Input: mapInputEpics(workspace.pipeline.agent4Input),
+      agent5Input: mapInputEpics(workspace.pipeline.agent5Input),
+      agent6Input: mapInputEpics(workspace.pipeline.agent6Input),
+    },
+  };
+}
+
+async function assertCanCreateEpic(uid: string, workspace: UserWorkspace): Promise<void> {
+  const plan = await resolveUserPlan(uid);
+  if (workspace.agent2.epics.length >= plan.limits.maxEpics) {
+    throw new PlanLimitError(
+      `Tu plan ${plan.id} permite hasta ${plan.limits.maxEpics} épica(s).`,
+      'PLAN_EPIC_LIMIT',
+      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+}
+
+async function assertCanCreateStory(
+  uid: string,
+  workspace: UserWorkspace,
+  epicId: string
+): Promise<void> {
+  const plan = await resolveUserPlan(uid);
+  const totalStories = workspace.agent2.epics.reduce(
+    (sum, epic) => sum + epic.userStories.length,
+    0
+  );
+  if (totalStories >= plan.limits.maxStories) {
+    throw new PlanLimitError(
+      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStories} historia(s).`,
+      'PLAN_STORY_LIMIT',
+      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+
+  const epic = workspace.agent2.epics.find((item) => item.id === epicId);
+  if (epic && epic.userStories.length >= plan.limits.maxStoriesPerEpic) {
+    throw new PlanLimitError(
+      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStoriesPerEpic} historia(s) por épica.`,
+      'PLAN_STORY_LIMIT',
+      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+}
+
+export interface CreateEpicInput {
+  title: string;
+  description: string;
+}
+
+export interface UpdateEpicInput {
+  title?: string;
+  description?: string;
 }
 
 function generateMemberId(members: ProjectMember[]): string {
@@ -788,6 +886,10 @@ export async function createUserStoryAcrossWorkspace(
   input: CreateUserStoryInput
 ): Promise<UserWorkspace> {
   const { workspace } = await getWorkspaceData(uid);
+  if (!workspace.agent2.epics.some((epic) => epic.id === input.epicId)) {
+    throw new Error(`Épica no encontrada: ${input.epicId}`);
+  }
+  await assertCanCreateStory(uid, workspace, input.epicId);
   const storyId = generateUserStoryId(workspace);
   const story: UserStory = {
     id: storyId,
@@ -1057,6 +1159,106 @@ export async function deleteUserStoryAcrossWorkspace(
     agent5: sanitize(updatedWorkspace.agent5),
     pipeline: sanitize(updatedWorkspace.pipeline),
     ...(updatedWorkspace.execution ? { execution: sanitize(updatedWorkspace.execution) } : {}),
+  });
+
+  return updatedWorkspace;
+}
+
+export async function createEpicAcrossWorkspace(
+  uid: string,
+  input: CreateEpicInput
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  await assertCanCreateEpic(uid, workspace);
+
+  const epic: Epic = {
+    id: generateEpicIdFromWorkspace(workspace),
+    title: input.title.trim(),
+    description: input.description.trim(),
+    userStories: [],
+    source: 'manual',
+    isEdited: false,
+    createdAt: Date.now(),
+  };
+
+  const updatedWorkspace = transformEpicsInWorkspace(workspace, (epics) => [...epics, epic]);
+
+  await saveProjectWorkspace(uid, await activeProject(uid), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
+
+  return updatedWorkspace;
+}
+
+export async function updateEpicAcrossWorkspace(
+  uid: string,
+  epicId: string,
+  updates: UpdateEpicInput
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const exists = workspace.agent2.epics.some((epic) => epic.id === epicId);
+  if (!exists) {
+    throw new Error(`Épica no encontrada: ${epicId}`);
+  }
+
+  const updatedWorkspace = transformEpicsInWorkspace(workspace, (epics) =>
+    epics.map((epic) =>
+      epic.id === epicId
+        ? {
+            ...epic,
+            ...(updates.title !== undefined ? { title: updates.title.trim() } : {}),
+            ...(updates.description !== undefined
+              ? { description: updates.description.trim() }
+              : {}),
+            isEdited: true,
+          }
+        : epic
+    )
+  );
+
+  await saveProjectWorkspace(uid, await activeProject(uid), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
+  });
+
+  return updatedWorkspace;
+}
+
+export async function deleteEpicAcrossWorkspace(
+  uid: string,
+  epicId: string
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const target = workspace.agent2.epics.find((epic) => epic.id === epicId);
+  if (!target) {
+    throw new Error(`Épica no encontrada: ${epicId}`);
+  }
+
+  const storyIds = target.userStories.map((story) => story.id);
+
+  for (const storyId of storyIds) {
+    await deleteUserStoryAcrossWorkspace(uid, storyId);
+  }
+
+  // Recargar por si deleteUserStory cambió el estado; luego quitar la épica vacía.
+  const { workspace: latest } = await getWorkspaceData(uid);
+  const updatedWorkspace = transformEpicsInWorkspace(latest, (epics) =>
+    epics.filter((epic) => epic.id !== epicId)
+  );
+
+  await saveProjectWorkspace(uid, await activeProject(uid), {
+    agent2: sanitize(updatedWorkspace.agent2),
+    agent3: sanitize(updatedWorkspace.agent3),
+    agent4: sanitize(updatedWorkspace.agent4),
+    agent5: sanitize(updatedWorkspace.agent5),
+    pipeline: sanitize(updatedWorkspace.pipeline),
   });
 
   return updatedWorkspace;

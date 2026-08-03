@@ -9,6 +9,53 @@ html[data-agent-theme],
   --sileo-state-action: var(--primary);
   --sileo-state-warning: #f59e0b;
   --sileo-state-loading: var(--foreground-muted);
+  --scrollbar-thumb: color-mix(in srgb, var(--foreground-subtle) 45%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--foreground-muted) 65%, transparent);
+  --scrollbar-track: transparent;
+}
+
+/* Scrollbars alineados al tema (evita el thumb blanco del SO) */
+.agent-workspace,
+.agentes-klark-shell__main,
+.harness-chat__body,
+.harness-dock__panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.agent-workspace *:not(html):not(body)::-webkit-scrollbar,
+.agentes-klark-shell__main ::-webkit-scrollbar,
+.harness-chat__body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.agent-workspace *:not(html):not(body)::-webkit-scrollbar-track,
+.agentes-klark-shell__main ::-webkit-scrollbar-track,
+.harness-chat__body::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.agent-workspace *:not(html):not(body)::-webkit-scrollbar-thumb,
+.agentes-klark-shell__main ::-webkit-scrollbar-thumb,
+.harness-chat__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.agent-workspace *:not(html):not(body)::-webkit-scrollbar-thumb:hover,
+.agentes-klark-shell__main ::-webkit-scrollbar-thumb:hover,
+.harness-chat__body::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.agent-workspace *:not(html):not(body)::-webkit-scrollbar-corner,
+.agentes-klark-shell__main ::-webkit-scrollbar-corner,
+.harness-chat__body::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 html[data-agent-theme="light"],

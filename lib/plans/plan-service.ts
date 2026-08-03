@@ -36,6 +36,7 @@ function emptyUsage(): UserUsage {
   return {
     periodKey: currentPeriodKey(),
     regenerations: { agent2: 0, agent3: 0, agent4: 0, agent5: 0 },
+    harnessMessages: 0,
   };
 }
 
@@ -55,6 +56,7 @@ function normalizeUsage(raw: Partial<UserUsage> | undefined): UserUsage {
       agent4: raw.regenerations?.agent4 ?? 0,
       agent5: raw.regenerations?.agent5 ?? 0,
     },
+    harnessMessages: raw.harnessMessages ?? 0,
   };
 }
 
@@ -188,6 +190,7 @@ export async function checkAndIncrementRegeneration(
       usage: {
         periodKey: plan.usage.periodKey,
         regenerations: updatedRegenerations,
+        harnessMessages: plan.usage.harnessMessages,
       },
     },
     { merge: true }
@@ -199,4 +202,42 @@ export async function checkAndIncrementRegeneration(
       : null;
 
   return { remaining };
+}
+
+/** Comprueba e incrementa el contador mensual de mensajes del harness de backlog. */
+export async function checkAndIncrementHarnessMessage(
+  uid: string
+): Promise<{ remaining: number | null }> {
+  const plan = await resolveUserPlan(uid);
+  const limit = plan.limits.maxHarnessMessages;
+
+  if (limit === null) {
+    return { remaining: null };
+  }
+
+  const used = plan.usage.harnessMessages;
+  if (used >= limit) {
+    throw new PlanLimitError(
+      `Has alcanzado el límite de mensajes de Klark este mes (${limit}).`,
+      'PLAN_HARNESS_LIMIT',
+      {
+        upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined,
+        remaining: 0,
+      }
+    );
+  }
+
+  const harnessMessages = used + 1;
+  await userDoc(uid).set(
+    {
+      usage: {
+        periodKey: plan.usage.periodKey,
+        regenerations: plan.usage.regenerations,
+        harnessMessages,
+      },
+    },
+    { merge: true }
+  );
+
+  return { remaining: Math.max(0, limit - harnessMessages) };
 }

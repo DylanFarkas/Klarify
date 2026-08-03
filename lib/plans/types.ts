@@ -15,6 +15,8 @@ export type PlanErrorCode =
   | 'PLAN_REGENERATION_BLOCKED'
   | 'PLAN_REGENERATION_LIMIT'
   | 'PLAN_STORY_LIMIT'
+  | 'PLAN_EPIC_LIMIT'
+  | 'PLAN_HARNESS_LIMIT'
   | 'PLAN_FEATURE_GITHUB'
   | 'PLAN_FEATURE_EXPORT'
   | 'PLAN_FEATURE_EXECUTION_BOARD'
@@ -33,6 +35,8 @@ export interface PlanLimits {
   export: false | 'manual' | 'full';
   executionBoard: boolean;
   maxTeamMembers: number;
+  /** Mensajes del harness de backlog por mes; null = ilimitado. */
+  maxHarnessMessages: number | null;
 }
 
 export interface AiGenerationConfig {
@@ -60,6 +64,8 @@ export interface RegenerationUsage {
 export interface UserUsage {
   periodKey: string;
   regenerations: RegenerationUsage;
+  /** Mensajes enviados al harness de backlog en el periodo actual. */
+  harnessMessages: number;
 }
 
 export interface PlanSnapshot {

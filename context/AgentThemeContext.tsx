@@ -81,7 +81,7 @@ export function AgentThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <AgentThemeContext.Provider value={{ theme, setTheme, carbonAccent, setCarbonAccent }}>
-      <div className="agent-workspace min-h-screen">
+      <div className="agent-workspace h-dvh min-h-0 overflow-hidden">
         {children}
       </div>
     </AgentThemeContext.Provider>

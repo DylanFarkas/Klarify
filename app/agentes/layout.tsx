@@ -5,6 +5,7 @@ import { WorkspaceProvider } from '@/context/WorkspaceContext';
 import { WorkspaceSettingsProvider } from '@/context/WorkspaceSettingsContext';
 import { AgentToaster } from '@/components/agents/shared/notifications/AgentToaster';
 import { ConfirmDialogProvider } from '@/components/agents/shared/ConfirmDialog';
+import { AgentesShell } from '@/components/agents/harness/AgentesShell';
 
 /** Layout compartido de /agentes — exige sesión, workspace y temas */
 export default function AgentesLayout({
@@ -19,7 +20,9 @@ export default function AgentesLayout({
         <ConfirmDialogProvider>
           <WorkspaceSettingsProvider>
             <AgentAuthGuard>
-              <WorkspaceProvider>{children}</WorkspaceProvider>
+              <WorkspaceProvider>
+                <AgentesShell>{children}</AgentesShell>
+              </WorkspaceProvider>
             </AgentAuthGuard>
           </WorkspaceSettingsProvider>
           <AgentToaster />

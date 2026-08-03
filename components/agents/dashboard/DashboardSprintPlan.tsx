@@ -43,7 +43,7 @@ export function DashboardSprintPlan({
 	const [isCreating, setIsCreating] = useState(false);
 
 	return (
-		<section className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface/80 shadow-sm">
+		<section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface/80 shadow-sm">
 			<div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-5">
 				<div className="min-w-0 flex-1">
 					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Plan de sprints</p>

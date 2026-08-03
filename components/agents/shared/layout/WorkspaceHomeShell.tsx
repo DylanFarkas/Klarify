@@ -14,7 +14,7 @@ interface WorkspaceHomeShellProps {
 
 export function WorkspaceHomeShell({ children }: WorkspaceHomeShellProps) {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-full min-h-0 bg-background text-foreground">
       <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 scrollbar-gutter-stable lg:flex">
         <div className="mb-8">
           <Link

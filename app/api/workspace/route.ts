@@ -28,6 +28,9 @@ import {
   createUserStoryAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
+  createEpicAcrossWorkspace,
+  updateEpicAcrossWorkspace,
+  deleteEpicAcrossWorkspace,
   updateSprintPlanAcrossWorkspace,
   resetAgent1,
   resetAgent2,
@@ -66,6 +69,9 @@ interface PostBody {
     | 'createUserStory'
     | 'deleteUserStory'
     | 'updateUserStory'
+    | 'createEpic'
+    | 'updateEpic'
+    | 'deleteEpic'
     | 'updateSprintPlan'
     | 'initializeExecution'
     | 'upsertProjectMember'
@@ -107,6 +113,18 @@ interface PostBody {
       }
     | {
         storyId: string;
+      }
+    | {
+        title: string;
+        description: string;
+      }
+    | {
+        epicId: string;
+        title?: string;
+        description?: string;
+      }
+    | {
+        epicId: string;
       }
     | {
         member?: {
@@ -258,6 +276,40 @@ export async function POST(request: NextRequest) {
           },
           payload.prioritizationUpdates
         );
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'createEpic': {
+        const payload = body.payload as { title?: string; description?: string };
+        if (!payload.title?.trim() || !payload.description?.trim()) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await createEpicAcrossWorkspace(uid, {
+          title: payload.title,
+          description: payload.description,
+        });
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'updateEpic': {
+        const payload = body.payload as {
+          epicId?: string;
+          title?: string;
+          description?: string;
+        };
+        if (!payload.epicId || (payload.title === undefined && payload.description === undefined)) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await updateEpicAcrossWorkspace(uid, payload.epicId, {
+          title: payload.title,
+          description: payload.description,
+        });
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'deleteEpic': {
+        const payload = body.payload as { epicId?: string };
+        if (!payload.epicId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await deleteEpicAcrossWorkspace(uid, payload.epicId);
         return NextResponse.json({ ok: true, workspace });
       }
       case 'updateSprintPlan': {
