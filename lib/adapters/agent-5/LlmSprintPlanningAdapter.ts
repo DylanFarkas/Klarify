@@ -1,10 +1,7 @@
 /**
- * @fileoverview Adaptador de Gemini para el Agente 5 — Scrum Master (Sprint Planning).
- * Utiliza el SDK @google/genai para planificar sprints con historias priorizadas.
- * Soporta streaming nativo de pensamientos del modelo vía generateContentStream.
+ * @fileoverview Adaptador multi-proveedor para el Agente 5 — Sprint Planning.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import type { ISprintPlanningAdapter } from './ISprintPlanningAdapter';
 import type {
   LocalStoryForPlanning,
@@ -26,16 +23,13 @@ import { FRAMEWORK_DESCRIPTIONS } from '@/lib/constants/agent-4';
 import { getPriorityOrderLabel } from '@/lib/utils/priority-rank';
 import {
   SPRINT_ID_PREFIX,
-  GEMINI_SPRINT_PLANNING_PREFIX,
+  AGENT5_JUSTIFICATION_PREFIX,
 } from '@/lib/constants/agent-5';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
-
-interface ContentPart {
-  text?: string;
-  thought?: boolean;
-}
+import { generateJson } from '@/lib/llm/generate';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 interface RawSprintPlanResponse {
   sprints: Array<{
@@ -50,17 +44,8 @@ interface RawSprintPlanResponse {
   unassignedStoryIds: string[];
 }
 
-export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
-  private ai: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash';
-
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-    }
-  }
+export class LlmSprintPlanningAdapter implements ISprintPlanningAdapter {
+  constructor(private credentials: LlmCredentials) {}
 
   async planSprints(
     stories: LocalStoryForPlanning[],
@@ -79,37 +64,23 @@ export class GeminiSprintPlanningAdapter implements ISprintPlanningAdapter {
     aiConfig?: AiGenerationConfig
   ): Promise<SprintPlan> {
     const ai = aiConfig ?? defaultAiConfig();
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
 
     try {
-      // console.log('[GeminiSprintPlanningAdapter] Iniciando planificación de sprints con Gemini...');
-
       const { systemInstruction, userPrompt } = this.buildPrompts(stories, config, framework);
 
-      const responseText = await this.streamGenerate(
-        userPrompt,
+      const { text: responseText } = await generateJson(this.credentials, {
         systemInstruction,
+        userPrompt,
+        temperature: 0.2,
+        thinkingBudget: ai.thinkingBudget,
         onThought,
-        ai.thinkingBudget
-      );
+      });
 
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini al planificar sprints.');
-      }
-
-      // console.log('[GEMINI SPRINT RESPONSE]:', responseText);
-      const result = this.parseSprintPlanResponse(responseText, config, stories, framework);
-      // console.log(
-      //   `[GeminiSprintPlanningAdapter] Planificación exitosa. Sprints: ${result.sprints.length}`
-      // );
-
-      return result;
+      return this.parseSprintPlanResponse(responseText, config, stories, framework);
     } catch (error) {
-      console.error('[GeminiSprintPlanningAdapter] Error al planificar sprints:', error);
+      console.error('[LlmSprintPlanningAdapter] Error al planificar sprints:', error);
       throw new Error(
-        `Error en el servicio de planificación (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de planificación: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   }
@@ -174,47 +145,6 @@ HISTORIAS A PLANIFICAR:
 ${JSON.stringify(stories, null, 2)}`;
 
     return { systemInstruction, userPrompt };
-  }
-
-  private async streamGenerate(
-    contents: string,
-    systemInstruction: string,
-    onThought: LLMThoughtCallback,
-    thinkingBudget: number
-  ): Promise<string> {
-    if (!this.ai) throw new Error('SDK no inicializado.');
-
-    const responseStream = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget,
-        },
-      },
-    });
-
-    let outputText = '';
-
-    for await (const chunk of responseStream) {
-      const parts = (chunk.candidates?.[0]?.content?.parts ?? []) as ContentPart[];
-
-      for (const part of parts) {
-        if (typeof part.text !== 'string') continue;
-
-        if (part.thought === true) {
-          onThought(part.text);
-        } else {
-          outputText += part.text;
-        }
-      }
-    }
-
-    return outputText;
   }
 
   private parseSprintPlanResponse(
@@ -309,7 +239,7 @@ ${JSON.stringify(stories, null, 2)}`;
         .map((d) => ({
           storyId: d.storyId.trim(),
           dependsOnStoryId: d.dependsOnStoryId.trim(),
-          reason: `${GEMINI_SPRINT_PLANNING_PREFIX} ${d.reason.trim()}`,
+          reason: `${AGENT5_JUSTIFICATION_PREFIX} ${d.reason.trim()}`,
         })),
       stories,
       { framework }

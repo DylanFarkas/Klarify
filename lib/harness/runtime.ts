@@ -1,15 +1,8 @@
 /**
- * @fileoverview Runtime del harness: loop Gemini function-calling + tools.
+ * @fileoverview Runtime del harness: loop multi-proveedor + tools (Klark).
  */
 
-import {
-  GoogleGenAI,
-  FunctionCallingConfigMode,
-  createPartFromFunctionResponse,
-  type Content,
-  type Part,
-} from '@google/genai';
-import { buildHarnessSystemPrompt } from '@/lib/harness/prompt';
+import { buildHarnessSystemPrompt, identityFromCredentials } from '@/lib/harness/prompt';
 import {
   createHarnessMessage,
   getHarnessHistory,
@@ -34,6 +27,9 @@ import {
 import { checkAndIncrementHarnessMessage } from '@/lib/plans/plan-service';
 import { isPlanLimitError } from '@/lib/plans/plan-errors';
 import { getWorkspaceData } from '@/lib/workspace-service';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
+import { runToolLoop } from '@/lib/llm/tool-loop';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 export type HarnessEventCallback = (event: HarnessStreamEvent) => void;
 
@@ -46,21 +42,6 @@ export interface RunHarnessTurnInput {
 export interface RunHarnessTurnResult {
   messages: HarnessChatMessage[];
   remaining: number | null;
-}
-
-function toModelContents(messages: HarnessChatMessage[]): Content[] {
-  return messages.map((msg) => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
-}
-
-function extractText(parts: Part[] | undefined): string {
-  if (!parts) return '';
-  return parts
-    .map((part) => (typeof part.text === 'string' && !part.thought ? part.text : ''))
-    .join('')
-    .trim();
 }
 
 function confirmationMessage(result: HarnessToolResult): string {
@@ -78,16 +59,28 @@ function isTerminalToolFailure(result: HarnessToolResult): boolean {
   return false;
 }
 
-/** ok para UI/activity: pending_confirmation no es error visual. */
 function toolEndOk(result: HarnessToolResult): boolean {
   return result.status === 'success' || result.status === 'pending_confirmation';
 }
 
-async function runGeminiHarnessTurn(
+function toolResultToPayload(result: HarnessToolResult): Record<string, unknown> {
+  return {
+    ok: result.ok,
+    status: result.status,
+    summary: result.summary,
+    data: result.data ?? null,
+    needsConfirmation: result.needsConfirmation ?? false,
+    mutated: Boolean(result.mutated),
+    error: result.error ?? null,
+    confirmationLabel: result.confirmationLabel ?? null,
+  };
+}
+
+async function runProviderHarnessTurn(
   input: RunHarnessTurnInput,
+  credentials: LlmCredentials,
   onEvent: HarnessEventCallback
 ): Promise<RunHarnessTurnResult> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   const {
     projectId,
     messages: history,
@@ -108,19 +101,20 @@ async function runGeminiHarnessTurn(
   const userMessage = createHarnessMessage('user', input.message.trim());
   let conversation = [...history, userMessage];
   let workspaceMutated = false;
-  const contents: Content[] = toModelContents(conversation);
   const turnOutcomes: string[] = [];
   let groundedText = '';
   let skipModelLoop = false;
 
+  const historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> =
+    conversation.map((msg) => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content,
+    }));
+
   if (previousOutcomes.length > 0) {
-    contents.push({
+    historyMessages.push({
       role: 'user',
-      parts: [
-        {
-          text: `[Sistema] Outcomes del turno anterior (hechos, no inventes lo contrario):\n${previousOutcomes.join('\n')}`,
-        },
-      ],
+      content: `[Sistema] Outcomes del turno anterior (hechos, no inventes lo contrario):\n${previousOutcomes.join('\n')}`,
     });
   }
 
@@ -149,18 +143,13 @@ async function runGeminiHarnessTurn(
       onEvent({ type: 'workspace_updated' });
     }
 
-    // Anclar siempre al resultado real; no dejar que un texto vacío diga "Listo".
     groundedText = confirmedResult.summary;
     if (!confirmedResult.ok || confirmedResult.status !== 'success') {
       skipModelLoop = true;
     } else {
-      contents.push({
+      historyMessages.push({
         role: 'user',
-        parts: [
-          {
-            text: `[Sistema] Acción confirmada ejecutada (${input.confirmedAction.name}): OK. ${confirmedResult.summary}. Puedes confirmar brevemente al usuario; no inventes otros cambios.`,
-          },
-        ],
+        content: `[Sistema] Acción confirmada ejecutada (${input.confirmedAction.name}): OK. ${confirmedResult.summary}. Puedes confirmar brevemente al usuario; no inventes otros cambios.`,
       });
     }
   }
@@ -168,48 +157,29 @@ async function runGeminiHarnessTurn(
   const { workspace } = await getWorkspaceData(input.uid);
   const framework = resolveWorkspaceFramework(workspace);
   const backlogIndex = buildBacklogIndex(workspace);
-  const systemInstruction = buildHarnessSystemPrompt(framework, backlogIndex);
+  const systemInstruction = buildHarnessSystemPrompt(
+    framework,
+    backlogIndex,
+    identityFromCredentials(credentials)
+  );
 
   let assistantText = groundedText;
+  let stopReason: 'confirm' | 'terminal' | null = null;
 
   if (!skipModelLoop) {
-    for (let iteration = 0; iteration < HARNESS_MAX_TOOL_ITERATIONS; iteration++) {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents,
-        config: {
-          systemInstruction,
-          tools: [{ functionDeclarations: HARNESS_TOOL_DECLARATIONS }],
-          toolConfig: {
-            functionCallingConfig: {
-              mode: FunctionCallingConfigMode.AUTO,
-            },
-          },
-        },
-      });
-
-      const functionCalls = response.functionCalls;
-      const modelContent = response.candidates?.[0]?.content;
-
-      if (!functionCalls?.length) {
-        const modelText =
-          extractText(modelContent?.parts) || response.text?.trim() || '';
-        // Si ya hay texto anclado (p. ej. confirmación exitosa), priorizarlo si el modelo calla.
-        assistantText = modelText || groundedText || '';
-        break;
-      }
-
-      if (modelContent) {
-        contents.push(modelContent);
-      }
-
-      const functionResponseParts: Part[] = [];
-      let stopAfterTools = false;
-
-      for (const call of functionCalls) {
-        const name = call.name ?? 'unknown';
-        const args = (call.args ?? {}) as Record<string, unknown>;
-
+    const loopResult = await runToolLoop({
+      credentials,
+      systemInstruction,
+      resolveSystemInstruction: (creds) =>
+        buildHarnessSystemPrompt(
+          framework,
+          backlogIndex,
+          identityFromCredentials(creds)
+        ),
+      historyMessages,
+      tools: HARNESS_TOOL_DECLARATIONS,
+      maxIterations: HARNESS_MAX_TOOL_ITERATIONS,
+      executeTool: async (name, args) => {
         onEvent({ type: 'tool_start', name, args });
         onEvent({ type: 'thought', text: `Ejecutando ${name}…` });
 
@@ -239,11 +209,11 @@ async function runGeminiHarnessTurn(
           });
           groundedText = confirmationMessage(result);
           assistantText = groundedText;
-          stopAfterTools = true;
+          stopReason = 'confirm';
         } else if (isTerminalToolFailure(result)) {
           groundedText = result.summary;
           assistantText = groundedText;
-          stopAfterTools = true;
+          stopReason = 'terminal';
         } else if (result.status === 'success' && result.mutated) {
           groundedText = result.summary;
         } else if (result.status === 'error') {
@@ -255,25 +225,13 @@ async function runGeminiHarnessTurn(
           onEvent({ type: 'workspace_updated' });
         }
 
-        functionResponseParts.push(
-          createPartFromFunctionResponse(call.id ?? `${name}-${iteration}`, name, {
-            ok: result.ok,
-            status: result.status,
-            summary: result.summary,
-            data: result.data ?? null,
-            needsConfirmation: result.needsConfirmation ?? false,
-            mutated: Boolean(result.mutated),
-            error: result.error ?? null,
-          })
-        );
-      }
+        return toolResultToPayload(result);
+      },
+      shouldStopAfterTools: () => stopReason !== null,
+    });
 
-      contents.push({ role: 'user', parts: functionResponseParts });
-
-      if (stopAfterTools) {
-        // El runtime escribe el mensaje; no dejamos que el modelo invente confirmación/éxito.
-        break;
-      }
+    if (!stopReason) {
+      assistantText = loopResult.assistantText || groundedText;
     }
   }
 
@@ -312,10 +270,11 @@ export async function runHarnessTurn(
 
   onEvent({ type: 'thought', text: 'Analizando petición…' });
 
-  if (!process.env.GEMINI_API_KEY) {
+  const credentials = await resolveLlmCredentials(input.uid);
+  if (!credentials) {
     const { runMockHarnessTurn } = await import('@/lib/harness/mock-runtime');
     return runMockHarnessTurn(input, onEvent);
   }
 
-  return runGeminiHarnessTurn(input, onEvent);
+  return runProviderHarnessTurn(input, credentials, onEvent);
 }

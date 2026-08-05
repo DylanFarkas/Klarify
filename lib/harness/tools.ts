@@ -4,10 +4,10 @@
  * Cada tool valida args y delega en workspace-service (*AcrossWorkspace).
  */
 
-import type { FunctionDeclaration } from '@google/genai';
 import type { FrameworkCategory } from '@/lib/types/agent-4';
 import type { UserWorkspace } from '@/lib/types/workspace';
 import type { HarnessToolResult } from '@/lib/harness/types';
+import type { LlmToolDefinition } from '@/lib/llm/types';
 import {
   describeFrameworkCategories,
   normalizePriorityCategory,
@@ -301,12 +301,12 @@ function resolveCategoryArg(
   return { ok: true, category };
 }
 
-export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
+export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'list_backlog',
     description:
       'Lista el backlog actual: épicas, historias, puntos, prioridad y asignación a sprints.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {},
       additionalProperties: false,
@@ -316,7 +316,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     name: 'get_story',
     description:
       'Obtiene una historia por ID (HU-XXX, "28", etc.). Úsala para verificar existencia o leer detalle antes de mutar.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         storyId: {
@@ -330,7 +330,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'create_story',
     description: 'Crea una historia de usuario en una épica existente.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         epicId: { type: 'string', description: 'ID de la épica (p. ej. EPIC-001)' },
@@ -363,7 +363,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     name: 'update_story',
     description:
       'Actualiza una historia (título, descripción, CA, épica, puntos, prioridad o sprint). Para priorizar usa category con el código canónico (must/should/could/wont si MoSCoW).',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         storyId: { type: 'string' },
@@ -390,7 +390,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     name: 'delete_story',
     description:
       'Elimina una historia. Requiere confirm=true tras confirmación explícita del usuario.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         storyId: {
@@ -409,7 +409,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'create_epic',
     description: 'Crea una épica vacía en el backlog.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         title: { type: 'string' },
@@ -421,7 +421,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'update_epic',
     description: 'Actualiza título o descripción de una épica.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         epicId: { type: 'string' },
@@ -435,7 +435,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     name: 'delete_epic',
     description:
       'Elimina una épica y todas sus historias. Requiere confirm=true tras confirmación del usuario.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         epicId: { type: 'string' },
@@ -450,7 +450,7 @@ export const HARNESS_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'assign_story_sprint',
     description: 'Asigna una historia a un sprint o la deja sin asignar.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         storyId: { type: 'string' },

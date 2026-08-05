@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { WorkspaceSettingsModal } from '@/components/agents/shared/settings/WorkspaceSettingsModal';
+import { AiModelPicker } from '@/components/agents/shared/settings/AiModelPicker';
 
 interface AgentSidebarSettingsProps {
   /** Clases extra para adaptar el componente en distintos layouts (ej. móvil) */
@@ -20,7 +21,8 @@ export function AgentSidebarSettings({ className = '' }: AgentSidebarSettingsPro
 
   return (
     <>
-      <div className={['relative z-10 border-border', className].filter(Boolean).join(' ')}>
+      <div className={['relative z-10 space-y-3 border-border', className].filter(Boolean).join(' ')}>
+        <AiModelPicker />
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}

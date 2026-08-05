@@ -1,24 +1,16 @@
 /**
- * @fileoverview Adaptador Gemini para la generación de backlog (Fase 3).
- *
- * Utiliza el SDK @google/genai para generar Épicas e Historias de Usuario
- * a partir de los deseos aprobados del cliente. Soporta streaming de
- * pensamientos del modelo vía generateContentStream.
+ * @fileoverview Adaptador multi-proveedor para generación de backlog (Agente 2).
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { IBacklogLLMAdapter } from './IBacklogLLMAdapter';
 import type { Wish, TranscriptionResult } from '@/lib/types/agent-1';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
-import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-service';
+import { generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { backlogDetailPrompt, defaultAiConfig } from '@/lib/plans/ai-config';
-
-interface ContentPart {
-  text?: string;
-  thought?: boolean;
-}
+import { generateJson } from '@/lib/llm/generate';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 interface RawBacklogResponse {
   epics: Array<{
@@ -33,17 +25,8 @@ interface RawBacklogResponse {
   }>;
 }
 
-export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
-  private ai: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash';
-
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-    }
-  }
+export class LlmBacklogAdapter implements IBacklogLLMAdapter {
+  constructor(private credentials: LlmCredentials) {}
 
   async generateBacklog(
     wishes: Wish[],
@@ -59,37 +42,23 @@ export class GeminiBacklogAdapter implements IBacklogLLMAdapter {
     transcription?: TranscriptionResult | null,
     aiConfig?: AiGenerationConfig
   ): Promise<Epic[]> {
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
-
     try {
-      // console.log('[GeminiBacklogAdapter] Iniciando generación de backlog con Gemini...');
-
       const config = aiConfig ?? defaultAiConfig();
       const { systemInstruction, userPrompt } = this.buildPrompts(wishes, transcription, config);
 
-      const responseText = await this.streamGenerate(
-        userPrompt,
+      const { text: responseText } = await generateJson(this.credentials, {
         systemInstruction,
+        userPrompt,
+        temperature: 0.2,
+        thinkingBudget: config.thinkingBudget,
         onThought,
-        config.thinkingBudget
-      );
+      });
 
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini');
-      }
-
-      const result = this.parseBacklogResponse(responseText);
-      const storyCount = result.reduce((sum, e) => sum + e.userStories.length, 0);
-      // console.log(
-      //   `[GeminiBacklogAdapter] Generación exitosa. Épicas: ${result.length}, Historias: ${storyCount}`
-      // );
-      return result;
+      return this.parseBacklogResponse(responseText);
     } catch (error) {
-      console.error('[GeminiBacklogAdapter] Error al generar backlog:', error);
+      console.error('[LlmBacklogAdapter] Error al generar backlog:', error);
       throw new Error(
-        `Error en el servicio de generación (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de generación: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   }
@@ -151,49 +120,6 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
     return { systemInstruction, userPrompt };
   }
 
-  private async streamGenerate(
-    contents: string,
-    systemInstruction: string,
-    onThought: LLMThoughtCallback,
-    thinkingBudget: number
-  ): Promise<string> {
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
-
-    const responseStream = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget,
-        },
-      },
-    });
-
-    let outputText = '';
-
-    for await (const chunk of responseStream) {
-      const parts = (chunk.candidates?.[0]?.content?.parts ?? []) as ContentPart[];
-
-      for (const part of parts) {
-        if (typeof part.text !== 'string') continue;
-
-        if (part.thought === true) {
-          onThought(part.text);
-        } else {
-          outputText += part.text;
-        }
-      }
-    }
-
-    return outputText;
-  }
-
   private parseBacklogResponse(responseText: string): Epic[] {
     const raw = JSON.parse(responseText) as RawBacklogResponse;
 
@@ -212,7 +138,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
         typeof rawEpic.description !== 'string' ||
         !Array.isArray(rawEpic.userStories)
       ) {
-        console.warn('[GeminiBacklogAdapter] Épica inválida descartada:', rawEpic?.title ?? rawEpic);
+        console.warn('[LlmBacklogAdapter] Épica inválida descartada:', rawEpic?.title ?? rawEpic);
         continue;
       }
 
@@ -229,7 +155,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
           rawStory.acceptanceCriteria.length < 1 ||
           !Array.isArray(rawStory.sourceWishIds)
         ) {
-          console.warn('[GeminiBacklogAdapter] Historia inválida descartada:', rawStory?.title ?? rawStory);
+          console.warn('[LlmBacklogAdapter] Historia inválida descartada:', rawStory?.title ?? rawStory);
           continue;
         }
 
@@ -238,7 +164,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
           .map((c) => c.trim());
 
         if (cleanCriteria.length === 0) {
-          console.warn('[GeminiBacklogAdapter] Historia descartada (sin criterios válidos):', rawStory.title);
+          console.warn('[LlmBacklogAdapter] Historia descartada (sin criterios válidos):', rawStory.title);
           continue;
         }
 

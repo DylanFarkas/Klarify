@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
               `Clasificando historias (${frameworkLabel})...`,
               () =>
                 prioritizeBacklogStream(
+                  uid,
                   agent4Input,
                   body.framework ?? 'moscow',
                   emitter.bindThought(),

@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
               AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.label,
               () =>
                 extractWishesFromContextStream(
+                  uid,
                   body.transcription,
                   body.discovery,
                   emitter.bindThought(),

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeSettingsPanel } from '@/components/agents/shared/settings/ThemeSettingsPanel';
 import { GitHubConnectionPanel } from '@/components/agents/shared/settings/GitHubConnectionPanel';
+import { AiProviderConnectionPanel } from '@/components/agents/shared/settings/AiProviderConnectionPanel';
 import { GeneralSettingsPanel } from '@/components/agents/shared/settings/GeneralSettingsPanel';
 import { GitHubExportUpgradeGate } from '@/components/agents/github/GitHubExportUpgradeGate';
 import { useWorkspace } from '@/hooks/useWorkspace';
@@ -175,9 +176,10 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Integraciones</h3>
                 <p className="mt-1 text-xs text-subtle">
-                  Conecta herramientas externas para exportar y gestionar tu backlog.
+                  Conecta un proveedor de IA y herramientas externas para tu backlog.
                 </p>
               </div>
+              <AiProviderConnectionPanel />
               {githubEnabled ? (
                 <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
               ) : (

@@ -1,8 +1,8 @@
 /**
- * @fileoverview Servicio del Agente 4 — Capa de lógica de negocio (Product Owner / Priorización).
- * Abstrae el procesamiento y clasificación MoSCoW del backlog estimado.
- * Instancia el adaptador correcto detectando automáticamente el entorno de Klarify.
+ * @fileoverview Servicio del Agente 4 — Priorización.
  */
+
+import 'server-only';
 
 import type { Agent4Input } from '@/lib/types/workspace';
 import type {
@@ -14,12 +14,15 @@ import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 import { IPrioritizationAdapter } from '../adapters/agent-4/IPrioritizationAdapter';
 import { MockPrioritizationAdapter } from '../adapters/agent-4/MockPrioritizationAdapter';
-import { GeminiPrioritizationAdapter } from '../adapters/agent-4/GeminiPrioritizationAdapter';
+import { LlmPrioritizationAdapter } from '../adapters/agent-4/LlmPrioritizationAdapter';
 import { DEFAULT_FRAMEWORK } from '@/lib/constants/agent-4';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
 
-const prioritizationAdapter: IPrioritizationAdapter = process.env.GEMINI_API_KEY
-  ? new GeminiPrioritizationAdapter()
-  : new MockPrioritizationAdapter();
+async function resolvePrioritizationAdapter(uid: string): Promise<IPrioritizationAdapter> {
+  const credentials = await resolveLlmCredentials(uid);
+  if (!credentials) return new MockPrioritizationAdapter();
+  return new LlmPrioritizationAdapter(credentials);
+}
 
 export interface ValidationResult {
   valid: boolean;
@@ -27,9 +30,6 @@ export interface ValidationResult {
   code?: 'NO_INPUT' | 'EMPTY_BACKLOG' | 'MISSING_ESTIMATIONS';
 }
 
-/**
- * Valida que el input del Agente 4 contenga la estructura necesaria.
- */
 export function validateAgent4Input(input: Agent4Input | null): ValidationResult {
   if (!input) {
     return { valid: false, error: 'No hay input proveído al Agente 4.', code: 'NO_INPUT' };
@@ -53,15 +53,14 @@ export function validateAgent4Input(input: Agent4Input | null): ValidationResult
   return { valid: true };
 }
 
-/**
- * Genera priorizaciones transmitiendo los pensamientos del modelo en tiempo real.
- */
 export async function prioritizeBacklogStream(
+  uid: string,
   input: Agent4Input,
   framework: PrioritizationFramework = DEFAULT_FRAMEWORK,
   onThought: LLMThoughtCallback,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Agent4SuggestionItem[]> {
+  const prioritizationAdapter = await resolvePrioritizationAdapter(uid);
   const localEpics = toLocalEpicsWithEstimation(input.epics, input.estimations);
   return prioritizationAdapter.prioritizeBacklogStream(localEpics, framework, onThought, aiConfig);
 }

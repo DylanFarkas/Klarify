@@ -1,25 +1,19 @@
 /**
- * @fileoverview Adaptador de Gemini para el Agente 3 — Scrum Master (Estimación).
- * Utiliza el SDK @google/genai para calcular Story Points a partir de las Épicas.
- * Soporta streaming nativo de pensamientos del modelo vía generateContentStream.
+ * @fileoverview Adaptador multi-proveedor para el Agente 3 — Estimación.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import type { IEstimationAdapter } from './IEstimationAdapter';
 import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
 import {
   FIBONACCI_SCALE_LABEL,
-  GEMINI_ESTIMATION_PREFIX,
+  AGENT3_JUSTIFICATION_PREFIX,
   MAX_JUSTIFICATION_LENGTH,
 } from '@/lib/constants/agent-3';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
-
-interface ContentPart {
-  text?: string;
-  thought?: boolean;
-}
+import { generateJson } from '@/lib/llm/generate';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 interface RawEstimationResponse {
   suggestions: Array<{
@@ -29,17 +23,8 @@ interface RawEstimationResponse {
   }>;
 }
 
-export class GeminiEstimationAdapter implements IEstimationAdapter {
-  private ai: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash'; // Manteniendo el modelo estándar del proyecto
-
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-    }
-  }
+export class LlmEstimationAdapter implements IEstimationAdapter {
+  constructor(private credentials: LlmCredentials) {}
 
   async estimateBacklog(
     epics: LocalEpic[],
@@ -54,34 +39,23 @@ export class GeminiEstimationAdapter implements IEstimationAdapter {
     aiConfig?: AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]> {
     const config = aiConfig ?? defaultAiConfig();
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
 
     try {
-      // console.log('[GeminiEstimationAdapter] Iniciando análisis de estimación con Gemini...');
-
       const { systemInstruction, userPrompt } = this.buildPrompts(epics);
 
-      const responseText = await this.streamGenerate(
-        userPrompt,
+      const { text: responseText } = await generateJson(this.credentials, {
         systemInstruction,
+        userPrompt,
+        temperature: 0.1,
+        thinkingBudget: config.thinkingBudget,
         onThought,
-        config.thinkingBudget
-      );
+      });
 
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini al estimar.');
-      }
-      // console.log('🔮 [GEMINI RESPONSE RAW]:', responseText);
-      const result = this.parseEstimationResponse(responseText);
-      // console.log(`[GeminiEstimationAdapter] Estimación exitosa. Historias procesadas: ${result.length}`);
-      
-      return result;
+      return this.parseEstimationResponse(responseText);
     } catch (error) {
-      console.error('[GeminiEstimationAdapter] Error al estimar backlog:', error);
+      console.error('[LlmEstimationAdapter] Error al estimar backlog:', error);
       throw new Error(
-        `Error en el servicio de estimación (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de estimación: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   }
@@ -113,48 +87,6 @@ ${JSON.stringify(epics, null, 2)}`;
     return { systemInstruction, userPrompt };
   }
 
-  private async streamGenerate(
-    contents: string,
-    systemInstruction: string,
-    onThought: LLMThoughtCallback,
-    thinkingBudget: number
-  ): Promise<string> {
-    if (!this.ai) throw new Error('SDK no inicializado.');
-
-    const responseStream = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        temperature: 0.1, // Temperatura baja para asegurar exactitud en estimaciones y JSON estructurado
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget,
-        },
-      },
-    });
-
-    let outputText = '';
-
-    for await (const chunk of responseStream) {
-      const parts = (chunk.candidates?.[0]?.content?.parts ?? []) as ContentPart[];
-
-      for (const part of parts) {
-        if (typeof part.text !== 'string') continue;
-
-        if (part.thought === true) {
-          // Captura el razonamiento nativo de Gemini y lo inyecta a la UI mediante la dinámica de Klarify
-          onThought(part.text);
-        } else {
-          outputText += part.text;
-        }
-      }
-    }
-
-    return outputText;
-  }
-
   private parseEstimationResponse(responseText: string): Agent3SuggestionItem[] {
     const raw = JSON.parse(responseText) as RawEstimationResponse;
 
@@ -168,7 +100,7 @@ ${JSON.stringify(epics, null, 2)}`;
       .map((sug) => ({
         storyId: sug.storyId.trim(),
         suggestedPoints: sug.suggestedPoints,
-        justification: `${GEMINI_ESTIMATION_PREFIX} ${sug.justification.trim()}`,
+        justification: `${AGENT3_JUSTIFICATION_PREFIX} ${sug.justification.trim()}`,
       }));
   }
 }

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
             const result = await emitter.runAction(
               'ACTION_ASSIGN_SPRINTS',
               'Asignando historias a sprints...',
-              () => planSprintsStream(agent5Input, body.config, emitter.bindThought(), aiConfig)
+              () => planSprintsStream(uid, agent5Input, body.config, emitter.bindThought(), aiConfig)
             );
 
             await emitter.runAction(

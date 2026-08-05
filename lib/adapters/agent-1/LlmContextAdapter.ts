@@ -1,12 +1,9 @@
 /**
- * @fileoverview Adaptador real para Google Gemini (LLM).
+ * @fileoverview Adaptador LLM multi-proveedor para el Agente 1 (contexto y deseos).
  *
- * Evalúa si el contexto del usuario es suficiente para un backlog y,
- * si no lo es, genera preguntas de clarificación con opciones MCQ.
- * Extrae deseos accionables a partir del contexto enriquecido.
+ * Evalúa contexto y extrae deseos vía la capa `lib/llm` (DeepSeek / OpenAI / Gemini).
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { ILLMAdapter } from './ILLMAdapter';
 import type {
   ClarifyingQuestion,
@@ -19,10 +16,12 @@ import {
   MAX_OPTIONS_PER_QUESTION,
   MIN_OPTIONS_PER_QUESTION,
 } from '@/lib/constants/agent-1';
-import { generateWishId } from '@/lib/services/agent-1-service';
+import { generateWishId } from '@/lib/utils/agent-1-ids';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
+import { generateJson } from '@/lib/llm/generate';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 interface RawAnalyzeResponse {
   isSufficient: boolean;
@@ -36,22 +35,8 @@ interface RawAnalyzeResponse {
   }>;
 }
 
-interface ContentPart {
-  text?: string;
-  thought?: boolean;
-}
-
-export class GeminiLLMAdapter implements ILLMAdapter {
-  private ai: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash';
-
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-    }
-  }
+export class LlmContextAdapter implements ILLMAdapter {
+  constructor(private credentials: LlmCredentials) {}
 
   async analyzeContext(
     transcription: TranscriptionResult,
@@ -66,13 +51,8 @@ export class GeminiLLMAdapter implements ILLMAdapter {
     aiConfig?: AiGenerationConfig
   ): Promise<ContextDiscovery> {
     const config = aiConfig ?? defaultAiConfig();
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
 
     try {
-      // console.log('[GeminiLLMAdapter] Evaluando contexto...');
-
       const systemInstruction = `Devuelve la respuesta estrictamente como un objeto JSON con esta forma exacta. No incluyas markdown ni texto extra.
 
 {
@@ -107,25 +87,16 @@ CONTEXTO DEL CLIENTE:
 ${transcription.fullText}
 """`;
 
-      const responseText = await this.streamGenerate(
-        userPrompt,
+      const { text: responseText } = await generateJson(this.credentials, {
         systemInstruction,
-        'application/json',
-        0.3,
+        userPrompt,
+        temperature: 0.3,
+        thinkingBudget: config.thinkingBudget,
         onThought,
-        config.thinkingBudget
-      );
-
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini');
-      }
+      });
 
       const raw: RawAnalyzeResponse = JSON.parse(responseText);
       const questions = this.normalizeQuestions(raw.questions ?? []);
-
-      // console.log(
-      //   `[GeminiLLMAdapter] Evaluación completada. Suficiente: ${raw.isSufficient}, Preguntas: ${questions.length}`
-      // );
 
       return {
         isSufficient: Boolean(raw.isSufficient),
@@ -136,9 +107,9 @@ ${transcription.fullText}
         skipped: false,
       };
     } catch (error) {
-      console.error('[GeminiLLMAdapter] Error al evaluar contexto:', error);
+      console.error('[LlmContextAdapter] Error al evaluar contexto:', error);
       throw new Error(
-        `Error en el servicio de evaluación (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de evaluación: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   }
@@ -158,18 +129,13 @@ ${transcription.fullText}
     aiConfig?: AiGenerationConfig
   ): Promise<Wish[]> {
     const config = aiConfig ?? defaultAiConfig();
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
 
     try {
-      // console.log('[GeminiLLMAdapter] Iniciando extracción de deseos con Gemini...');
-
       const contextBlock = enrichedContext?.trim()
         ? `\nCONTEXTO ENRIQUECIDO (incluye respuestas del cliente):\n"""\n${enrichedContext}\n"""`
         : '';
 
-      const prompt = `
+      const userPrompt = `
 Eres un analista de requerimientos experto (Product Owner/Scrum Master).
 Analiza el contexto del cliente y extrae necesidades, deseos o funcionalidades como elementos accionables para crear Historias de Usuario.
 
@@ -188,23 +154,19 @@ ${transcription.fullText}
 ${contextBlock}
       `;
 
-      const responseText = await this.streamGenerate(
-        prompt,
-        'Devuelve la respuesta estrictamente como un array de strings en formato JSON (ej: ["deseo 1", "deseo 2"]). No incluyas markdown ni bloques de código extra, solo el array.',
-        'application/json',
-        0.2,
+      const { text: responseText } = await generateJson(this.credentials, {
+        systemInstruction:
+          'Devuelve la respuesta estrictamente como un array de strings en formato JSON (ej: ["deseo 1", "deseo 2"]). No incluyas markdown ni bloques de código extra, solo el array.',
+        userPrompt,
+        temperature: 0.2,
+        thinkingBudget: config.thinkingBudget,
         onThought,
-        config.thinkingBudget
-      );
-
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini');
-      }
+      });
 
       const rawWishes: string[] = JSON.parse(responseText);
 
       if (!Array.isArray(rawWishes)) {
-        throw new Error('Gemini no devolvió un array JSON válido');
+        throw new Error('El modelo no devolvió un array JSON válido');
       }
 
       const wishes: Wish[] = [];
@@ -220,59 +182,13 @@ ${contextBlock}
         }
       }
 
-      // console.log(`[GeminiLLMAdapter] Extracción exitosa. Deseos encontrados: ${wishes.length}`);
       return wishes;
     } catch (error) {
-      console.error('[GeminiLLMAdapter] Error al extraer deseos:', error);
+      console.error('[LlmContextAdapter] Error al extraer deseos:', error);
       throw new Error(
-        `Error en el servicio de extracción (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de extracción: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
-  }
-
-  private async streamGenerate(
-    contents: string,
-    systemInstruction: string,
-    responseMimeType: string,
-    temperature: number,
-    onThought: LLMThoughtCallback,
-    thinkingBudget: number
-  ): Promise<string> {
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
-
-    const responseStream = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType,
-        temperature,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget,
-        },
-      },
-    });
-
-    let outputText = '';
-
-    for await (const chunk of responseStream) {
-      const parts = (chunk.candidates?.[0]?.content?.parts ?? []) as ContentPart[];
-
-      for (const part of parts) {
-        if (typeof part.text !== 'string') continue;
-
-        if (part.thought === true) {
-          onThought(part.text);
-        } else {
-          outputText += part.text;
-        }
-      }
-    }
-
-    return outputText;
   }
 
   private normalizeQuestions(

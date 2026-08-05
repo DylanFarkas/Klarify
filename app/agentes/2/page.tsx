@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { authFetch } from '@/lib/api-client';
 import { useAgentActivity } from '@/hooks/useAgentActivity';
-import { generateEpicId, generateUserStoryId } from '@/lib/services/agent-2-service';
+import { generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
 import { EmptyBacklogState } from '@/components/agents/agent-2/EmptyBacklogState';
 import { WishesSummaryPanel } from '@/components/agents/agent-2/WishesSummaryPanel';
 import { BacklogView } from '@/components/agents/agent-2/BacklogView';

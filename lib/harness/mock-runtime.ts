@@ -1,5 +1,5 @@
 /**
- * @fileoverview Runtime mock del harness cuando no hay GEMINI_API_KEY.
+ * @fileoverview Runtime mock del harness cuando no hay LLM configurado.
  */
 
 import {

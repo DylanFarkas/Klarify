@@ -27,6 +27,7 @@ import {
 } from '@/lib/utils/llm-stream';
 
 async function runExtraction(
+  uid: string,
   emitter: AgentStreamEmitter,
   body: Agent1AnalyzeRequest,
   discovery: Awaited<ReturnType<typeof analyzeContextStream>>,
@@ -48,6 +49,7 @@ async function runExtraction(
         AGENT_ACTIVITY.ACTION_EXTRACT_WISHES.label,
         () =>
           extractWishesFromContextStream(
+            uid,
             body.transcription,
             discovery,
             emitter.bindThought(),
@@ -94,13 +96,13 @@ export async function POST(request: NextRequest) {
             return emitter.runAction(
               AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.id,
               AGENT_ACTIVITY.ACTION_ANALYZE_CONTEXT.label,
-              () => analyzeContextStream(body.transcription, emitter.bindThought(), aiConfig)
+              () => analyzeContextStream(uid, body.transcription, emitter.bindThought(), aiConfig)
             );
           }
         );
 
         if (!discovery.isSufficient && discovery.questions.length === 0) {
-          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery, aiConfig);
+          const { wishes, enrichedContext } = await runExtraction(uid, emitter, body, discovery, aiConfig);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, isSufficient: true, completedAt: Date.now() },
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (discovery.isSufficient) {
-          const { wishes, enrichedContext } = await runExtraction(emitter, body, discovery, aiConfig);
+          const { wishes, enrichedContext } = await runExtraction(uid, emitter, body, discovery, aiConfig);
 
           const response: Agent1AnalyzeResponse = {
             discovery: { ...discovery, completedAt: Date.now() },

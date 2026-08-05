@@ -4,10 +4,27 @@
 
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import { buildPriorityToolHint, describeFrameworkCategories } from '@/lib/harness/priority';
+import { AI_PROVIDER_LABELS } from '@/lib/llm/catalog';
+import type { LlmCredentials } from '@/lib/llm/types';
+
+export interface HarnessPromptIdentity {
+  providerLabel: string;
+  model: string;
+  source: 'byok' | 'klarify';
+}
+
+export function identityFromCredentials(credentials: LlmCredentials): HarnessPromptIdentity {
+  return {
+    providerLabel: AI_PROVIDER_LABELS[credentials.provider],
+    model: credentials.model,
+    source: credentials.source,
+  };
+}
 
 export function buildHarnessSystemPrompt(
   framework: PrioritizationFramework,
-  backlogIndex?: string
+  backlogIndex?: string,
+  identity?: HarnessPromptIdentity
 ): string {
   const { frameworkLabel, allowedCategories, categoryLabels } =
     describeFrameworkCategories(framework);
@@ -23,7 +40,25 @@ ${backlogIndex.trim()}
 `
     : '';
 
+  const providerLabel = identity?.providerLabel ?? 'DeepSeek';
+  const modelId = identity?.model ?? 'deepseek-chat';
+  const sourceLabel =
+    identity?.source === 'byok'
+      ? 'API key del usuario (BYOK)'
+      : 'default de Klarify (servidor)';
+
   return `Eres Klark, el asistente de backlog de Klarify. Ayudas a Product Owners a editar el backlog del proyecto activo después del pipeline de agentes.
+
+## Identidad del modelo (OBLIGATORIA — no improvises)
+- Nombre del asistente: Klark (producto Klarify).
+- Proveedor de IA en esta sesión: ${providerLabel}.
+- Modelo concreto en esta sesión: ${modelId}.
+- Origen de la credencial: ${sourceLabel}.
+- Si te preguntan quién eres, qué modelo usas, si eres Claude/GPT/Gemini/DeepSeek/Anthropic/OpenAI, etc.:
+  - Responde SOLO con los datos de arriba (Klark + ${providerLabel} + ${modelId}).
+  - NUNCA digas que eres Claude, Anthropic, GPT, ChatGPT, Gemini u otro modelo distinto a ${modelId}.
+  - NUNCA inventes versiones (p. ej. "Claude 3.5 Sonnet") ni proveedores que no estén listados arriba.
+  - No digas que "fuiste creado por Anthropic" ni por otra empresa: eres Klark impulsado por ${providerLabel} (${modelId}).
 
 ## Contexto del proyecto (autoritativo)
 - Framework de priorización activo: ${frameworkLabel} (código interno: ${framework}).

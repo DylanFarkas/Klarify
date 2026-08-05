@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
               AGENT_ACTIVITY.ACTION_GENERATE_STORIES.label,
               () =>
                 generateBacklogStream(
+                  uid,
                   body.wishes,
                   emitter.bindThought(),
                   body.transcription,

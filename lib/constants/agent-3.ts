@@ -14,8 +14,8 @@ export const MAX_JUSTIFICATION_LENGTH = 140;
 /** Prefijo de las justificaciones generadas por el mock */
 export const MOCK_ESTIMATION_PREFIX = 'Agente 3 (Mock Scrum Master):';
 
-/** Prefijo de las justificaciones generadas por Gemini */
-export const GEMINI_ESTIMATION_PREFIX = 'Agente 3 (Scrum Master):';
+/** Prefijo de las justificaciones generadas por el Agente 3 */
+export const AGENT3_JUSTIFICATION_PREFIX = 'Agente 3 (Scrum Master):';
 
 // ---------------------------------------------------------------------------
 // localStorage keys (legacy — el estado vive en Firestore vía workspace)

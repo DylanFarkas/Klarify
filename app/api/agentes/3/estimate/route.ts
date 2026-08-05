@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
             return emitter.runAction(
               'ACTION_ESTIMATE_STORIES',
               'Calculando Story Points (Fibonacci)...',
-              () => estimateBacklogStream(body.epics, emitter.bindThought(), aiConfig)
+              () => estimateBacklogStream(uid, body.epics, emitter.bindThought(), aiConfig)
             );
           }
         );

@@ -1,8 +1,8 @@
 /**
- * @fileoverview Servicio del Agente 5 — Capa de lógica de negocio (Sprint Planning).
- * Abstrae la planificación de sprints a partir del backlog priorizado.
- * Instancia el adaptador correcto detectando automáticamente el entorno de Klarify.
+ * @fileoverview Servicio del Agente 5 — Sprint Planning.
  */
+
+import 'server-only';
 
 import type { Agent5Input } from '@/lib/types/workspace';
 import type { SprintPlan, SprintPlanningConfig } from '@/lib/types/agent-5';
@@ -11,11 +11,14 @@ import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 
 import { ISprintPlanningAdapter } from '../adapters/agent-5/ISprintPlanningAdapter';
 import { MockSprintPlanningAdapter } from '../adapters/agent-5/MockSprintPlanningAdapter';
-import { GeminiSprintPlanningAdapter } from '../adapters/agent-5/GeminiSprintPlanningAdapter';
+import { LlmSprintPlanningAdapter } from '../adapters/agent-5/LlmSprintPlanningAdapter';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
 
-const sprintPlanningAdapter: ISprintPlanningAdapter = process.env.GEMINI_API_KEY
-  ? new GeminiSprintPlanningAdapter()
-  : new MockSprintPlanningAdapter();
+async function resolveSprintPlanningAdapter(uid: string): Promise<ISprintPlanningAdapter> {
+  const credentials = await resolveLlmCredentials(uid);
+  if (!credentials) return new MockSprintPlanningAdapter();
+  return new LlmSprintPlanningAdapter(credentials);
+}
 
 export interface ValidationResult {
   valid: boolean;
@@ -51,11 +54,13 @@ export function validateAgent5Input(input: Agent5Input | null): ValidationResult
 }
 
 export async function planSprintsStream(
+  uid: string,
   input: Agent5Input,
   config: SprintPlanningConfig,
   onThought: LLMThoughtCallback,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<SprintPlan> {
+  const sprintPlanningAdapter = await resolveSprintPlanningAdapter(uid);
   const stories = toLocalStoriesForPlanning(input);
   return sprintPlanningAdapter.planSprintsStream(stories, config, input.framework, onThought, aiConfig);
 }

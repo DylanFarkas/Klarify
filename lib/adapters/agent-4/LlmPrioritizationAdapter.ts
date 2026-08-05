@@ -1,10 +1,7 @@
 /**
- * @fileoverview Adaptador de Gemini para el Agente 4 — Product Owner (Priorización).
- * Utiliza el SDK @google/genai para clasificar historias en categorías MoSCoW.
- * Soporta streaming nativo de pensamientos del modelo vía generateContentStream.
+ * @fileoverview Adaptador multi-proveedor para el Agente 4 — Priorización.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import type { IPrioritizationAdapter } from './IPrioritizationAdapter';
 import type {
   LocalEpicWithEstimation,
@@ -13,7 +10,7 @@ import type {
   FrameworkCategory,
 } from '@/lib/types/agent-4';
 import {
-  GEMINI_PRIORITIZATION_PREFIX,
+  AGENT4_JUSTIFICATION_PREFIX,
   MAX_PRIORITIZATION_JUSTIFICATION_LENGTH,
   getFrameworkCategories,
   FRAMEWORK_DESCRIPTIONS,
@@ -21,11 +18,8 @@ import {
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
-
-interface ContentPart {
-  text?: string;
-  thought?: boolean;
-}
+import { generateJson } from '@/lib/llm/generate';
+import type { LlmCredentials } from '@/lib/llm/types';
 
 interface RawPrioritizationResponse {
   suggestions: Array<{
@@ -35,19 +29,8 @@ interface RawPrioritizationResponse {
   }>;
 }
 
-
-
-export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
-  private ai: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash';
-
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-      });
-    }
-  }
+export class LlmPrioritizationAdapter implements IPrioritizationAdapter {
+  constructor(private credentials: LlmCredentials) {}
 
   async prioritizeBacklog(
     epics: LocalEpicWithEstimation[],
@@ -64,36 +47,23 @@ export class GeminiPrioritizationAdapter implements IPrioritizationAdapter {
     aiConfig?: AiGenerationConfig
   ): Promise<Agent4SuggestionItem[]> {
     const config = aiConfig ?? defaultAiConfig();
-    if (!this.ai) {
-      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno.');
-    }
 
     try {
-      // console.log('[GeminiPrioritizationAdapter] Iniciando análisis de priorización con Gemini...');
-
       const { systemInstruction, userPrompt } = this.buildPrompts(epics, framework);
 
-      const responseText = await this.streamGenerate(
-        userPrompt,
+      const { text: responseText } = await generateJson(this.credentials, {
         systemInstruction,
+        userPrompt,
+        temperature: 0.1,
+        thinkingBudget: config.thinkingBudget,
         onThought,
-        config.thinkingBudget
-      );
+      });
 
-      if (!responseText) {
-        throw new Error('Respuesta vacía de Gemini al priorizar.');
-      }
-      // console.log('📋 [GEMINI RESPONSE RAW]:', responseText);
-      const result = this.parsePrioritizationResponse(responseText, framework);
-      // console.log(
-      //   `[GeminiPrioritizationAdapter] Priorización exitosa. Historias procesadas: ${result.length}`
-      // );
-
-      return result;
+      return this.parsePrioritizationResponse(responseText, framework);
     } catch (error) {
-      console.error('[GeminiPrioritizationAdapter] Error al priorizar backlog:', error);
+      console.error('[LlmPrioritizationAdapter] Error al priorizar backlog:', error);
       throw new Error(
-        `Error en el servicio de priorización (Gemini): ${error instanceof Error ? error.message : 'Error desconocido'}`
+        `Error en el servicio de priorización: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
     }
   }
@@ -136,47 +106,6 @@ ${JSON.stringify(epics, null, 2)}`;
     return { systemInstruction, userPrompt };
   }
 
-  private async streamGenerate(
-    contents: string,
-    systemInstruction: string,
-    onThought: LLMThoughtCallback,
-    thinkingBudget: number
-  ): Promise<string> {
-    if (!this.ai) throw new Error('SDK no inicializado.');
-
-    const responseStream = await this.ai.models.generateContentStream({
-      model: this.modelName,
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget,
-        },
-      },
-    });
-
-    let outputText = '';
-
-    for await (const chunk of responseStream) {
-      const parts = (chunk.candidates?.[0]?.content?.parts ?? []) as ContentPart[];
-
-      for (const part of parts) {
-        if (typeof part.text !== 'string') continue;
-
-        if (part.thought === true) {
-          onThought(part.text);
-        } else {
-          outputText += part.text;
-        }
-      }
-    }
-
-    return outputText;
-  }
-
   private parsePrioritizationResponse(
     responseText: string,
     framework: PrioritizationFramework
@@ -203,7 +132,7 @@ ${JSON.stringify(epics, null, 2)}`;
       .map((sug) => ({
         storyId: sug.storyId.trim(),
         suggestedCategory: sug.suggestedCategory as FrameworkCategory,
-        justification: `${GEMINI_PRIORITIZATION_PREFIX} ${sug.justification.trim()}`,
+        justification: `${AGENT4_JUSTIFICATION_PREFIX} ${sug.justification.trim()}`,
       }));
   }
 }
