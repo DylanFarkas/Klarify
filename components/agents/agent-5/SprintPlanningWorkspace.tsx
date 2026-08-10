@@ -177,12 +177,12 @@ export function SprintPlanningWorkspace({
   if (input.epics.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-8 animate-[fadeIn_0.3s_ease-out]">
+    <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease-out]">
       {showModelReasoning && (
         <AgentActivityModal
           open={activityModalOpen}
           isActive={isPlanning}
-          title={hasPlan ? 'Regenerando plan de sprints...' : 'Planificando sprints...'}
+          title={hasPlan ? 'Regenerando plan de sprints…' : 'Planificando sprints…'}
           description={
             hasPlan
               ? 'El Scrum Master IA reorganiza las historias en sprints según la nueva configuración.'
@@ -223,13 +223,14 @@ export function SprintPlanningWorkspace({
       )}
 
       {isPlanning && !showModelReasoning && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-surface-muted/60 px-6 py-14 animate-[fadeIn_0.25s_ease-out]">
-          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-[3px] border-border border-t-primary" />
-          <p className="text-sm font-semibold text-foreground">
-            {hasPlan ? 'Regenerando plan de sprints...' : 'Planificando sprints...'}
+        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-5 py-14 animate-[fadeIn_0.25s_ease-out]">
+          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-border border-t-foreground" />
+          <p className="text-[15px] font-semibold tracking-tight text-foreground">
+            {hasPlan ? 'Regenerando plan de sprints…' : 'Planificando sprints…'}
           </p>
-          <p className="mt-1.5 text-xs text-muted">
-            El Scrum Master IA está distribuyendo {totalStories} historia{totalStories !== 1 ? 's' : ''} en sprints de {config.sprintCapacitySp} SP.
+          <p className="mt-1.5 text-sm text-muted">
+            Distribuyendo {totalStories} historia{totalStories !== 1 ? 's' : ''} en sprints de{' '}
+            {config.sprintCapacitySp} SP.
           </p>
         </div>
       )}
@@ -256,21 +257,23 @@ export function SprintPlanningWorkspace({
       )}
 
       {hasPlan && !isApproved && plan && !isPlanning && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-muted/80 px-6 py-4">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Revisar y aprobar plan de sprints
-            </h3>
-            <p className="mt-0.5 text-xs text-muted">
-              Edita objetivos y fechas desde cada sprint. Arrastra historias entre sprints para reorganizar.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <ApproveButton
-              onClick={onApprove}
-              disabled={!isApprovable || isApproving || isPlanning}
-              label={isApproving ? 'Consolidando...' : 'Consolidar Plan de Sprints'}
-            />
+        <div className="rounded-xl border border-border bg-surface px-4 py-3 sm:px-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+                Revisar y aprobar plan de sprints
+              </h3>
+              <p className="mt-0.5 text-sm text-muted">
+                Edita objetivos y fechas desde cada sprint. Arrastra historias entre sprints para reorganizar.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center">
+              <ApproveButton
+                onClick={onApprove}
+                disabled={!isApprovable || isApproving || isPlanning}
+                label={isApproving ? 'Consolidando…' : 'Consolidar Plan de Sprints'}
+              />
+            </div>
           </div>
         </div>
       )}

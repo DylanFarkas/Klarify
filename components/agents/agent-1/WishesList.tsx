@@ -36,112 +36,108 @@ export function WishesList({
 }: WishesListProps) {
   const [isAddingWish, setIsAddingWish] = useState(false);
 
-  // Contadores para stats
   const autoCount = wishes.filter((w) => w.source === 'auto').length;
   const manualCount = wishes.filter((w) => w.source === 'manual').length;
 
   return (
     <section
-      className="flex flex-col rounded-2xl border border-border bg-surface-muted backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
+      className="flex flex-col rounded-xl border border-border bg-surface"
       aria-labelledby="wishes-heading"
     >
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <h3 id="wishes-heading" className="text-lg font-bold text-foreground">
-            Deseos del Cliente
-          </h3>
-          <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-bold text-primary">
-            {wishes.length}
-          </span>
+      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5 md:px-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h3
+              id="wishes-heading"
+              className="text-[15px] font-semibold tracking-tight text-foreground"
+            >
+              Deseos del cliente
+            </h3>
+            <span className="text-[12px] tabular-nums text-subtle">{wishes.length}</span>
+          </div>
+          <p className="mt-1 text-[12px] text-muted">
+            Revisa, edita o añade lo que debe entrar al backlog.
+          </p>
         </div>
 
-        {/* Botón añadir (solo si no está aprobado) */}
-        {!isApproved && !isAddingWish && (
+        {!isApproved && !isAddingWish ? (
           <button
             id="add-wish-button"
+            type="button"
             onClick={() => setIsAddingWish(true)}
-            className={[
-              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-              'text-xs font-bold text-primary',
-              'hover:bg-primary/10 transition-colors cursor-pointer',
-            ].join(' ')}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Añadir
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* ── Contenido ──────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[500px]">
+      <div className="max-h-140 flex-1 overflow-y-auto">
         {wishes.length === 0 && !isAddingWish ? (
-          // Estado vacío
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">
-              <svg
-                className="h-7 w-7 text-icon-muted"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-sm text-subtle">
-              Los deseos del cliente aparecerán aquí tras procesar el archivo.
+          <div className="flex flex-col items-center justify-center px-4 py-14 text-center">
+            <p className="text-sm text-muted">Aún no hay deseos.</p>
+            <p className="mt-1 text-[12px] text-subtle">
+              Añade uno manualmente o vuelve a procesar el contexto.
             </p>
+            {!isApproved ? (
+              <button
+                type="button"
+                onClick={() => setIsAddingWish(true)}
+                className="mt-4 cursor-pointer rounded-lg bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
+              >
+                Añadir deseo
+              </button>
+            ) : null}
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {/* Lista de deseos */}
+          <ol>
             {wishes.map((wish, index) => (
-              <WishItem
-                key={wish.id}
-                wish={wish}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                isApproved={isApproved}
-                index={index}
-              />
+              <li key={wish.id}>
+                <WishItem
+                  wish={wish}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  isApproved={isApproved}
+                  index={index}
+                />
+              </li>
             ))}
 
-            {/* Formulario de nuevo deseo */}
-            {isAddingWish && (
-              <AddWishForm
-                onAdd={(text) => {
-                  onAdd(text);
-                  setIsAddingWish(false);
-                }}
-                onCancel={() => setIsAddingWish(false)}
-              />
-            )}
-          </div>
+            {isAddingWish ? (
+              <li className={wishes.length > 0 ? 'border-t border-border' : ''}>
+                <AddWishForm
+                  onAdd={(text) => {
+                    onAdd(text);
+                    setIsAddingWish(false);
+                  }}
+                  onCancel={() => setIsAddingWish(false)}
+                />
+              </li>
+            ) : null}
+          </ol>
         )}
       </div>
 
-      {/* ── Footer con stats ───────────────────────────────────── */}
-      {wishes.length > 0 && (
-        <div className="border-t border-border px-6 py-3">
-          <div className="flex items-center gap-4 text-xs text-subtle">
-            <span>{autoCount} extraídos por IA</span>
-            {manualCount > 0 && (
-              <>
-                <span>•</span>
-                <span>{manualCount} añadidos manualmente</span>
-              </>
-            )}
-          </div>
+      {wishes.length > 0 ? (
+        <div className="border-t border-border px-4 py-2.5 md:px-5">
+          <p className="text-[12px] text-subtle">
+            {autoCount} por IA
+            {manualCount > 0 ? ` · ${manualCount} manuales` : ''}
+            {' · '}
+            {wishes.length} en total
+          </p>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

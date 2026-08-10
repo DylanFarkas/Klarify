@@ -145,24 +145,24 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
   const displayName = githubUsername ?? 'github';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface ring-1 ring-border/50">
+    <div className="overflow-hidden rounded-xl border border-border bg-surface">
       {/* Header */}
-      <div className="flex items-start gap-3 border-b border-border/60 px-3.5 py-3.5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#24292F] text-white shadow-sm">
-          <GitHubIcon className="h-5 w-5" />
+      <div className="flex items-start gap-3 border-b border-border px-3.5 py-3.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
+          <GitHubIcon className="h-4 w-4" />
         </div>
 
         <div className="min-w-0 flex-1 pt-0.5">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-foreground">GitHub</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h3>
             {isGithubConnected && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
                 Activo
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-xs leading-relaxed text-subtle">
+          <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
             {isGithubConnected
               ? 'Exporta backlogs a GitHub Projects. Reconecta si falta acceso a Projects.'
               : 'Conecta tu cuenta para exportar el backlog a GitHub Projects.'}
@@ -180,16 +180,16 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
               disabled={linking || disconnecting}
               className={[
                 'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5',
-                'bg-[#24292F] text-sm font-semibold text-white shadow-sm',
-                'transition-all hover:bg-[#1b1f23] hover:shadow',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-                'disabled:cursor-not-allowed disabled:opacity-60',
+                'bg-foreground text-sm font-medium text-background',
+                'transition-opacity hover:opacity-90',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong',
+                'disabled:cursor-not-allowed disabled:opacity-40',
               ].join(' ')}
             >
               {linking ? (
                 <>
-                  <Spinner className="h-4 w-4 text-white" />
-                  Conectando...
+                  <Spinner className="h-4 w-4" />
+                  Conectando…
                 </>
               ) : (
                 <>
@@ -199,8 +199,8 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
               )}
             </button>
             {showDisconnect && (
-              <div className="rounded-lg border border-border/60 bg-elevated/50 px-3 py-2.5">
-                <p className="text-[11px] text-subtle">
+              <div className="rounded-lg border border-border bg-surface-muted/25 px-3 py-2.5">
+                <p className="text-[11px] text-muted">
                   GitHub sigue vinculado en tu cuenta de Klarify pero sin token activo. Desconéctalo
                   para volver a conectar.
                 </p>
@@ -208,7 +208,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                   <button
                     type="button"
                     onClick={() => setConfirmDisconnect(true)}
-                    className="mt-2 text-xs font-medium text-red-500 hover:underline"
+                    className="mt-2 text-xs font-medium text-danger hover:underline"
                   >
                     Desconectar GitHub
                   </button>
@@ -218,9 +218,9 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                       type="button"
                       onClick={handleDisconnect}
                       disabled={disconnecting}
-                      className="rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/15 disabled:opacity-60"
+                      className="rounded-md px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
                     >
-                      {disconnecting ? 'Desconectando...' : 'Confirmar desconexión'}
+                      {disconnecting ? 'Desconectando…' : 'Confirmar desconexión'}
                     </button>
                     <button
                       type="button"
@@ -238,8 +238,8 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
         ) : (
           <div className="space-y-3">
             {/* Perfil conectado */}
-            <div className="flex items-center gap-3 rounded-lg bg-elevated px-3 py-2.5 ring-1 ring-border/40">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#24292F]/10 text-sm font-bold text-foreground">
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-sm font-medium text-foreground">
                 {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
@@ -260,14 +260,14 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
             </div>
 
             {/* Acordeón de repos */}
-            <div className="overflow-hidden rounded-lg border border-border/60">
+            <div className="overflow-hidden rounded-lg border border-border">
               <button
                 type="button"
                 onClick={toggleRepos}
                 aria-expanded={reposExpanded}
                 className={[
                   'flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-sm font-medium',
-                  'text-foreground transition-colors hover:bg-surface-hover',
+                  'text-foreground transition-colors hover:bg-surface-hover/40',
                 ].join(' ')}
               >
                 <svg
@@ -285,7 +285,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                 </svg>
                 <span className="flex-1">Repositorios</span>
                 {reposLoaded && repos.length > 0 && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  <span className="tabular-nums text-[11px] text-subtle">
                     {repos.length}
                   </span>
                 )}
@@ -293,18 +293,18 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
               </button>
 
               {reposExpanded && (
-                <div className="border-t border-border/60 bg-elevated/50">
+                <div className="border-t border-border">
                   {loadingRepos && <RepoSkeleton />}
 
                   {!loadingRepos && reposError && (
                     <div className="space-y-2 px-3 py-3">
-                      <p className="text-xs text-red-500" role="alert">
+                      <p className="text-xs text-danger" role="alert">
                         {reposError}
                       </p>
                       <button
                         type="button"
                         onClick={loadRepos}
-                        className="text-xs font-medium text-primary hover:underline"
+                        className="text-xs font-medium text-foreground hover:underline"
                       >
                         Reintentar
                       </button>
@@ -312,7 +312,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                   )}
 
                   {!loadingRepos && !reposError && reposLoaded && repos.length === 0 && (
-                    <p className="px-3 py-4 text-center text-xs text-subtle">
+                    <p className="px-3 py-4 text-center text-xs text-muted">
                       No se encontraron repositorios.
                     </p>
                   )}
@@ -329,12 +329,12 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                               rel="noopener noreferrer"
                               className={[
                                 'group flex items-center gap-2.5 rounded-lg px-2 py-2',
-                                'transition-colors hover:bg-surface-hover',
+                                'transition-colors hover:bg-surface-hover/40',
                               ].join(' ')}
                             >
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface ring-1 ring-border/50">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
                                 <svg
-                                  className="h-3.5 w-3.5 text-subtle group-hover:text-primary"
+                                  className="h-3.5 w-3.5 text-subtle group-hover:text-foreground"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -355,7 +355,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                               <div className="flex shrink-0 items-center gap-1">
                                 {repo.private && (
                                   <span
-                                    className="rounded bg-surface px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-subtle ring-1 ring-border/50"
+                                    className="rounded border border-border px-1.5 py-0.5 text-[9px] text-subtle"
                                     title="Repositorio privado"
                                   >
                                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -389,13 +389,13 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                 type="button"
                 onClick={() => setConfirmDisconnect(true)}
                 disabled={disconnecting}
-                className="w-full rounded-lg border border-border/60 px-3 py-2 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/5 disabled:opacity-60 cursor-pointer"
+                className="w-full cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
               >
                 Desconectar GitHub
               </button>
             ) : (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5">
-                <p className="text-[11px] leading-relaxed text-subtle">
+              <div className="rounded-lg border border-border bg-surface-muted/25 px-3 py-2.5">
+                <p className="text-[11px] leading-relaxed text-muted">
                   Se eliminará el acceso a tus repositorios. Podrás volver a conectar GitHub cuando
                   quieras.
                 </p>
@@ -404,15 +404,15 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                     type="button"
                     onClick={handleDisconnect}
                     disabled={disconnecting}
-                    className="rounded-md bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/15 disabled:opacity-60 cursor-pointer"
+                    className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
                   >
-                    {disconnecting ? 'Desconectando...' : 'Confirmar desconexión'}
+                    {disconnecting ? 'Desconectando…' : 'Confirmar desconexión'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmDisconnect(false)}
                     disabled={disconnecting}
-                    className="text-xs text-subtle hover:text-foreground cursor-pointer"
+                    className="cursor-pointer text-xs text-subtle hover:text-foreground"
                   >
                     Cancelar
                   </button>
@@ -423,7 +423,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
         )}
 
         {authError && (
-          <p className="mt-2.5 rounded-lg bg-red-500/10 px-2.5 py-2 text-xs text-red-500" role="alert">
+          <p className="mt-2.5 rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs text-danger" role="alert">
             {authError}
           </p>
         )}

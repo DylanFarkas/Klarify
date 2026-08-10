@@ -33,12 +33,14 @@ export function ProjectSwitcher() {
   );
 
   return (
-    <div ref={containerRef} className="relative border-t border-border pt-6">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-subtle">Proyecto activo</p>
+    <div ref={containerRef} className="relative border-t border-border pt-3.5">
+      <div className="mb-1.5 flex items-center justify-between px-2.5">
+        <p className="text-xs font-medium text-subtle">Cambiar proyecto</p>
+      </div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:border-border-strong hover:bg-surface-hover"
+        className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-surface-hover"
       >
         <span className="min-w-0 truncate font-medium text-foreground">
           {active?.name ?? 'Proyecto'}
@@ -56,18 +58,18 @@ export function ProjectSwitcher() {
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
           <ul className="max-h-56 overflow-y-auto py-1">
             {projects.map((project) => (
               <li key={project.id}>
                 <button
                   type="button"
                   onClick={() => void handleSelect(project.id)}
-                  className={`flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-surface-hover ${
-                    project.id === activeProjectId ? 'bg-primary/5 text-primary' : 'text-foreground'
+                  className={`flex w-full cursor-pointer flex-col px-3 py-2 text-left text-sm hover:bg-surface-hover ${
+                    project.id === activeProjectId ? 'bg-surface-hover text-foreground' : 'text-muted'
                   }`}
                 >
-                  <span className="truncate font-medium">{project.name}</span>
+                  <span className="truncate font-medium text-foreground">{project.name}</span>
                   <span className="text-xs text-subtle">{project.pipelineLabel}</span>
                 </button>
               </li>
@@ -77,9 +79,9 @@ export function ProjectSwitcher() {
             <Link
               href="/agentes/proyectos"
               onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-surface-hover"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"
             >
-              Ver todos los proyectos
+              Ver todos
             </Link>
           </div>
         </div>

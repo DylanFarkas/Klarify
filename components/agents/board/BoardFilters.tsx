@@ -13,23 +13,26 @@ interface BoardFiltersProps {
   onChange: (patch: Partial<BoardFiltersState>) => void;
 }
 
+const controlClass =
+  'rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none';
+
 export function BoardFilters({ filters, sprints, epics, members, onChange }: BoardFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative min-w-[140px] flex-1 sm:max-w-xs">
+    <div className="flex flex-wrap items-center gap-2.5">
+      <div className="relative min-w-35 flex-1 sm:max-w-xs">
         <input
           type="search"
           value={filters.search}
           onChange={(e) => onChange({ search: e.target.value })}
           placeholder="Buscar historias..."
-          className="w-full rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className={`w-full placeholder:text-subtle ${controlClass}`}
         />
       </div>
 
       <select
         value={filters.sprintFilter}
         onChange={(e) => onChange({ sprintFilter: e.target.value as BoardFiltersState['sprintFilter'] })}
-        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className={`cursor-pointer ${controlClass}`}
         aria-label="Filtrar por sprint"
       >
         <option value="all">Todo el backlog</option>
@@ -44,7 +47,7 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       <select
         value={filters.epicId}
         onChange={(e) => onChange({ epicId: e.target.value })}
-        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className={`cursor-pointer ${controlClass}`}
         aria-label="Filtrar por épica"
       >
         <option value="all">Todas las épicas</option>
@@ -58,7 +61,7 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       <select
         value={filters.assigneeId}
         onChange={(e) => onChange({ assigneeId: e.target.value as BoardFiltersState['assigneeId'] })}
-        className="cursor-pointer rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+        className={`cursor-pointer ${controlClass}`}
         aria-label="Filtrar por responsable"
       >
         <option value="all">Todos los responsables</option>

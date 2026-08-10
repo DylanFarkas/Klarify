@@ -1,10 +1,5 @@
 /**
  * @fileoverview AcceptanceCriteriaEditor — Editor de criterios de aceptación.
- *
- * Renderiza una lista editable de strings (cada uno es un criterio).
- * Permite añadir, editar y eliminar criterios inline.
- *
- * Cumple CA1 (cada HU tiene criterios) y CA3 (HITL: edición manual).
  */
 
 'use client';
@@ -13,15 +8,16 @@ import { useState, useRef, useEffect } from 'react';
 import { MAX_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
 
 interface AcceptanceCriteriaEditorProps {
-  /** Lista actual de criterios de aceptación */
   criteria: string[];
-  /** Callback cuando la lista cambia (add/edit/delete) */
   onChange: (updated: string[]) => void;
-  /** Deshabilita todas las interacciones (ej: cuando status es approved) */
   disabled: boolean;
 }
 
-export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: AcceptanceCriteriaEditorProps) {
+export function AcceptanceCriteriaEditor({
+  criteria,
+  onChange,
+  disabled,
+}: AcceptanceCriteriaEditorProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newText, setNewText] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -29,14 +25,12 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
   const addInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // Autofocar input de añadir
   useEffect(() => {
     if (isAdding && addInputRef.current) {
       addInputRef.current.focus();
     }
   }, [isAdding]);
 
-  // Autofocar input solo al entrar en modo edición (no en cada tecla)
   useEffect(() => {
     if (editingIndex !== null && editInputRef.current) {
       editInputRef.current.focus();
@@ -45,7 +39,6 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
     }
   }, [editingIndex]);
 
-  // ── Handlers ──────────────────────────────────────────────────
   const handleAdd = () => {
     const trimmed = newText.trim();
     if (!trimmed || criteria.length >= MAX_ACCEPTANCE_CRITERIA) return;
@@ -104,19 +97,17 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
   const canAdd = criteria.length < MAX_ACCEPTANCE_CRITERIA;
 
   return (
-    <div className="flex flex-col gap-1.5 ml-8">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
-        Criterios de aceptación ({criteria.length}/{MAX_ACCEPTANCE_CRITERIA})
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] text-subtle">
+        {criteria.length}/{MAX_ACCEPTANCE_CRITERIA} criterios
       </span>
 
-      {/* ── Lista de criterios ──────────────────────────────────── */}
       {criteria.map((criterion, index) => (
         <div
           key={index}
           className={[
-            'flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5',
-            'transition-all duration-200',
-            editingIndex === index && 'border-primary/40 bg-primary/5',
+            'group/criterion flex items-center gap-2 rounded-md border border-border/80 px-3 py-1.5',
+            editingIndex === index ? 'border-border-strong bg-surface' : 'bg-surface/60',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -129,112 +120,128 @@ export function AcceptanceCriteriaEditor({ criteria, onChange, disabled }: Accep
                 onChange={(e) => setEditingText(e.target.value)}
                 onKeyDown={handleEditKeyDown}
                 disabled={disabled}
-                className={[
-                  'min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none',
-                  'placeholder:text-placeholder',
-                ].join(' ')}
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder"
               />
               <button
+                type="button"
                 onClick={handleSaveEdit}
                 disabled={!editingText.trim()}
-                className={[
-                  'shrink-0 rounded px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer',
-                  editingText.trim()
-                    ? 'bg-primary text-white hover:bg-primary-hover'
-                    : 'bg-disabled text-disabled-text cursor-not-allowed',
-                ].join(' ')}
+                className="shrink-0 cursor-pointer rounded-md bg-foreground px-2 py-0.5 text-[11px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 OK
               </button>
               <button
+                type="button"
                 onClick={handleCancelEdit}
-                className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+                className="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-[11px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 Cancelar
               </button>
             </>
           ) : (
             <>
-              <span className="min-w-0 flex-1 text-sm text-body">
-                {criterion}
-              </span>
-              {!disabled && (
-                <div className="flex shrink-0 items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+              <span className="min-w-0 flex-1 text-sm text-foreground">{criterion}</span>
+              {!disabled ? (
+                <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover/criterion:opacity-100">
                   <button
+                    type="button"
                     onClick={() => handleStartEdit(index)}
-                    className="rounded p-1 text-muted hover:text-foreground hover:bg-surface-hover transition-all cursor-pointer"
+                    className="cursor-pointer rounded p-1 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                     aria-label="Editar criterio"
                   >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"
+                      />
                     </svg>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDelete(index)}
-                    className="rounded p-1 text-muted transition-all cursor-pointer hover:text-red-400 hover:bg-red-500/10"
+                    className="cursor-pointer rounded p-1 text-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
                     aria-label="Eliminar criterio"
                   >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>
       ))}
 
-      {/* ── Fila de añadir ─────────────────────────────────────── */}
-      {!disabled && canAdd && (
+      {!disabled && canAdd ? (
         isAdding ? (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-1.5 animate-[fadeIn_0.2s_ease-out]">
+          <div className="flex items-center gap-2 rounded-md border border-border/80 bg-surface px-3 py-1.5">
             <input
               ref={addInputRef}
               value={newText}
               onChange={(e) => setNewText(e.target.value)}
               onKeyDown={handleAddKeyDown}
-              placeholder="Escribe el criterio..."
-              className={[
-                'min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none',
-                'placeholder:text-placeholder',
-              ].join(' ')}
+              placeholder="Escribe el criterio…"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder"
             />
             <button
+              type="button"
               onClick={handleAdd}
               disabled={!newText.trim()}
-              className={[
-                'shrink-0 rounded px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer',
-                newText.trim()
-                  ? 'bg-primary text-white hover:bg-primary-hover'
-                  : 'bg-disabled text-disabled-text cursor-not-allowed',
-              ].join(' ')}
+              className="shrink-0 cursor-pointer rounded-md bg-foreground px-2 py-0.5 text-[11px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Añadir
             </button>
             <button
-              onClick={() => { setIsAdding(false); setNewText(''); }}
-              className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+              type="button"
+              onClick={() => {
+                setIsAdding(false);
+                setNewText('');
+              }}
+              className="shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-[11px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               Cancelar
             </button>
           </div>
         ) : (
           <button
+            type="button"
             onClick={() => setIsAdding(true)}
-            className={[
-              'flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-1.5',
-              'text-xs font-medium text-muted transition-all cursor-pointer',
-              'hover:border-primary/40 hover:bg-primary/5 hover:text-primary',
-            ].join(' ')}
+            className="inline-flex cursor-pointer items-center gap-1 self-start rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Añadir criterio
           </button>
         )
-      )}
+      ) : null}
     </div>
   );
 }

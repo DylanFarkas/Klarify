@@ -22,11 +22,11 @@ interface KanbanColumnProps {
   onOpenStory: (storyId: string) => void;
 }
 
-const COLUMN_ACCENT: Record<KanbanStatus, string> = {
-  todo: 'border-t-slate-400',
-  in_progress: 'border-t-blue-500',
-  code_review: 'border-t-amber-500',
-  done: 'border-t-emerald-500',
+const COLUMN_DOT: Record<KanbanStatus, string> = {
+  todo: 'bg-subtle',
+  in_progress: 'bg-primary',
+  code_review: 'bg-[var(--sileo-state-warning)]',
+  done: 'bg-green-500',
 };
 
 export function KanbanColumn({
@@ -46,25 +46,29 @@ export function KanbanColumn({
   return (
     <div
       className={[
-        'flex min-h-[420px] w-[280px] shrink-0 flex-col rounded-2xl border border-border/80 bg-surface/50',
-        'border-t-[3px]',
-        COLUMN_ACCENT[status],
-        isOver ? 'ring-2 ring-primary/25' : '',
+        'flex min-h-105 w-70 shrink-0 flex-col rounded-xl border border-border bg-surface',
+        isOver ? 'border-border-strong' : '',
       ].join(' ')}
     >
-      <header className="border-b border-border/60 px-4 py-3">
+      <header className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-foreground">{label}</h3>
-          <span className="rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold text-muted">
-            {stats.count}
-          </span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${COLUMN_DOT[status]}`}
+              aria-hidden
+            />
+            <h3 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+              {label}
+            </h3>
+          </div>
+          <span className="tabular-nums text-[11px] text-subtle">{stats.count}</span>
         </div>
-        <p className="mt-0.5 text-[10px] text-subtle">{stats.points} SP</p>
+        <p className="mt-0.5 pl-3.5 text-[11px] text-subtle">{stats.points} SP</p>
       </header>
 
       <div
         ref={setNodeRef}
-        className="flex min-h-[320px] flex-1 flex-col gap-2 overflow-y-auto p-3"
+        className="flex min-h-80 flex-1 flex-col gap-2 overflow-y-auto p-3"
       >
         <SortableContext items={storyIds} strategy={verticalListSortingStrategy}>
           {storyIds.map((storyId) => {

@@ -22,7 +22,7 @@ export const AGENT_THEMES: {
 }[] = [
   { id: 'light', label: 'Claro', preview: { bg: '#f8fafc', accent: '#005BBF' } },
   { id: 'dark', label: 'Oscuro', preview: { bg: '#0B0F1A', accent: '#4d9fff' } },
-  { id: 'carbon', label: 'Carbón', preview: { bg: '#1c1c1c', accent: '#3ecf8e' } },
+  { id: 'carbon', label: 'Carbón', preview: { bg: '#0f0f10', accent: '#3ecf8e' } },
   { id: 'ocean', label: 'Océano', preview: { bg: '#0a1628', accent: '#22d3ee' } },
   { id: 'forest', label: 'Bosque', preview: { bg: '#0a1a12', accent: '#34d399' } },
   { id: 'rose', label: 'Rosa', preview: { bg: '#1a1014', accent: '#f472b6' } },

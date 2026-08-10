@@ -27,7 +27,7 @@ export function DoneStepsSummary({ actions, variant = 'default' }: DoneStepsSumm
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="mt-1 self-start font-mono text-[10px] text-muted/70 hover:text-muted"
+          className="mt-1 self-start text-[11px] text-subtle transition-colors hover:text-muted"
         >
           Ocultar pasos
         </button>
@@ -44,16 +44,23 @@ export function DoneStepsSummary({ actions, variant = 'default' }: DoneStepsSumm
       className="group flex w-full items-start gap-2 rounded-lg py-1 text-left transition-colors hover:bg-surface-hover/60"
       aria-expanded={false}
     >
-      <span className="mt-0.5 shrink-0 text-success/80">✓</span>
-      <span className="min-w-0 flex-1 text-xs leading-relaxed text-muted">
+      <svg
+        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-hidden
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      <span className="min-w-0 flex-1 text-[13px] leading-relaxed text-muted">
         <span className="font-medium text-foreground/70">
           {actions.length} pasos completados
         </span>
         <span className="hidden sm:inline"> — {summary}</span>
       </span>
-      <span className="shrink-0 font-mono text-[10px] text-muted/50 group-hover:text-muted">
-        ver
-      </span>
+      <span className="shrink-0 text-[11px] text-subtle group-hover:text-muted">ver</span>
     </button>
   );
 }

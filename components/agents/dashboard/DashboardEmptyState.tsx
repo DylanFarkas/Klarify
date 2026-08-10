@@ -1,29 +1,43 @@
 import Link from 'next/link';
+import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
 
 export function DashboardEmptyState() {
 	return (
-		<section className="rounded-2xl border border-border bg-surface/80 p-8 shadow-sm">
-			<div className="max-w-2xl">
-				<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Sin datos</p>
-				<h2 className="mt-2 text-2xl font-bold text-foreground">Aun no hay metricas para mostrar</h2>
-				<p className="mt-3 text-sm leading-relaxed text-muted">
-					Cuando cargues una reunion en el Agente 1 y avances por el pipeline, este dashboard empezara a mostrar epicas, historias, puntos, prioridades y sprints automaticamente.
-				</p>
-				<div className="mt-6 flex flex-wrap gap-3">
+		<EmptyAgentState
+			title="Aún no hay datos para mostrar"
+			description="Cuando cargues una reunión en el Agente 1 y avances por el pipeline, el dashboard mostrará el backlog, coberturas y el plan de sprints."
+			icon={
+				<svg
+					className="h-6 w-6 text-muted"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					strokeWidth={1.5}
+					aria-hidden="true"
+				>
+					<path
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+					/>
+				</svg>
+			}
+			action={
+				<div className="flex flex-wrap items-center justify-center gap-2">
 					<Link
 						href="/agentes/1"
-						className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+						className="inline-flex cursor-pointer items-center rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
 					>
 						Ir al Agente 1
 					</Link>
 					<Link
 						href="/agentes/2"
-						className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover"
+						className="inline-flex cursor-pointer items-center rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 					>
 						Ver Agente 2
 					</Link>
 				</div>
-			</div>
-		</section>
+			}
+		/>
 	);
 }

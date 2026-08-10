@@ -9,6 +9,8 @@ import type { ProjectExportFormat } from '@/lib/export/types';
 interface ProjectExportPanelProps {
   projectName: string;
   className?: string;
+  /** Dense row of format buttons without outer card chrome (for dashboard). */
+  compact?: boolean;
 }
 
 const EXPORT_FORMATS: Array<{
@@ -37,7 +39,11 @@ const EXPORT_FORMATS: Array<{
   },
 ];
 
-export function ProjectExportPanel({ projectName, className = '' }: ProjectExportPanelProps) {
+export function ProjectExportPanel({
+  projectName,
+  className = '',
+  compact = false,
+}: ProjectExportPanelProps) {
   const { workspace, plan } = useWorkspace();
   const [downloadingFormat, setDownloadingFormat] = useState<ProjectExportFormat | null>(null);
 
@@ -64,12 +70,46 @@ export function ProjectExportPanel({ projectName, className = '' }: ProjectExpor
     }
   };
 
+  if (compact) {
+    return (
+      <div className={className}>
+        <div className="flex flex-wrap gap-2">
+          {EXPORT_FORMATS.map((format) => {
+            const isLoading = downloadingFormat === format.id;
+
+            return (
+              <button
+                key={format.id}
+                type="button"
+                onClick={() => handleExport(format.id)}
+                disabled={!canExport || downloadingFormat !== null}
+                title={
+                  canExport
+                    ? `Descargar ${format.label}`
+                    : 'Genera al menos un backlog antes de exportar'
+                }
+                className="cursor-pointer rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isLoading ? '…' : `${format.label} ${format.extension}`}
+              </button>
+            );
+          })}
+        </div>
+        {!canExport ? (
+          <p className="mt-2 text-[11px] text-subtle">
+            Completa al menos el Agente 2 (backlog) para habilitar la exportación.
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <section
-      className={`flex flex-col gap-4 rounded-2xl border border-border bg-surface/80 p-5 ${className}`}
+      className={`flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 ${className}`}
     >
       <div>
-        <p className="text-sm font-semibold text-foreground">Exportar proyecto</p>
+        <p className="text-[15px] font-semibold tracking-tight text-foreground">Exportar proyecto</p>
         <p className="mt-1 text-xs text-muted">
           Descarga épicas, historias, criterios de aceptación, estimaciones, prioridades, sprints y
           estado del tablero en el formato que prefieras.
@@ -86,7 +126,7 @@ export function ProjectExportPanel({ projectName, className = '' }: ProjectExpor
               type="button"
               onClick={() => handleExport(format.id)}
               disabled={!canExport || downloadingFormat !== null}
-              className="cursor-pointer flex flex-col items-start gap-2 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer flex-col items-start gap-2 rounded-lg border border-border px-4 py-3 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
               title={
                 canExport
                   ? `Descargar ${format.label}`

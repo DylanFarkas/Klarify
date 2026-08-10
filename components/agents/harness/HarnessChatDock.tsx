@@ -153,7 +153,6 @@ export function HarnessChatDock() {
             : 'Klark (disponible al completar el pipeline)'
         }
       >
-        <span className="harness-fab__glow" aria-hidden />
         <AgentIcon />
         <span className="harness-fab__label">Klark</span>
         {!harnessEnabled ? <span className="harness-fab__lock" aria-hidden /> : null}

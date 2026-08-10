@@ -27,35 +27,28 @@ export function ApproveButton({ onClick, disabled, label }: ApproveButtonProps) 
     if (disabled || isAnimating) return;
     setIsAnimating(true);
     onClick();
-    // Resetear animación después de completar
     setTimeout(() => setIsAnimating(false), 800);
   };
 
   return (
     <button
       id="approve-button"
+      type="button"
       onClick={handleClick}
       disabled={disabled}
       className={[
-        'inline-flex items-center gap-3 rounded-xl px-8 py-4 text-base font-bold',
-        'transition-all duration-300 cursor-pointer',
+        'inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium sm:w-auto',
+        'transition-opacity cursor-pointer',
         disabled
           ? 'cursor-not-allowed bg-disabled text-disabled-text'
-          : [
-              'bg-primary text-white',
-              'shadow-[0_0_30px_color-mix(in_srgb,var(--primary)_30%,transparent)]',
-              'hover:shadow-[0_0_40px_color-mix(in_srgb,var(--primary)_50%,transparent)]',
-              'hover:scale-[1.03] active:scale-95',
-            ].join(' '),
-        isAnimating && 'scale-105 shadow-[0_0_50px_color-mix(in_srgb,var(--primary)_60%,transparent)]',
+          : 'bg-foreground text-background hover:opacity-90',
       ]
         .filter(Boolean)
         .join(' ')}
       aria-label={label}
     >
-      {/* Icono check */}
       <svg
-        className="h-5 w-5"
+        className="h-4 w-4"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

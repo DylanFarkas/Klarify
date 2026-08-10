@@ -254,228 +254,192 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-12 gap-6">
+      <div className="flex flex-col gap-4">
         {/* ── Zona de drop principal ───────────────────────────── */}
-        <div className="col-span-12">
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => {
-              if (!isProcessing && !isRecording) {
-                handleUploadIntent();
-              }
-            }}
-            className={[
-              'group relative flex h-[min(400px,55vh)] cursor-pointer flex-col items-center justify-center',
-              'overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-300',
-              'agent-capture-drop',
-              isDragging
-                ? 'border-primary bg-primary/10 shadow-[0_8px_32px_color-mix(in_srgb,var(--primary)_20%,transparent)]'
-                : 'border-border-strong bg-surface-muted shadow-sm hover:border-primary/60 hover:shadow-md',
-              isProcessing && 'pointer-events-none opacity-70',
-              isRecording && 'cursor-default border-red-500/40',
-              error && !isProcessing && 'border-red-500/40',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {/* Acento de fondo al hover */}
-            <div
-              className={[
-                'pointer-events-none absolute inset-0 bg-primary/5 transition-opacity duration-300',
-                isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-              ].join(' ')}
-              aria-hidden="true"
-            />
-
-            {/* Estado: Procesando archivo */}
-            {isProcessing && selectedFileName && (
-              <div className="relative z-10 flex flex-col items-center gap-5">
-                <div className="h-14 w-14 animate-spin rounded-full border-2 border-border border-t-primary" />
-                <div className="flex flex-col items-center gap-1">
-                  <p className="text-base font-semibold text-foreground">
-                    Procesando archivo...
-                  </p>
-                  <p className="text-sm text-muted">
-                    {getFileIcon(selectedFileName)} {selectedFileName}
-                  </p>
-                </div>
-                <div className="h-1.5 w-56 overflow-hidden rounded-full bg-border">
-                  <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
-                </div>
-              </div>
-            )}
-
-            {/* Estado: Grabando */}
-            {!isProcessing && isRecording && (
-              <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 animate-[fadeIn_0.3s_ease-out]">
-                <div className="flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
-                  </span>
-                  <span className="text-sm font-bold uppercase tracking-wider text-foreground">
-                    Escuchando...
-                  </span>
-                </div>
-
-                <div className="min-h-[120px] w-full max-h-[200px] overflow-y-auto rounded-xl border border-border bg-input p-5 text-left">
-                  <p className="text-sm italic leading-relaxed text-body">
-                    {liveTranscription || 'Habla ahora, te estoy escuchando...'}
-                  </p>
-                </div>
-
-                <button
-                  id="stop-record-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    stopRecording();
-                  }}
-                  className={[
-                    'rounded-xl bg-white px-8 py-3 text-sm font-bold text-black',
-                    'transition-all duration-200 cursor-pointer',
-                    'hover:scale-105 hover:bg-gray-100 active:scale-95',
-                  ].join(' ')}
-                >
-                  Detener grabación y Revisar
-                </button>
-              </div>
-            )}
-
-            {/* Estado: Idle / Esperando archivo */}
-            {!isProcessing && !isRecording && (
-              <div className="relative z-10">
-                <div
-                  className={[
-                    'mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border transition-all duration-500',
-                    isDragging
-                      ? 'scale-105 border-primary/40 bg-primary/20'
-                      : 'border-border bg-surface-hover group-hover:scale-105 group-hover:border-primary/30 group-hover:bg-primary/10',
-                  ].join(' ')}
-                >
-                  <svg
-                    className={[
-                      'h-10 w-10 transition-colors duration-300',
-                      isDragging ? 'text-primary' : 'text-primary/80',
-                    ].join(' ')}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
-                    />
-                  </svg>
-                </div>
-
-                <h3 className="mb-2 text-xl font-bold text-foreground">
-                  {isDragging ? 'Suelta el archivo aquí' : 'Arrastra tu archivo aquí o selecciona un método'}
-                </h3>
-                <p className="mx-auto mb-8 max-w-md text-sm text-muted">
-                  Primero analizamos tu contexto y, si hace falta, te hacemos unas preguntas rápidas.
-                  Aceptamos {ALLOWED_EXTENSIONS.join(', ')}. Tamaño máximo: {MAX_FILE_SIZE_LABEL}.
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => {
+            if (!isProcessing && !isRecording) {
+              handleUploadIntent();
+            }
+          }}
+          className={[
+            'group relative flex min-h-55 cursor-pointer flex-col items-center justify-center',
+            'overflow-hidden rounded-xl border border-dashed p-6 text-center transition-colors',
+            isDragging
+              ? 'border-primary bg-primary/5'
+              : 'border-border-strong bg-surface hover:border-primary/50 hover:bg-surface-hover/40',
+            isProcessing && 'pointer-events-none opacity-70',
+            isRecording && 'cursor-default border-red-500/40',
+            error && !isProcessing && 'border-red-500/40',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {/* Estado: Procesando archivo */}
+          {isProcessing && selectedFileName && (
+            <div className="relative z-10 flex flex-col items-center gap-4">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-sm font-medium text-foreground">Procesando archivo…</p>
+                <p className="text-[13px] text-muted">
+                  {getFileIcon(selectedFileName)} {selectedFileName}
                 </p>
-
-                <button
-                  id="file-select-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUploadIntent();
-                  }}
-                  className={[
-                    'mx-auto inline-flex items-center gap-2 rounded-xl bg-primary px-8 py-3',
-                    'text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)]',
-                    'transition-all duration-200 cursor-pointer',
-                    'hover:bg-primary-hover hover:shadow-lg active:scale-95',
-                  ].join(' ')}
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                  </svg>
-                  Seleccionar archivo
-                </button>
               </div>
-            )}
+              <div className="h-1 w-48 overflow-hidden rounded-full bg-border">
+                <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
+              </div>
+            </div>
+          )}
 
-            {/* Input oculto */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={FILE_INPUT_ACCEPT}
-              onChange={handleInputChange}
-              className="hidden"
-              aria-label="Seleccionar archivo"
-            />
-          </div>
+          {/* Estado: Grabando */}
+          {!isProcessing && isRecording && (
+            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-4">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                </span>
+                <span className="text-xs font-medium uppercase tracking-wider text-foreground">
+                  Escuchando…
+                </span>
+              </div>
+
+              <div className="max-h-45 min-h-25 w-full overflow-y-auto rounded-lg border border-border bg-input p-4 text-left">
+                <p className="text-sm italic leading-relaxed text-body">
+                  {liveTranscription || 'Habla ahora, te estoy escuchando…'}
+                </p>
+              </div>
+
+              <button
+                id="stop-record-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  stopRecording();
+                }}
+                className="cursor-pointer rounded-lg bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              >
+                Detener y revisar
+              </button>
+            </div>
+          )}
+
+          {/* Estado: Idle / Esperando archivo */}
+          {!isProcessing && !isRecording && (
+            <div className="relative z-10">
+              <div
+                className={[
+                  'mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border transition-colors',
+                  isDragging
+                    ? 'border-primary/40 bg-primary/15'
+                    : 'border-border bg-surface-muted group-hover:border-primary/30',
+                ].join(' ')}
+              >
+                <svg
+                  className={[
+                    'h-6 w-6 transition-colors',
+                    isDragging ? 'text-primary' : 'text-muted',
+                  ].join(' ')}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="mb-1.5 text-[15px] font-semibold text-foreground">
+                {isDragging ? 'Suelta el archivo aquí' : 'Arrastra un archivo o elige un método'}
+              </h3>
+              <p className="mx-auto mb-5 max-w-md text-[13px] text-muted">
+                Aceptamos {ALLOWED_EXTENSIONS.join(', ')}. Máx. {MAX_FILE_SIZE_LABEL}.
+              </p>
+
+              <button
+                id="file-select-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUploadIntent();
+                }}
+                className="mx-auto inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+              >
+                Seleccionar archivo
+              </button>
+            </div>
+          )}
+
+          {/* Input oculto */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={FILE_INPUT_ACCEPT}
+            onChange={handleInputChange}
+            className="hidden"
+            aria-label="Seleccionar archivo"
+          />
         </div>
 
-        {/* ── Tarjetas de acción ───────────────────────────────── */}
+        {/* ── Acciones ─────────────────────────────────────────── */}
         {!isProcessing && !isRecording && (
-          <div className="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {/* Subir Archivo */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={handleUploadIntent}
-              className={[
-                'group rounded-2xl border border-border bg-surface p-6 text-left',
-                'transition-all duration-200 cursor-pointer',
-                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
-              ].join(' ')}
+              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 transition-transform duration-200 group-hover:scale-110">
-                <svg className="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
+                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-foreground">Subir Archivo</h5>
-              <p className="text-xs text-muted">Importa documentos o audios pregrabados.</p>
+              <div className="min-w-0">
+                <h5 className="text-sm font-medium text-foreground">Subir archivo</h5>
+                <p className="mt-0.5 text-xs text-muted">Documentos o audios</p>
+              </div>
             </button>
 
-            {/* Grabar Audio */}
             <button
               type="button"
               id="start-record-button"
               onClick={startRecording}
-              className={[
-                'group rounded-2xl border border-border bg-surface p-6 text-left',
-                'transition-all duration-200 cursor-pointer',
-                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
-              ].join(' ')}
+              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
             >
-              <div className="relative mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/15 transition-transform duration-200 group-hover:scale-110">
-                <svg className="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
+                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-foreground">Grabar Audio</h5>
-              <p className="text-xs text-muted">Captura una reunión en vivo ahora mismo.</p>
+              <div className="min-w-0">
+                <h5 className="text-sm font-medium text-foreground">Grabar audio</h5>
+                <p className="mt-0.5 text-xs text-muted">Reunión en vivo</p>
+              </div>
             </button>
 
-            {/* Escribir Texto */}
             <button
               type="button"
               id="write-text-button"
               onClick={() => {
                 if (onTranscriptionComplete) onTranscriptionComplete('');
               }}
-              className={[
-                'group rounded-2xl border border-border bg-surface p-6 text-left',
-                'transition-all duration-200 cursor-pointer',
-                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
-              ].join(' ')}
+              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-hover transition-transform duration-200 group-hover:scale-110">
-                <svg className="h-7 w-7 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
+                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
               </div>
-              <h5 className="mb-1 font-bold text-foreground">Escribir Texto</h5>
-              <p className="text-xs text-muted">Pega minutas de reunión o notas rápidas.</p>
+              <div className="min-w-0">
+                <h5 className="text-sm font-medium text-foreground">Escribir texto</h5>
+                <p className="mt-0.5 text-xs text-muted">Notas o minutas</p>
+              </div>
             </button>
           </div>
         )}
@@ -483,21 +447,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
 
       {/* ── Mensaje de error ───────────────────────────────────── */}
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3">
-          <svg
-            className="mt-0.5 h-5 w-5 shrink-0 text-red-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
+        <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
           <p className="text-sm text-danger">{error}</p>
         </div>
       )}
@@ -510,7 +460,7 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
         title="La carga de archivos llegará muy pronto"
         maxWidth="md"
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           <p className="text-sm leading-relaxed text-muted">
             Estamos desarrollando el MVP de Klarify y la carga de archivos
             (.mp3, .wav, .txt, .pdf) todavía está en proceso de prueba.
@@ -518,26 +468,24 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             grabando audio en vivo o escribiendo el texto directamente.
           </p>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => {
                 setShowUploadNotice(false);
                 startRecording();
               }}
-              className={[
-                'group rounded-xl border border-border bg-surface p-4 text-left',
-                'transition-all duration-200 cursor-pointer',
-                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
-              ].join(' ')}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
             >
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/15">
-                <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
+                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                 </svg>
               </div>
-              <h5 className="mb-1 text-sm font-bold text-foreground">Grabar Audio</h5>
-              <p className="text-xs text-muted">Captura una reunión en vivo ahora mismo.</p>
+              <div>
+                <h5 className="text-sm font-medium text-foreground">Grabar audio</h5>
+                <p className="mt-0.5 text-xs text-muted">Reunión en vivo</p>
+              </div>
             </button>
 
             <button
@@ -546,19 +494,17 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
                 setShowUploadNotice(false);
                 onTranscriptionComplete?.('');
               }}
-              className={[
-                'group rounded-xl border border-border bg-surface p-4 text-left',
-                'transition-all duration-200 cursor-pointer',
-                'hover:border-primary/50 hover:bg-surface-muted hover:shadow-md',
-              ].join(' ')}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
             >
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-hover">
-                <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
+                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
               </div>
-              <h5 className="mb-1 text-sm font-bold text-foreground">Escribir Texto</h5>
-              <p className="text-xs text-muted">Pega minutas de reunión o notas rápidas.</p>
+              <div>
+                <h5 className="text-sm font-medium text-foreground">Escribir texto</h5>
+                <p className="mt-0.5 text-xs text-muted">Notas o minutas</p>
+              </div>
             </button>
           </div>
         </div>

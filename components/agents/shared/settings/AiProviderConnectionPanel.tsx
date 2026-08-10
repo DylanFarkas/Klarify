@@ -108,7 +108,7 @@ export function AiProviderConnectionPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-elevated/40 px-4 py-6 text-sm text-subtle">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-6 text-sm text-muted">
         <Spinner />
         Cargando proveedor de IA…
       </div>
@@ -116,23 +116,12 @@ export function AiProviderConnectionPanel() {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-elevated/30 p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
-            />
-          </svg>
-        </div>
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-semibold text-foreground">Proveedor de IA</h4>
-          <p className="mt-0.5 text-xs text-subtle">
-            Primero conecta tu API key; después eliges el modelo disponible.
-          </p>
-        </div>
+    <div className="space-y-4 rounded-xl border border-border bg-surface p-4">
+      <div className="min-w-0">
+        <h4 className="text-[15px] font-semibold tracking-tight text-foreground">Proveedor de IA</h4>
+        <p className="mt-0.5 text-[12px] text-muted">
+          Primero conecta tu API key; después eliges el modelo disponible.
+        </p>
       </div>
 
       {status.connected ? (
@@ -144,16 +133,16 @@ export function AiProviderConnectionPanel() {
               </span>
               <span
                 className={[
-                  'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                  'rounded-md px-2 py-0.5 text-[10px] font-medium',
                   status.active
-                    ? 'bg-emerald-500/15 text-emerald-600'
-                    : 'bg-border text-subtle',
+                    ? 'text-success'
+                    : 'text-subtle',
                 ].join(' ')}
               >
                 {status.active ? 'Activo' : 'En pausa'}
               </span>
             </div>
-            <p className="mt-1 text-xs text-subtle">
+            <p className="mt-1 text-xs text-muted">
               {status.keyHint ? <>Key …{status.keyHint}</> : null}
               {status.keyHint ? ' · ' : null}
               Modelo actual: <span className="text-foreground">{modelLabel}</span>
@@ -161,7 +150,7 @@ export function AiProviderConnectionPanel() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-muted">Modelo</label>
+            <label className="mb-1.5 block text-[11px] font-medium text-subtle">Modelo</label>
             <DropdownSelect
               value={status.model}
               onChange={(value) => void handleModelChange(value)}
@@ -186,7 +175,7 @@ export function AiProviderConnectionPanel() {
               type="button"
               disabled={saving}
               onClick={() => setConfirmDisconnect(true)}
-              className="w-full cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+              className="w-full cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
             >
               Desconectar proveedor
             </button>
@@ -196,7 +185,7 @@ export function AiProviderConnectionPanel() {
                 type="button"
                 disabled={saving}
                 onClick={() => void handleDisconnect()}
-                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-danger px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 {saving ? <Spinner /> : null}
                 Confirmar
@@ -205,7 +194,7 @@ export function AiProviderConnectionPanel() {
                 type="button"
                 disabled={saving}
                 onClick={() => setConfirmDisconnect(false)}
-                className="flex-1 cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-hover"
+                className="flex-1 cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground"
               >
                 Cancelar
               </button>
@@ -215,7 +204,7 @@ export function AiProviderConnectionPanel() {
       ) : (
         <div className="space-y-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-muted">Proveedor</label>
+            <label className="mb-1.5 block text-[11px] font-medium text-subtle">Proveedor</label>
             <DropdownSelect
               value={provider}
               onChange={(value) => setProvider(value as AiProviderId)}
@@ -229,7 +218,7 @@ export function AiProviderConnectionPanel() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-muted">API key</label>
+            <label className="mb-1.5 block text-[11px] font-medium text-subtle">API key</label>
             <input
               type="password"
               value={apiKey}
@@ -237,7 +226,7 @@ export function AiProviderConnectionPanel() {
               placeholder="sk-…"
               autoComplete="off"
               disabled={saving}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none ring-primary/30 placeholder:text-subtle focus:ring-2 disabled:opacity-50"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle focus:border-border-strong disabled:opacity-40"
             />
             <p className="mt-1.5 text-[11px] text-subtle">
               Tras validar la key podrás elegir el modelo.
@@ -248,7 +237,7 @@ export function AiProviderConnectionPanel() {
             type="button"
             disabled={saving || !apiKey.trim()}
             onClick={() => void handleConnect()}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-3 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {saving ? <Spinner /> : null}
             Conectar
@@ -257,7 +246,7 @@ export function AiProviderConnectionPanel() {
       )}
 
       {displayError ? (
-        <p className="text-xs text-red-600" role="alert">
+        <p className="text-xs text-danger" role="alert">
           {displayError}
         </p>
       ) : null}

@@ -56,7 +56,7 @@ export function SprintEditModal({
             value={goalDraft}
             onChange={(e) => setGoalDraft(e.target.value)}
             rows={3}
-            className="w-full resize-none rounded-xl border border-border bg-surface px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none"
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
             placeholder="Objetivo del sprint..."
           />
         </label>

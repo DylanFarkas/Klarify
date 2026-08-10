@@ -406,15 +406,15 @@ export function HarnessChatPanel({
   };
 
   const headerActions = (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
       {enabled && confirmClear ? (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-muted/25 px-2.5 py-1.5">
           <span className="text-xs font-medium text-foreground">¿Limpiar?</span>
           <button
             type="button"
             onClick={() => void clearChat()}
             disabled={isClearing}
-            className="cursor-pointer rounded-lg bg-foreground px-2.5 py-1 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="cursor-pointer rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {isClearing ? '…' : 'Sí'}
           </button>
@@ -422,7 +422,7 @@ export function HarnessChatPanel({
             type="button"
             onClick={() => setConfirmClear(false)}
             disabled={isClearing}
-            className="cursor-pointer rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-bold text-foreground disabled:opacity-50"
+            className="cursor-pointer rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
           >
             No
           </button>
@@ -432,7 +432,7 @@ export function HarnessChatPanel({
           type="button"
           onClick={() => setConfirmClear(true)}
           disabled={isSending || isClearing || messages.length === 0}
-          className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface/90 px-2.5 py-2 text-xs font-bold text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           title="Limpiar conversación"
         >
           <TrashIcon />
@@ -443,7 +443,7 @@ export function HarnessChatPanel({
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface/90 text-foreground transition-colors hover:bg-surface-hover"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           aria-label="Cerrar Klark"
         >
           <CloseIcon />
@@ -455,15 +455,14 @@ export function HarnessChatPanel({
   if (!enabled) {
     return (
       <section className="harness-chat harness-chat--drawer harness-chat--locked" aria-label="Klark">
-        <div className="harness-chat__mesh" aria-hidden />
         <header className="harness-chat__header">
           <div className="min-w-0">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-subtle">
               <LockIcon />
               Bloqueado
             </span>
-            <h2 className="mt-3 text-xl font-bold tracking-tight text-foreground">
-              Klark
+            <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
+              <span className="text-primary">K</span>lark
             </h2>
           </div>
           {headerActions}
@@ -487,25 +486,17 @@ export function HarnessChatPanel({
 
   return (
     <section className="harness-chat harness-chat--drawer" aria-label="Klark">
-      <div className="harness-chat__mesh" aria-hidden />
-
       <header className="harness-chat__header">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {/* <span className="harness-chat__status">
-              <span className="harness-chat__status-dot" aria-hidden />
-              En línea
-            </span> */}
             {quotaLabel ? (
-              <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] font-semibold text-muted">
-                {quotaLabel}
-              </span>
+              <span className="text-[11px] tabular-nums text-subtle">{quotaLabel}</span>
             ) : null}
           </div>
-          <h2 className="mt-2 text-lg font-bold tracking-tight text-foreground">
-            Klark
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+            <span className="text-primary">K</span>lark
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted">
+          <p className="mt-0.5 text-sm text-muted">
             Edita historias, épicas, prioridad y sprints sobre tu workspace.
           </p>
         </div>
@@ -515,26 +506,24 @@ export function HarnessChatPanel({
       <div className="harness-chat__body" ref={bodyRef}>
         {isLoadingHistory ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-10 text-sm text-muted">
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-primary" />
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-foreground" />
             Cargando conversación…
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-1 flex-col justify-center gap-4 py-2">
+          <div className="flex flex-1 flex-col justify-center gap-3 py-2">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">
+              <p className="text-[15px] font-semibold tracking-tight text-foreground">
                 Qué puede hacer Klark
               </p>
               <p className="mt-1 text-sm text-muted">
                 Ejemplos orientativos. Escribe abajo lo que necesites sobre tu proyecto.
               </p>
             </div>
-            <div className="grid gap-2.5">
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
               {EXAMPLES.map((item) => (
                 <div key={item.label} className="harness-chat__suggestion harness-chat__suggestion--static">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary">
-                    {item.hint}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{item.label}</span>
+                  <span className="text-[11px] text-subtle">{item.hint}</span>
+                  <span className="text-[13px] font-medium text-foreground">{item.label}</span>
                   <span className="line-clamp-2 text-xs leading-relaxed text-muted">{item.example}</span>
                 </div>
               ))}
@@ -579,24 +568,22 @@ export function HarnessChatPanel({
         )}
 
         {activities.length > 0 ? (
-          <div className="rounded-xl border border-border/80 bg-surface-muted/60 px-3 py-2.5">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-subtle">
-              Herramientas
-            </p>
+          <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
+            <p className="mb-2 text-[11px] font-medium text-subtle">Herramientas</p>
             <ul className="space-y-1.5">
               {activities.map((activity) => (
                 <li key={activity.id} className="flex items-start gap-2 text-xs text-muted">
                   <span
                     className={`mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
                       activity.status === 'running'
-                        ? 'animate-pulse bg-amber-500'
+                        ? 'animate-pulse bg-subtle'
                         : activity.status === 'done'
                           ? 'bg-success'
                           : 'bg-danger'
                     }`}
                   />
                   <span>
-                    <span className="font-semibold text-foreground">{toolLabel(activity.name)}</span>
+                    <span className="font-medium text-foreground">{toolLabel(activity.name)}</span>
                     {activity.summary ? (
                       <span className="text-muted"> — {activity.summary}</span>
                     ) : activity.status === 'running' ? (
@@ -612,26 +599,24 @@ export function HarnessChatPanel({
         {thought ? (
           <div className="flex items-center gap-2 text-xs text-muted">
             <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:120ms]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:240ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70 [animation-delay:120ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70 [animation-delay:240ms]" />
             </span>
             {thought}
           </div>
         ) : null}
 
         {pendingConfirm ? (
-          <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-600">
-              Confirmación requerida
-            </p>
+          <div className="rounded-xl border border-border bg-surface px-4 py-3.5">
+            <p className="text-[11px] font-medium text-subtle">Confirmación requerida</p>
             <p className="mt-1.5 text-sm font-medium text-foreground">{pendingConfirm.label}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={handleConfirm}
                 disabled={isSending}
-                className="cursor-pointer rounded-xl bg-primary px-3.5 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="cursor-pointer rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 Confirmar
               </button>
@@ -639,7 +624,7 @@ export function HarnessChatPanel({
                 type="button"
                 onClick={() => setPendingConfirm(null)}
                 disabled={isSending}
-                className="cursor-pointer rounded-xl border border-border bg-surface px-3.5 py-2 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
+                className="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
               >
                 Cancelar
               </button>
@@ -648,7 +633,7 @@ export function HarnessChatPanel({
         ) : null}
 
         {error ? (
-          <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
           </p>
         ) : null}
@@ -666,12 +651,12 @@ export function HarnessChatPanel({
             onKeyDown={handleComposerKeyDown}
             placeholder="Ej: Asigna prioridad Should a HU-020…"
             disabled={isSending}
-            className="max-h-[132px] min-h-[40px] min-w-0 flex-1 resize-none bg-transparent py-2.5 text-sm text-foreground outline-none placeholder:text-muted disabled:opacity-60"
+            className="max-h-33 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-sm text-foreground outline-none placeholder:text-subtle disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={isSending || !input.trim()}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-primary text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-foreground text-background transition-opacity hover:opacity-90 disabled:opacity-40"
             aria-label="Enviar mensaje"
           >
             {isSending ? <SpinnerIcon /> : <SendIcon />}

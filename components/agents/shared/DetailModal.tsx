@@ -40,20 +40,26 @@ export function DetailModal({
   }, []);
 
   const handleClose = useCallback(() => {
-    setClosing(true);
-    window.setTimeout(() => {
-      setVisible(false);
-      setClosing(false);
-      onClose();
-    }, 220);
+    onClose();
   }, [onClose]);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
       setClosing(false);
+      return;
     }
-  }, [open]);
+
+    // Cierre externo (Cancelar, Escape, backdrop, X): open=false
+    if (!visible) return;
+
+    setClosing(true);
+    const timer = window.setTimeout(() => {
+      setVisible(false);
+      setClosing(false);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [open, visible]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -88,7 +94,7 @@ export function DetailModal({
     >
       <div
         className={[
-          'absolute inset-0 bg-background/70 backdrop-blur-md',
+          'absolute inset-0 bg-background/70 backdrop-blur-sm',
           closing ? 'detail-modal-backdrop-out' : 'detail-modal-backdrop-in',
         ].join(' ')}
         aria-hidden="true"
@@ -97,54 +103,50 @@ export function DetailModal({
 
       <div
         className={[
-          'detail-modal-shell relative w-full sm:mx-auto',
+          'relative w-full sm:mx-auto',
           MAX_WIDTH[maxWidth],
           closing ? 'detail-modal-panel-out' : 'detail-modal-panel-in',
         ].join(' ')}
       >
-        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl">
-          <div
-            className="pointer-events-none absolute -top-20 left-1/2 h-36 w-[65%] -translate-x-1/2 rounded-full bg-primary/8 blur-3xl"
-            aria-hidden="true"
-          />
-
-          <header className="relative shrink-0 border-b border-border/60 px-5 py-4 sm:px-6">
+        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-xl border border-border bg-surface sm:rounded-xl">
+          <header className="relative shrink-0 border-b border-border px-4 py-3.5 sm:px-5">
             <button
               ref={closeBtnRef}
               type="button"
               onClick={handleClose}
-              className={[
-                'cursor-pointer absolute right-3 top-3 rounded-lg p-2 text-muted',
-                'transition-colors hover:bg-surface-hover hover:text-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-              ].join(' ')}
+              className="absolute right-3 top-3 cursor-pointer rounded-lg p-2 text-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
               aria-label="Cerrar detalles"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
             <div className="pr-10">
-              {eyebrow && (
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80">
-                  {eyebrow}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                {subtitle && (
-                  <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted">
-                    {subtitle}
-                  </span>
-                )}
-                <h2 id="detail-modal-title" className="text-base font-bold text-foreground sm:text-lg">
+              {eyebrow ? (
+                <p className="mb-1 text-[11px] font-medium text-subtle">{eyebrow}</p>
+              ) : null}
+              <div className="flex flex-wrap items-baseline gap-2">
+                {subtitle ? (
+                  <span className="font-mono text-[11px] text-subtle">{subtitle}</span>
+                ) : null}
+                <h2
+                  id="detail-modal-title"
+                  className="text-[15px] font-semibold tracking-tight text-foreground sm:text-base"
+                >
                   {title}
                 </h2>
               </div>
             </div>
           </header>
 
-          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
             {children}
           </div>
         </div>

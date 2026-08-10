@@ -16,39 +16,39 @@ interface AgentLayoutShellProps {
 export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLayoutShellProps) {
   return (
     <div className="flex h-full min-h-0 bg-background text-foreground">
-      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-border bg-surface px-6 py-8 overflow-y-auto scrollbar-gutter-stable">
-        <div className="mb-8">
-          <Link
-            href="/"
-            className="block text-center text-4xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
-          >
-            <span className="text-primary">K</span>larify
-          </Link>
-          <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
-            Workspace de agentes
-          </p>
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
+        <div className="flex min-h-0 flex-1 flex-col px-3.5 pt-5">
+          <div className="mb-5">
+            <Link
+              href="/agentes/proyectos"
+              className="block text-center text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
+            >
+              <span className="text-primary">K</span>larify
+            </Link>
+            <p className="mt-1.5 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
+              Workspace de agentes
+            </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+            <AgentStepper currentStep={currentStep} />
+
+            <div className="mt-1">
+              <ProjectSwitcher />
+            </div>
+          </div>
         </div>
 
-        <AgentStepper currentStep={currentStep} />
-
-        <div className="mt-8">
-          <ProjectSwitcher />
-        </div>
-
-        <div className="mt-3">
+        <div className="mt-auto shrink-0 border-t border-border px-3.5 py-3.5">
           <AgentSidebarSettings />
-        </div>
-        
-        <div className="mt-3">
-          <NewSessionButton />
-        </div>
-
-        <div className="mt-3">
+          <div className="mt-1">
+            <NewSessionButton />
+          </div>
           <Link
             href="/manual"
-            className="flex items-center gap-2 rounded-xl px-2 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="mt-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
-            <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+            <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -58,34 +58,33 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
             <span>Guía de uso</span>
           </Link>
         </div>
-
-        <div className="mt-auto pt-8 border-t border-border">
-          <p className="text-xs text-subtle">Klarify v0.1.0 — MVP</p>
-        </div>
       </aside>
 
-      <div className="relative flex flex-1 flex-col min-w-0">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceGridBackground />
 
-        <div className="relative z-10 border-b border-border bg-surface/90 backdrop-blur-md px-6 py-4 lg:hidden">
-          <div className="flex items-center justify-between gap-4">
+        <div className="relative z-10 border-b border-border bg-surface/90 px-4 py-3 backdrop-blur-md lg:hidden">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <Link href="/" className="text-lg font-extrabold tracking-tight text-foreground">
+              <Link
+                href="/agentes/proyectos"
+                className="text-lg font-extrabold tracking-tight text-foreground"
+              >
                 <span className="text-primary">K</span>larify
               </Link>
-              <p className="truncate text-xs text-muted">
-                Paso {currentStep} - {agentTitle}
+              <p className="truncate text-[12px] text-muted">
+                Paso {currentStep} · {agentTitle}
               </p>
             </div>
-            <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">
+            <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-1 text-[11px] font-medium tabular-nums text-muted">
               {currentStep}/6
             </span>
           </div>
-          <AgentSidebarSettings className="mt-4 border-t-0 pt-0" />
-          <NewSessionButton className="mt-2" />
+          <AgentSidebarSettings className="mt-2.5" />
+          <NewSessionButton className="mt-1" />
         </div>
 
-        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-10 lg:py-10">
+        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-12 lg:py-10">
           {children}
         </main>
       </div>

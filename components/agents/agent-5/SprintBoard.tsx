@@ -109,25 +109,25 @@ export function SprintBoard({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease-out]">
         {plan.dependencies.length > 0 && (
-          <div className="rounded-xl border border-amber-400/20 bg-amber-400/5">
+          <div className="rounded-xl border border-border bg-surface">
             <button
               type="button"
               onClick={() => setDepsExpanded(!depsExpanded)}
-              className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left cursor-pointer hover:bg-amber-400/5 transition-colors rounded-xl"
+              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition-colors hover:bg-surface-hover/40"
               aria-expanded={depsExpanded}
             >
               <div className="flex items-center gap-2">
-                <svg className="h-3.5 w-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <svg className="h-3.5 w-3.5 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
                 </svg>
-                <span className="text-xs font-medium text-amber-700">
+                <span className="text-[13px] font-medium text-foreground">
                   {plan.dependencies.length} dependencia{plan.dependencies.length !== 1 ? 's' : ''} entre historias
                 </span>
               </div>
-              <span className="text-[10px] text-amber-600/80">{depsExpanded ? 'Ocultar' : 'Ver'}</span>
+              <span className="text-[11px] text-subtle">{depsExpanded ? 'Ocultar' : 'Ver'}</span>
             </button>
             {depsExpanded && (
-              <div className="flex flex-wrap gap-1 border-t border-amber-400/15 px-4 py-2.5">
+              <div className="flex flex-wrap gap-1.5 border-t border-border px-4 py-2.5">
                 {plan.dependencies.map((dep) => (
                   <DependencyBadge
                     key={`${dep.storyId}-${dep.dependsOnStoryId}`}
@@ -142,7 +142,7 @@ export function SprintBoard({
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {plan.sprints.map((sprint, idx) => {
             const completedSpBefore = plan.sprints.slice(0, idx).reduce((sum, item) => sum + item.velocitySp, 0);
 
@@ -177,13 +177,12 @@ export function SprintBoard({
               type="button"
               onClick={onAddSprint}
               className={[
-                'flex items-center justify-center gap-2 rounded-xl border border-dashed border-border',
-                'px-5 py-4 text-sm font-medium text-muted',
-                'hover:border-primary hover:bg-primary/5 hover:text-foreground',
-                'transition-colors cursor-pointer',
+                'flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border',
+                'px-5 py-3.5 text-sm font-medium text-muted',
+                'transition-colors hover:border-border-strong hover:bg-surface-hover/40 hover:text-foreground',
               ].join(' ')}
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
               Nuevo sprint
@@ -208,8 +207,8 @@ export function SprintBoard({
 
       <DragOverlay>
         {activeStory ? (
-          <div className="rounded-lg border border-primary bg-surface px-4 py-2 shadow-lg">
-            <span className="text-sm font-semibold text-foreground">{activeStory.title}</span>
+          <div className="rounded-lg border border-border-strong bg-surface px-4 py-2 shadow-sm">
+            <span className="text-sm font-medium text-foreground">{activeStory.title}</span>
           </div>
         ) : null}
       </DragOverlay>

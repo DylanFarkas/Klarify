@@ -95,6 +95,7 @@ html[data-agent-theme="light"],
 
 html[data-agent-theme="dark"],
 .agent-workspace[data-theme="dark"] {
+  color-scheme: dark;
   --grid-size: 52px;
   --grid-line: rgb(255 255 255 / 0.045);
   --grid-line-opacity: 1;
@@ -130,15 +131,16 @@ html[data-agent-theme="dark"],
 
 html[data-agent-theme="carbon"],
 .agent-workspace[data-theme="carbon"] {
+  color-scheme: dark;
   --grid-size: 52px;
   --grid-line: rgb(255 255 255 / 0.04);
   --grid-line-opacity: 1;
   --grid-dot: rgb(62 207 142 / 0.18);
   --grid-dot-opacity: 0.5;
-  --grid-vignette: rgb(28 28 28 / 0.75);
+  --grid-vignette: rgb(15 15 16 / 0.75);
   --grid-noise-opacity: 0.05;
-  --background: #1c1c1c;
-  --surface: #1e1e1e;
+  --background: #0f0f10;
+  --surface: #171718;
   --surface-muted: rgb(255 255 255 / 0.04);
   --surface-hover: rgb(62 207 142 / 0.06);
   --foreground: #ffffff;
@@ -229,6 +231,7 @@ html[data-agent-theme="carbon"][data-carbon-accent="cafe"] {
 
 html[data-agent-theme="ocean"],
 .agent-workspace[data-theme="ocean"] {
+  color-scheme: dark;
   --grid-size: 52px;
   --grid-line: rgb(34 211 238 / 0.07);
   --grid-line-opacity: 1;
@@ -264,6 +267,7 @@ html[data-agent-theme="ocean"],
 
 html[data-agent-theme="forest"],
 .agent-workspace[data-theme="forest"] {
+  color-scheme: dark;
   --grid-size: 52px;
   --grid-line: rgb(52 211 153 / 0.07);
   --grid-line-opacity: 1;
@@ -299,6 +303,7 @@ html[data-agent-theme="forest"],
 
 html[data-agent-theme="rose"],
 .agent-workspace[data-theme="rose"] {
+  color-scheme: dark;
   --grid-size: 52px;
   --grid-line: rgb(244 114 182 / 0.07);
   --grid-line-opacity: 1;

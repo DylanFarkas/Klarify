@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import {
 	DndContext,
@@ -13,23 +13,17 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AcceptanceCriteriaEditor } from '@/components/agents/agent-2/AcceptanceCriteriaEditor';
-import { CategoryBadge, CategorySelect } from '@/components/agents/agent-4/CategorySelect';
+import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
 import { DependencyBadge } from '@/components/agents/agent-5/DependencyBadge';
 import { SprintEditModal } from '@/components/agents/agent-5/SprintEditModal';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
-import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 import { SPRINT_COLORS } from '@/lib/constants/agent-5';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
-import type {
-	FrameworkCategory,
-	PrioritizationFramework,
-	StoryPrioritization,
-} from '@/lib/types/agent-4';
+import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { PlannedSprint, SprintDatePatch, SprintPlan } from '@/lib/types/agent-5';
 import { formatDateRangeEs } from '@/lib/utils/dates';
 import {
@@ -43,11 +37,13 @@ import {
 	updateSprintGoal,
 } from '@/lib/utils/sprint-plan-mutations';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
+import {
+	DashboardCreateStoryModal,
+	DashboardEditStoryModal,
+} from './DashboardStoryFormModal';
 import { ExecutionStatusBadge } from './ExecutionStatusBadge';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
-
-const ALLOWED_STORY_POINTS = FIBONACCI_SCALE;
 
 interface DashboardSprintStoriesTableProps {
 	epics: Epic[];
@@ -177,7 +173,7 @@ export function DashboardSprintStoriesTable({
 				await onEditStory(storyId, updates, estimationUpdates, options, prioritizationUpdates);
 				const onlyCriteria =
 					Object.keys(updates).length === 1 && updates.acceptanceCriteria !== undefined;
-				notifySuccess(onlyCriteria ? 'Criterios de aceptación actualizados' : 'HU actualizada');
+				notifySuccess(onlyCriteria ? 'Criterios de aceptaciÃ³n actualizados' : 'HU actualizada');
 			} catch (err) {
 				notifyError(errorMessage(err, 'No se pudo guardar la HU'));
 				throw err;
@@ -222,8 +218,8 @@ export function DashboardSprintStoriesTable({
 			const nextPlan = deleteEmptySprintAtIndex(current, sprintIndex);
 			if (!nextPlan) return;
 			const confirmed = await confirm({
-				title: '¿Eliminar este sprint vacío?',
-				description: 'El sprint se quitará del plan. Esta acción no se puede deshacer.',
+				title: 'Â¿Eliminar este sprint vacÃ­o?',
+				description: 'El sprint se quitarÃ¡ del plan. Esta acciÃ³n no se puede deshacer.',
 				confirmLabel: 'Eliminar',
 				variant: 'danger',
 			});
@@ -286,18 +282,13 @@ export function DashboardSprintStoriesTable({
 		? [...rows, ...unassignedRows].find((r) => r.story.id === activeStoryId)?.story.title
 		: null;
 
-	const createPanel = isCreating ? (
-		<CreateStoryPanel
-			epics={epics}
-			framework={framework}
-			sprintOptions={sprintOptions}
-			onCancel={() => setIsCreating(false)}
-			onCreate={async (input) => {
-				await handleCreateStory(input);
-				setIsCreating(false);
-			}}
-		/>
-	) : null;
+	const editingRow = useMemo(
+		() =>
+			editingStoryId
+				? [...rows, ...unassignedRows].find((row) => row.story.id === editingStoryId) ?? null
+				: null,
+		[editingStoryId, rows, unassignedRows]
+	);
 
 	const dependenciesBanner =
 		safePlan && safePlan.dependencies.length > 0 ? (
@@ -357,9 +348,9 @@ export function DashboardSprintStoriesTable({
 						<th className="min-w-0 px-3 py-3 @lg:px-4">HU</th>
 						<th className="hidden w-[18%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
 						<th className="w-12 px-2 py-3 @lg:w-14 @lg:px-3">SP</th>
-						<th className="w-[6.75rem] px-2 py-3 @xl:w-[8rem] @xl:px-3">Prioridad</th>
-						<th className="hidden w-[5.5rem] px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
-						<th className="w-[5.75rem] px-2 py-3 text-right @lg:w-[6.75rem] @lg:px-3">Acciones</th>
+						<th className="w-27 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
+						<th className="hidden w-22 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
+						<th className="w-23 px-2 py-3 text-right @lg:w-27 @lg:px-3">Acciones</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -368,14 +359,9 @@ export function DashboardSprintStoriesTable({
 							key={group.key}
 							framework={framework}
 							group={group}
-							epics={epics}
-							sprintOptions={sprintOptions}
-							editingStoryId={editingStoryId}
 							canManagePlan={canManagePlan}
 							capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
-							onCancelEdit={() => setEditingStoryId(null)}
 							onDeleteStory={handleDeleteStory}
-							onEditStory={handleEditStory}
 							onOpenDetail={setDetailRow}
 							onStartEdit={setEditingStoryId}
 							onEditSprint={
@@ -426,14 +412,13 @@ export function DashboardSprintStoriesTable({
 
 	const tableContent = (
 		<>
-			{createPanel}
 			{dependenciesBanner}
 			<DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
 				{tableBody}
 				{addSprintButton}
 				<DragOverlay>
 					{activeStoryTitle ? (
-						<div className="rounded-lg border border-primary bg-surface px-4 py-2 shadow-lg">
+						<div className="rounded-lg border border-border bg-surface px-4 py-2 shadow-sm">
 							<span className="text-sm font-semibold text-foreground">{activeStoryTitle}</span>
 						</div>
 					) : null}
@@ -452,6 +437,39 @@ export function DashboardSprintStoriesTable({
 					onDatesChange={(patch) => handleDatesChange(editingSprint.id, patch)}
 				/>
 			)}
+
+			<DashboardCreateStoryModal
+				open={isCreating}
+				onClose={() => setIsCreating(false)}
+				epics={epics}
+				framework={framework}
+				sprintOptions={sprintOptions}
+				onCreate={async (input) => {
+					await handleCreateStory(input);
+					setIsCreating(false);
+				}}
+			/>
+
+			{editingRow ? (
+				<DashboardEditStoryModal
+					open={Boolean(editingRow)}
+					onClose={() => setEditingStoryId(null)}
+					row={editingRow}
+					epics={epics}
+					framework={framework}
+					sprintOptions={sprintOptions}
+					onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
+						await handleEditStory(
+							editingRow.story.id,
+							updates,
+							estimationUpdates,
+							options,
+							prioritizationUpdates
+						);
+						setEditingStoryId(null);
+					}}
+				/>
+			) : null}
 
 			<DetailModal
 				open={Boolean(detailRow)}
@@ -593,7 +611,7 @@ function buildSprintGroups(
 		groups.push({
 			key: 'unassigned',
 			label: 'Sin asignar',
-			meta: 'Suelta historias aquí para desasignarlas',
+			meta: 'Suelta historias aquÃ­ para desasignarlas',
 			rows: plan ? unassignedRows : unresolvedUnassigned,
 			sprint: null,
 			sprintIndex: null,
@@ -661,14 +679,9 @@ function getSprintOptions(plan: SprintPlan | null, rows: DashboardSprintStoryRow
 function SprintGroupRows({
 	framework,
 	group,
-	epics,
-	sprintOptions,
-	editingStoryId,
 	canManagePlan,
 	capacitySp,
-	onCancelEdit,
 	onDeleteStory,
-	onEditStory,
 	onOpenDetail,
 	onStartEdit,
 	onEditSprint,
@@ -676,20 +689,9 @@ function SprintGroupRows({
 }: {
 	framework: PrioritizationFramework | null;
 	group: SprintRowsGroup;
-	epics: Epic[];
-	sprintOptions: SprintOption[];
-	editingStoryId: string | null;
 	canManagePlan: boolean;
 	capacitySp: number;
-	onCancelEdit: () => void;
 	onDeleteStory: (storyId: string) => Promise<void>;
-	onEditStory: (
-		storyId: string,
-		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions,
-		prioritizationUpdates?: Partial<StoryPrioritization>
-	) => Promise<void>;
 	onOpenDetail: (row: DashboardSprintStoryRow) => void;
 	onStartEdit: (storyId: string) => void;
 	onEditSprint?: () => void;
@@ -762,8 +764,8 @@ function SprintGroupRows({
 								type="button"
 								onClick={onDeleteSprint}
 								className="cursor-pointer rounded-lg px-1.5 py-1 text-muted transition-colors hover:text-danger"
-								title="Eliminar sprint vacío"
-								aria-label="Eliminar sprint vacío"
+								title="Eliminar sprint vacÃ­o"
+								aria-label="Eliminar sprint vacÃ­o"
 							>
 								<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
 									<path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -778,38 +780,23 @@ function SprintGroupRows({
 					<td colSpan={7} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
 						{canManagePlan
 							? group.isUnassigned
-								? 'Suelta historias aquí para desasignarlas'
-								: 'Sin historias — arrastra aquí para asignar.'
+								? 'Suelta historias aquÃ­ para desasignarlas'
+								: 'Sin historias â€” arrastra aquÃ­ para asignar.'
 							: 'Sin historias asignadas.'}
 					</td>
 				</tr>
 			) : (
-				group.rows.map((row) =>
-					editingStoryId === row.story.id ? (
-						<EditableStoryRow
-							key={row.id}
-							row={row}
-							epics={epics}
-							framework={framework}
-							sprintOptions={sprintOptions}
-							onCancel={onCancelEdit}
-							onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
-								await onEditStory(row.story.id, updates, estimationUpdates, options, prioritizationUpdates);
-								onCancelEdit();
-							}}
-						/>
-					) : (
-						<StoryReadOnlyRow
-							key={row.id}
-							framework={framework}
-							row={row}
-							canDrag={canManagePlan}
-							onDelete={async () => onDeleteStory(row.story.id)}
-							onOpenDetail={() => onOpenDetail(row)}
-							onStartEdit={() => onStartEdit(row.story.id)}
-						/>
-					)
-				)
+				group.rows.map((row) => (
+					<StoryReadOnlyRow
+						key={row.id}
+						framework={framework}
+						row={row}
+						canDrag={canManagePlan}
+						onDelete={async () => onDeleteStory(row.story.id)}
+						onOpenDetail={() => onOpenDetail(row)}
+						onStartEdit={() => onStartEdit(row.story.id)}
+					/>
+				))
 			)}
 		</>
 	);
@@ -921,7 +908,7 @@ function StoryReadOnlyRow({
 						onClick={onStartEdit}
 						aria-label="Editar HU"
 						title="Editar HU"
-						className="cursor-pointer inline-flex items-center justify-center rounded-lg p-1.5 text-muted transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+						className="inline-flex cursor-pointer items-center justify-center rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
 					>
 						<EditIcon />
 					</button>
@@ -929,8 +916,8 @@ function StoryReadOnlyRow({
 						type="button"
 						onClick={async () => {
 							const confirmed = await confirm({
-								title: `¿Eliminar ${row.story.id}?`,
-								description: `"${row.story.title}" se eliminará del backlog. Esta acción no se puede deshacer.`,
+								title: `Â¿Eliminar ${row.story.id}?`,
+								description: `"${row.story.title}" se eliminarÃ¡ del backlog. Esta acciÃ³n no se puede deshacer.`,
 								confirmLabel: 'Eliminar',
 								variant: 'danger',
 							});
@@ -958,364 +945,6 @@ function StoryReadOnlyRow({
 			</td>
 		</tr>
 	);
-}
-
-function EditableStoryRow({
-	row,
-	epics,
-	framework,
-	sprintOptions,
-	onCancel,
-	onSave,
-}: {
-	row: DashboardSprintStoryRow;
-	epics: Epic[];
-	framework: PrioritizationFramework | null;
-	sprintOptions: SprintOption[];
-	onCancel: () => void;
-	onSave: (
-		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions,
-		prioritizationUpdates?: Partial<StoryPrioritization>
-	) => Promise<void>;
-}) {
-	const [title, setTitle] = useState(row.story.title);
-	const [description, setDescription] = useState(row.story.description);
-	const [criteria, setCriteria] = useState(row.story.acceptanceCriteria);
-	const [epicId, setEpicId] = useState(row.epicId);
-	const [sprintId, setSprintId] = useState(row.sprintId ?? '');
-	const initialPoints = row.estimation?.points ?? 1;
-	const [points, setPoints] = useState(String(isAllowedStoryPoint(initialPoints) ? initialPoints : 1));
-	const [category, setCategory] = useState<FrameworkCategory | ''>(row.prioritization?.category ?? '');
-	const [isSaving, setIsSaving] = useState(false);
-	const parsedPoints = Number(points);
-	const isInvalidPoints = !isAllowedStoryPoint(parsedPoints);
-	const isSaveDisabled = !title.trim() || !description.trim() || !epicId || isInvalidPoints || isSaving;
-	const hasEpicChange = epicId !== row.epicId;
-	const hasSprintChange = (sprintId || null) !== row.sprintId;
-	const hasPriorityChange = framework ? category !== (row.prioritization?.category ?? '') : false;
-
-	return (
-		<tr className="border-b border-primary/20 bg-primary/5">
-			<td className="hidden px-3 py-3 align-top @3xl:table-cell @3xl:px-4 @3xl:py-4">
-				<span className="font-mono text-xs font-bold text-primary">{row.story.id}</span>
-			</td>
-			<td colSpan={6} className="px-3 py-3 @lg:px-4 @lg:py-4">
-				<span className="mb-3 block font-mono text-xs font-bold text-primary @3xl:hidden">{row.story.id}</span>
-				<div className="grid gap-4 @3xl:grid-cols-[1fr_1.1fr]">
-					<div className="flex flex-col gap-3">
-						<div className="grid gap-3 @md:grid-cols-2 @3xl:grid-cols-3">
-							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-								Epica
-								<select
-									value={epicId}
-									onChange={(event) => setEpicId(event.target.value)}
-									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-								>
-									{epics.map((epic) => (
-										<option key={epic.id} value={epic.id}>
-											{epic.title}
-										</option>
-									))}
-								</select>
-							</label>
-							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-								Sprint
-								<select
-									value={sprintId}
-									onChange={(event) => setSprintId(event.target.value)}
-									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-								>
-									<option value="">Sin sprint</option>
-									{sprintOptions.map((sprint) => (
-										<option key={sprint.id} value={sprint.id}>
-											{sprint.label}
-										</option>
-									))}
-								</select>
-							</label>
-							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-								Titulo
-								<input
-									value={title}
-									onChange={(event) => setTitle(event.target.value)}
-									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-semibold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-								/>
-							</label>
-							<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-								Story points
-								<select
-									value={points}
-									onChange={(event) => setPoints(event.target.value)}
-									className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-								>
-									{ALLOWED_STORY_POINTS.map((value) => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</select>
-							</label>
-							<label className="min-w-0 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-								Prioridad
-								{framework ? (
-									<div className="mt-1 min-w-0">
-										<CategorySelect
-											framework={framework}
-											value={category}
-											onChange={setCategory}
-											className="w-full"
-										/>
-									</div>
-								) : (
-									<p className="mt-2 text-xs text-muted">Sin framework de priorizacion</p>
-								)}
-							</label>
-						</div>
-						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-							Descripcion
-							<textarea
-								value={description}
-								onChange={(event) => setDescription(event.target.value)}
-								rows={4}
-								className="mt-1 w-full resize-none rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-							/>
-						</label>
-					</div>
-					<div className="group">
-						<AcceptanceCriteriaEditor criteria={criteria} onChange={setCriteria} disabled={false} />
-					</div>
-				</div>
-				<div className="mt-4 flex justify-end gap-2">
-					<button
-						type="button"
-						onClick={onCancel}
-						className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-					>
-						Cancelar
-					</button>
-					<button
-						type="button"
-						onClick={async () => {
-							if (isSaveDisabled) return;
-							setIsSaving(true);
-							try {
-								await onSave(
-									{
-										title: title.trim(),
-										description: description.trim(),
-										acceptanceCriteria: criteria,
-									},
-									{
-										points: parsedPoints,
-										justification:
-											row.estimation?.justification ||
-											'Estimacion ajustada manualmente desde el dashboard.',
-										isModified: true,
-									},
-									{
-										...(hasEpicChange ? { epicId } : {}),
-										...(hasSprintChange ? { sprintId: sprintId || null } : {}),
-									},
-									framework && hasPriorityChange && category
-										? {
-												category,
-												justification:
-													row.prioritization?.justification ||
-													'Priorizacion ajustada manualmente desde el dashboard.',
-												isModified: true,
-											}
-										: undefined
-								);
-							} finally {
-								setIsSaving(false);
-							}
-						}}
-						disabled={isSaveDisabled}
-						className={[
-							'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
-							isSaveDisabled
-								? 'cursor-not-allowed bg-disabled text-disabled-text'
-								: 'bg-primary text-white hover:bg-primary-hover',
-						].join(' ')}
-					>
-						{isSaving ? 'Guardando...' : 'Guardar cambios'}
-					</button>
-				</div>
-			</td>
-		</tr>
-	);
-}
-
-function CreateStoryPanel({
-	epics,
-	framework,
-	sprintOptions,
-	onCancel,
-	onCreate,
-}: {
-	epics: Epic[];
-	framework: PrioritizationFramework | null;
-	sprintOptions: SprintOption[];
-	onCancel: () => void;
-	onCreate: (input: CreateDashboardUserStoryInput) => Promise<void>;
-}) {
-	const [epicId, setEpicId] = useState(epics[0]?.id ?? '');
-	const [sprintId, setSprintId] = useState('');
-	const [title, setTitle] = useState('');
-	const [description, setDescription] = useState('');
-	const [criteria, setCriteria] = useState<string[]>([]);
-	const [points, setPoints] = useState(String(ALLOWED_STORY_POINTS[0]));
-	const [category, setCategory] = useState<FrameworkCategory | ''>('');
-	const [isSaving, setIsSaving] = useState(false);
-	const isSaveDisabled = !epicId || !title.trim() || !description.trim() || isSaving;
-
-	return (
-		<div className="border-b border-border bg-primary/5 px-6 py-5">
-			<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-				<div>
-					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">Nueva HU</p>
-					<p className="mt-1 text-sm text-muted">
-						La historia se crea como manual y queda sincronizada con el backlog y el plan.
-					</p>
-				</div>
-			</div>
-
-			<div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-				<div className="flex flex-col gap-3">
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-							Epica
-							<select
-								value={epicId}
-								onChange={(event) => setEpicId(event.target.value)}
-								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-							>
-								{epics.map((epic) => (
-									<option key={epic.id} value={epic.id}>
-										{epic.title}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-							Sprint
-							<select
-								value={sprintId}
-								onChange={(event) => setSprintId(event.target.value)}
-								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-							>
-								<option value="">Sin sprint</option>
-								{sprintOptions.map((sprint) => (
-									<option key={sprint.id} value={sprint.id}>
-										{sprint.label}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-							Story points
-							<select
-								value={points}
-								onChange={(event) => setPoints(event.target.value)}
-								className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-bold text-foreground outline-none transition-all focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-							>
-								{ALLOWED_STORY_POINTS.map((value) => (
-									<option key={value} value={value}>
-										{value}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="min-w-0 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-							Prioridad
-							{framework ? (
-								<div className="mt-1 min-w-0">
-									<CategorySelect
-										framework={framework}
-										value={category}
-										onChange={setCategory}
-										className="w-full"
-									/>
-								</div>
-							) : (
-								<p className="mt-2 text-xs text-muted">Disponible tras priorizar (Agente 4)</p>
-							)}
-						</label>
-					</div>
-
-					<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-						Titulo
-						<input
-							value={title}
-							onChange={(event) => setTitle(event.target.value)}
-							placeholder="Titulo de la historia..."
-							className="mt-1 w-full rounded-lg border border-input-border bg-surface px-3 py-2 text-sm font-semibold text-foreground outline-none transition-all placeholder:text-placeholder focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-						/>
-					</label>
-
-					<label className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-						Descripcion
-						<textarea
-							value={description}
-							onChange={(event) => setDescription(event.target.value)}
-							rows={4}
-							placeholder="Como usuario, quiero..."
-							className="mt-1 w-full resize-none rounded-lg border border-input-border bg-surface px-3 py-2 text-sm text-foreground outline-none transition-all placeholder:text-placeholder focus:border-primary/60 focus:ring-1 focus:ring-primary/30"
-						/>
-					</label>
-				</div>
-
-				<div className="group">
-					<AcceptanceCriteriaEditor criteria={criteria} onChange={setCriteria} disabled={false} />
-				</div>
-			</div>
-
-			<div className="mt-4 flex justify-end gap-2">
-				<button
-					type="button"
-					onClick={onCancel}
-					className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-				>
-					Cancelar
-				</button>
-				<button
-					type="button"
-					onClick={async () => {
-						if (isSaveDisabled) return;
-						setIsSaving(true);
-						try {
-							await onCreate({
-								epicId,
-								sprintId: sprintId || null,
-								title: title.trim(),
-								description: description.trim(),
-								acceptanceCriteria: criteria,
-								points: Number(points),
-								...(category ? { category } : {}),
-							});
-						} finally {
-							setIsSaving(false);
-						}
-					}}
-					disabled={isSaveDisabled}
-					className={[
-						'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
-						isSaveDisabled
-							? 'cursor-not-allowed bg-disabled text-disabled-text'
-							: 'bg-primary text-white hover:bg-primary-hover',
-					].join(' ')}
-				>
-					{isSaving ? 'Creando...' : 'Crear HU'}
-				</button>
-			</div>
-		</div>
-	);
-}
-
-function isAllowedStoryPoint(value: number): value is (typeof ALLOWED_STORY_POINTS)[number] {
-	return ALLOWED_STORY_POINTS.includes(value as (typeof ALLOWED_STORY_POINTS)[number]);
 }
 
 function formatDateRange(startDate: string | null, endDate: string | null): string {

@@ -14,27 +14,29 @@ export function AgentCelebrationBanner({
   extra,
 }: AgentCelebrationBannerProps) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-success/25 bg-linear-to-br from-success/[0.07] via-success/3 to-transparent px-6 py-6 animate-[scaleIn_0.35s_ease-out]">
-      <div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-success/10 blur-3xl animate-[heroGlow_6s_ease-in-out_infinite]"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-success/30 bg-success/15 animate-[celebrationPop_0.5s_ease-out]">
-            <svg className="h-7 w-7 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+    <div className="rounded-xl border border-border bg-surface px-5 py-4 animate-[fadeIn_0.3s_ease-out]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted">
+            <svg
+              className="h-4.5 w-4.5 text-success"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <div>
-            <p className="text-base font-bold text-success">{title}</p>
-            <p className="mt-0.5 text-sm text-success/70">{description}</p>
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold tracking-tight text-foreground">{title}</p>
+            <p className="mt-0.5 text-sm text-muted">{description}</p>
             {extra}
           </div>
         </div>
 
-        {action && <div className="flex shrink-0 items-center sm:ml-auto">{action}</div>}
+        {action ? <div className="flex shrink-0 items-center sm:ml-auto">{action}</div> : null}
       </div>
     </div>
   );

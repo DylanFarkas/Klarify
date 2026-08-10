@@ -9,23 +9,22 @@ import { getProjectEntryPath } from '@/lib/utils/project-progress';
 const NAV_ITEMS = [
   {
     href: '/agentes/proyectos',
-    label: 'Tus proyectos',
+    label: 'Proyectos',
     icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM4.875 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-2.25z"
         />
       </svg>
-      
     ),
   },
   {
     href: '/manual',
     label: 'Guía de uso',
     icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -35,6 +34,15 @@ const NAV_ITEMS = [
     ),
   },
 ] as const;
+
+function navClass(isActive: boolean): string {
+  return [
+    'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
+    isActive
+      ? 'bg-surface-hover font-medium text-foreground'
+      : 'text-muted hover:bg-surface-hover hover:text-foreground',
+  ].join(' ');
+}
 
 export function WorkspaceHomeNav() {
   const pathname = usePathname();
@@ -56,20 +64,13 @@ export function WorkspaceHomeNav() {
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Navegación del workspace">
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">Inicio</p>
-
       {NAV_ITEMS.map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={[
-              'flex items-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted hover:bg-surface-hover hover:text-foreground',
-            ].join(' ')}
+            className={navClass(isActive)}
             aria-current={isActive ? 'page' : undefined}
           >
             {item.icon}
@@ -80,33 +81,26 @@ export function WorkspaceHomeNav() {
 
       {activeProject ? (
         <>
-          <p className="mb-3 mt-6 text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
-            Proyecto activo
-          </p>
+          <div className="mb-1.5 mt-5 flex items-center justify-between px-2.5">
+            <p className="text-xs font-medium text-subtle">Proyecto activo</p>
+          </div>
 
           {continueHref ? (
-            <Link
-              href={continueHref}
-              className="flex items-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+            <Link href={continueHref} className={navClass(false)}>
+              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
               </svg>
-              <span className="min-w-0 truncate">Continuar pipeline</span>
+              <span className="min-w-0 truncate">Continuar</span>
             </Link>
           ) : null}
 
           {showDashboard ? (
             <Link
               href="/agentes/dashboard"
-              className={[
-                'flex items-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium transition-colors',
-                pathname === '/agentes/dashboard'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted hover:bg-surface-hover hover:text-foreground',
-              ].join(' ')}
+              className={navClass(pathname === '/agentes/dashboard')}
+              aria-current={pathname === '/agentes/dashboard' ? 'page' : undefined}
             >
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -120,14 +114,10 @@ export function WorkspaceHomeNav() {
           {showBoard ? (
             <Link
               href="/agentes/board"
-              className={[
-                'flex items-center gap-3 rounded-xl px-2 py-2.5 text-sm font-medium transition-colors',
-                pathname === '/agentes/board'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted hover:bg-surface-hover hover:text-foreground',
-              ].join(' ')}
+              className={navClass(pathname === '/agentes/board')}
+              aria-current={pathname === '/agentes/board' ? 'page' : undefined}
             >
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -138,12 +128,12 @@ export function WorkspaceHomeNav() {
             </Link>
           ) : null}
 
-          <div className="mt-2 rounded-xl border border-border bg-background/60 px-3 py-2.5">
-            <p className="truncate text-xs font-semibold text-foreground">{activeProject.name}</p>
-            <p className="mt-0.5 text-[11px] text-subtle">
+          <div className="mt-2 rounded-lg px-2.5 py-2.5">
+            <p className="truncate text-[13px] font-medium text-foreground">{activeProject.name}</p>
+            <p className="mt-0.5 text-xs text-subtle">
               {activeProject.pipelineLabel} · {activeProject.completionPercentage}%
             </p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-border">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-500"
                 style={{ width: `${activeProject.completionPercentage}%` }}

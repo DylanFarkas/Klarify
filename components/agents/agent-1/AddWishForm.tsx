@@ -22,7 +22,6 @@ export function AddWishForm({ onAdd, onCancel }: AddWishFormProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Autofocar al montar
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
@@ -46,15 +45,9 @@ export function AddWishForm({ onAdd, onCancel }: AddWishFormProps) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={[
-        'rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4',
-        'animate-[fadeIn_0.2s_ease-out]',
-      ].join(' ')}
-    >
-      <label htmlFor="new-wish-input" className="mb-2 block text-xs font-bold text-muted">
-        Nuevo deseo del cliente
+    <form onSubmit={handleSubmit} className="px-4 py-3.5 md:px-5">
+      <label htmlFor="new-wish-input" className="mb-1.5 block text-[12px] font-medium text-muted">
+        Nuevo deseo
       </label>
 
       <textarea
@@ -64,36 +57,23 @@ export function AddWishForm({ onAdd, onCancel }: AddWishFormProps) {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         rows={2}
-        placeholder="Describe el deseo o necesidad del cliente..."
-        className={[
-          'w-full resize-none rounded-lg border border-input-border bg-surface px-3 py-2',
-          'text-sm text-foreground placeholder:text-placeholder',
-          'outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30',
-          'transition-all duration-200',
-        ].join(' ')}
+        placeholder="Describe el deseo o necesidad del cliente…"
+        className="w-full resize-none rounded-lg border border-input-border bg-input px-3 py-2.5 text-[15px] leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
       />
 
-      <div className="mt-3 flex items-center justify-end gap-2">
+      <div className="mt-2.5 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:bg-surface-hover transition-colors cursor-pointer"
+          className="cursor-pointer rounded-md px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={!text.trim()}
-          className={[
-            'inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold transition-all cursor-pointer',
-            text.trim()
-              ? 'bg-primary text-white hover:bg-primary-hover'
-              : 'bg-disabled text-disabled-text cursor-not-allowed',
-          ].join(' ')}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
           Añadir
         </button>
       </div>

@@ -143,7 +143,7 @@ export function DropdownSelect({
                     className={[
                       'block w-full cursor-pointer px-3 py-2.5 text-left text-sm transition-colors',
                       isSelected
-                        ? 'bg-primary text-white'
+                        ? 'bg-surface-hover text-foreground'
                         : 'text-foreground hover:bg-surface-hover',
                     ].join(' ')}
                   >
@@ -174,7 +174,7 @@ export function DropdownSelect({
         className={[
           'flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors cursor-pointer',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          open ? 'border-primary/60' : 'hover:border-border',
+          open ? 'border-border-strong' : 'hover:border-border',
           selectedLabel ? 'text-foreground' : 'text-muted',
         ].join(' ')}
       >

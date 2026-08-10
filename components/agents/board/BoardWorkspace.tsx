@@ -121,15 +121,15 @@ export function BoardWorkspace() {
   if (!isExecutionReady || isInitializing) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-sm text-muted">Preparando tablero...</p>
+        <p className="text-sm text-muted">Preparando tablero…</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <Link
             href="/agentes/dashboard"
             className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
@@ -139,21 +139,26 @@ export function BoardWorkspace() {
             </svg>
             Volver al dashboard
           </Link>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Ejecución</p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">Tablero Kanban</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tablero Kanban</h1>
           <p className="mt-1 text-sm text-muted">
             {boardData.stories.length} historias visibles · {progress}% completadas
           </p>
         </div>
-        <div className="h-2 w-full max-w-xs overflow-hidden">
-          <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        <div className="w-full max-w-xs">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-subtle">Progreso</span>
+            <span className="text-[11px] tabular-nums text-subtle">{progress}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-border">
+            <div
+              className="h-full rounded-full bg-foreground/70 transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <BoardFilters
           filters={filters}
           sprints={snapshot?.plan.sprints ?? []}

@@ -77,18 +77,18 @@ export function StoryExecutionDrawer({
       maxWidth="xl"
     >
       <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-background/50 p-4">
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Ejecución</h3>
+        <section className="rounded-xl border border-border bg-surface p-4">
+          <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Ejecución</h3>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="story-status" className="text-[11px] font-semibold text-subtle">
+              <label htmlFor="story-status" className="text-[11px] font-medium text-subtle">
                 Estado
               </label>
               <select
                 id="story-status"
                 value={item.execution.status}
                 onChange={(e) => onStatusChange(item.story.id, e.target.value as KanbanStatus)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface text-foreground px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
               >
                 {KANBAN_COLUMNS.map((col) => (
                   <option key={col.id} value={col.id}>
@@ -99,7 +99,7 @@ export function StoryExecutionDrawer({
               <p className="mt-1 text-[10px] text-subtle">Atajos: teclas 1–4</p>
             </div>
             <div>
-              <label htmlFor="story-assignee" className="text-[11px] font-semibold text-subtle">
+              <label htmlFor="story-assignee" className="text-[11px] font-medium text-subtle">
                 Responsable
               </label>
               <select
@@ -108,7 +108,7 @@ export function StoryExecutionDrawer({
                 onChange={(e) =>
                   onAssigneeChange(item.story.id, e.target.value ? e.target.value : null)
                 }
-                className="mt-1 w-full rounded-lg border border-border bg-surface text-foreground px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
               >
                 <option value="">Sin asignar</option>
                 {members.map((m) => (
@@ -121,7 +121,7 @@ export function StoryExecutionDrawer({
           </div>
           {item.sprintNumber !== null && (
             <p className="mt-3 text-xs text-muted">
-              Sprint planificado: <span className="font-semibold">Sprint {item.sprintNumber}</span>
+              Sprint planificado: <span className="font-medium text-foreground">Sprint {item.sprintNumber}</span>
             </p>
           )}
         </section>
@@ -136,14 +136,14 @@ export function StoryExecutionDrawer({
 
         {activity.length > 0 && (
           <section>
-            <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+            <h3 className="mb-2 text-[15px] font-semibold tracking-tight text-foreground">
               Actividad reciente
             </h3>
-            <ul className="space-y-2">
+            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
               {activity.map((entry, i) => (
                 <li
                   key={`${entry.at}-${i}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-2 px-3 py-2.5 text-xs"
                 >
                   <span className="text-muted">{formatActivity(entry, members)}</span>
                   <time className="shrink-0 text-[10px] text-subtle">

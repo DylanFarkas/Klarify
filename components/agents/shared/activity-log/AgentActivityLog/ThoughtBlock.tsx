@@ -70,7 +70,6 @@ export function ThoughtBlock({
     stickToBottomRef.current = true;
   }, [entry.id, isStreaming]);
 
-  // Auto-scroll mientras crece el contenido (ResizeObserver cubre el layout post-render).
   useEffect(() => {
     if (!isStreaming) return;
 
@@ -93,7 +92,6 @@ export function ThoughtBlock({
     return () => observer.disconnect();
   }, [isStreaming, entry.id, isWaitingForText]);
 
-  // Fallback cuando llegan chunks de texto.
   useEffect(() => {
     if (!isStreaming || !stickToBottomRef.current) return;
     const el = bodyRef.current;
@@ -116,25 +114,13 @@ export function ThoughtBlock({
 
   const canToggle = isComplete && displayText.length > 0;
 
-  const containerClass = nestable
-    ? 'rounded-lg border border-border/50 bg-surface/50'
-    : 'agent-thought rounded-xl border border-primary/20 bg-[color-mix(in_srgb,var(--primary)_4%,var(--surface))]';
-
   return (
     <div
       className={[
-        'group relative overflow-hidden',
+        'group relative overflow-hidden rounded-lg border border-border/70 bg-surface-muted/30',
         fillSpace ? 'flex min-h-0 flex-1 flex-col' : '',
-        containerClass,
       ].join(' ')}
     >
-      {!nestable && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-0.5 bg-linear-to-b from-primary/70 via-primary/30 to-transparent"
-        />
-      )}
-
       <button
         type="button"
         onClick={() => canToggle && setExpanded((prev) => !prev)}
@@ -145,21 +131,27 @@ export function ThoughtBlock({
         disabled={!canToggle}
         aria-expanded={showBody}
       >
-        <span className="font-mono text-[10px] text-primary/80">✦</span>
-        <span className="text-xs font-medium text-foreground/90">
+        <span
+          className={[
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            isComplete ? 'bg-foreground/30' : 'bg-foreground/60',
+          ].join(' ')}
+          aria-hidden
+        />
+        <span className="text-[12px] font-medium text-foreground">
           {isComplete && !expanded ? preview : 'Razonamiento'}
         </span>
-        {duration && (
-          <span className="font-mono text-[10px] text-muted/60">{duration}</span>
-        )}
+        {duration ? (
+          <span className="text-[11px] tabular-nums text-subtle">{duration}</span>
+        ) : null}
         {!isComplete ? (
-          <span className="ml-auto flex items-center gap-1.5">
-            <span className="font-mono text-[10px] text-muted">pensando</span>
+          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-subtle">
+            pensando
             <span className="flex gap-0.5">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="h-1 w-1 animate-bounce rounded-full bg-primary/70"
+                  className="h-1 w-1 animate-bounce rounded-full bg-foreground/40"
                   style={{ animationDelay: `${i * 120}ms` }}
                 />
               ))}
@@ -167,8 +159,8 @@ export function ThoughtBlock({
           </span>
         ) : (
           canToggle && (
-            <span className="ml-auto font-mono text-[10px] text-muted/50">
-              {expanded ? '▾' : '▸'}
+            <span className="ml-auto text-[11px] text-subtle">
+              {expanded ? 'Ocultar' : 'Ver'}
             </span>
           )
         )}
@@ -179,31 +171,31 @@ export function ThoughtBlock({
           ref={bodyRef}
           onScroll={isStreaming ? handleBodyScroll : undefined}
           className={[
-            'relative border-t border-border/40 px-3 pb-3 pt-2',
+            'relative border-t border-border/50 px-3.5 pb-3.5 pt-3',
             fillSpace
               ? 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain'
               : isStreaming
-                ? 'max-h-[min(50vh,400px)] min-h-56 overflow-y-auto overscroll-contain'
+                ? 'max-h-[min(50vh,400px)] min-h-52 overflow-y-auto overscroll-contain'
                 : '',
           ].join(' ')}
         >
           {isWaitingForText ? (
             <div className="flex flex-col gap-2 py-1">
-              <div className="h-2 w-[90%] animate-pulse rounded-full bg-muted/20" />
-              <div className="h-2 w-[70%] animate-pulse rounded-full bg-muted/15" />
+              <div className="h-2 w-[88%] animate-pulse rounded-full bg-border" />
+              <div className="h-2 w-[64%] animate-pulse rounded-full bg-border/70" />
             </div>
           ) : (
             <div ref={contentRef} className={fillSpace ? 'min-h-0 flex-1' : undefined}>
               <ThoughtMarkdown text={displayText} compact={nestable} />
               {!isComplete && (
-                <span className="ml-0.5 inline-block h-3 w-1 animate-pulse rounded-sm bg-primary/70 align-middle" />
+                <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
               )}
             </div>
           )}
           {isLive && isStreaming && (
             <div
               aria-hidden="true"
-              className="pointer-events-none sticky bottom-0 -mb-3 h-6 bg-linear-to-t from-surface/95 to-transparent"
+              className="pointer-events-none sticky bottom-0 -mb-3.5 h-8 bg-linear-to-t from-surface via-surface/80 to-transparent"
             />
           )}
         </div>

@@ -48,7 +48,7 @@ export function KanbanCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.45 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
@@ -56,9 +56,9 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       className={[
-        'group rounded-xl border border-border/80 bg-background/90 p-3 shadow-sm transition-shadow',
-        'hover:border-primary/25 hover:shadow-md',
-        isDragging ? 'ring-2 ring-primary/30 opacity-45' : '',
+        'group rounded-lg border border-border bg-surface p-3 transition-colors',
+        'hover:bg-surface-hover/40',
+        isDragging ? 'border-border-strong' : '',
       ].join(' ')}
     >
       <div className="flex items-start gap-2">
@@ -67,7 +67,7 @@ export function KanbanCard({
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
-          className="flex h-7 w-5 shrink-0 items-center justify-center self-start rounded-md cursor-grab touch-none text-subtle hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
+          className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded-md text-subtle hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
           aria-label="Arrastrar historia"
         >
           <svg className="block h-[18px] w-[10px]" fill="currentColor" viewBox="0 0 10 18" aria-hidden>
@@ -83,14 +83,12 @@ export function KanbanCard({
         <button
           type="button"
           onClick={() => onOpen(item.story.id)}
-          className="min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
         >
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-[10px] font-medium text-subtle">{item.story.id}</span>
             {item.sprintNumber !== null && (
-              <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-[9px] font-bold text-muted">
-                S{item.sprintNumber}
-              </span>
+              <span className="text-[10px] text-subtle">S{item.sprintNumber}</span>
             )}
             <DependencyBadge
               storyId={item.story.id}
@@ -99,7 +97,9 @@ export function KanbanCard({
               compact
             />
           </div>
-          <p className="mt-1 line-clamp-2 text-sm font-semibold text-foreground cursor-pointer">{item.story.title}</p>
+          <p className="mt-1 line-clamp-2 cursor-pointer text-[13px] font-medium text-foreground">
+            {item.story.title}
+          </p>
           <p className="mt-0.5 line-clamp-1 text-[11px] text-subtle">{item.epicTitle}</p>
         </button>
       </div>
@@ -107,13 +107,13 @@ export function KanbanCard({
       <div className="mt-3 flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {item.points > 0 && (
-            <span className="rounded-md border border-border bg-surface-muted px-1.5 py-0.5 text-[10px] font-bold text-muted">
+            <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted">
               {item.points} SP
             </span>
           )}
           {priorityLabel && (
             <span
-              className="rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white"
               style={{ backgroundColor: priorityColor }}
             >
               {priorityLabel}
@@ -123,7 +123,7 @@ export function KanbanCard({
 
         {assignee ? (
           <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-medium text-white"
             style={{ backgroundColor: assignee.avatarColor }}
             title={assignee.displayName}
           >

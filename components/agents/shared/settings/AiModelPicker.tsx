@@ -41,7 +41,7 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     return (
       <div
         className={[
-          'rounded-lg border border-border bg-elevated/40 px-2 py-2 text-xs text-subtle',
+          'rounded-lg border border-border bg-surface px-2 py-2 text-xs text-muted',
           className,
         ]
           .filter(Boolean)
@@ -56,7 +56,7 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     <div className={['space-y-1.5', className].filter(Boolean).join(' ')}>
       {!compact ? (
         <div className="flex items-center justify-between gap-2 px-0.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+          <span className="text-[11px] font-medium text-subtle">
             Modelo de IA
           </span>
           <span className="truncate text-[10px] text-subtle">

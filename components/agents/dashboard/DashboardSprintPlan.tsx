@@ -43,38 +43,33 @@ export function DashboardSprintPlan({
 	const [isCreating, setIsCreating] = useState(false);
 
 	return (
-		<section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface/80 shadow-sm">
-			<div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-6 py-5">
+		<section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface">
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3.5 md:px-5">
 				<div className="min-w-0 flex-1">
-					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Plan de sprints</p>
-					<h2 className="mt-2 text-xl font-bold text-foreground">Planificación e historias</h2>
-					<p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-						Ajusta sprints e historias en un solo lugar. Arrastra HU entre sprints, edita objetivos y fechas, o
-						crea nuevas historias.
+					<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
+						Plan de sprints
+					</h2>
+					<p className="mt-1 text-[12px] text-muted">
+						Arrastra HU entre sprints, edita objetivos y fechas, o crea nuevas historias.
+						{' · '}
+						<span className="tabular-nums text-subtle">{rows.length} planificadas</span>
 					</p>
 				</div>
 
-				<div className="flex flex-wrap items-start gap-3">
-					<button
-						type="button"
-						onClick={() => setIsCreating(true)}
-						disabled={epics.length === 0 || isCreating}
-						className={[
-							'cursor-pointer inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all',
-							epics.length > 0 && !isCreating
-								? 'bg-primary text-white hover:bg-primary-hover'
-								: 'cursor-not-allowed bg-disabled text-disabled-text',
-						].join(' ')}
-					>
-						<PlusIcon />
-						Nueva HU
-					</button>
-
-					<div className="rounded-2xl border border-border bg-surface px-4 py-3 text-right">
-						<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">HU planificadas</p>
-						<p className="mt-1 text-2xl font-bold text-foreground">{rows.length}</p>
-					</div>
-				</div>
+				<button
+					type="button"
+					onClick={() => setIsCreating(true)}
+					disabled={epics.length === 0 || isCreating}
+					className={[
+						'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-opacity',
+						epics.length > 0 && !isCreating
+							? 'bg-foreground text-background hover:opacity-90'
+							: 'cursor-not-allowed bg-disabled text-disabled-text opacity-40',
+					].join(' ')}
+				>
+					<PlusIcon />
+					Nueva HU
+				</button>
 			</div>
 
 			<DashboardSprintStoriesTable
@@ -98,7 +93,7 @@ export function DashboardSprintPlan({
 
 function PlusIcon() {
 	return (
-		<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+		<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
 			<path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
 		</svg>
 	);

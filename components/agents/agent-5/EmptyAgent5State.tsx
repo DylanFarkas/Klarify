@@ -3,15 +3,6 @@
 import Link from 'next/link';
 import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
 
-const backLinkClass = [
-  'inline-flex items-center gap-2 rounded-xl px-6 py-3',
-  'text-sm font-bold text-white',
-  'bg-primary hover:bg-primary-hover',
-  'shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)]',
-  'transition-all hover:shadow-[0_6px_28px_color-mix(in_srgb,var(--primary)_45%,transparent)]',
-  'cursor-pointer',
-].join(' ');
-
 export function EmptyAgent5State() {
   return (
     <EmptyAgentState
@@ -19,7 +10,7 @@ export function EmptyAgent5State() {
       description="Para planificar sprints, primero debes completar el Agente 4 y aprobar la priorización del backlog."
       icon={
         <svg
-          className="h-10 w-10 text-primary/60"
+          className="h-6 w-6 text-muted"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -34,7 +25,10 @@ export function EmptyAgent5State() {
         </svg>
       }
       action={
-        <Link href="/agentes/4" className={backLinkClass}>
+        <Link
+          href="/agentes/4"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
           <svg
             className="h-4 w-4"
             fill="none"

@@ -164,7 +164,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
             ref={popoverRef}
             role="dialog"
             aria-label="Gestionar equipo"
-            className="fixed z-300 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl animate-[fadeIn_0.15s_ease-out]"
+            className="fixed z-300 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg animate-[fadeIn_0.15s_ease-out]"
             style={{
               top: position.top,
               left: position.left,
@@ -172,10 +172,10 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
               maxHeight: position.maxHeight,
             }}
           >
-            <header className="shrink-0 border-b border-border/60 px-4 py-3">
+            <header className="shrink-0 border-b border-border px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-bold text-foreground">Equipo</h2>
-                <span className="text-[10px] font-medium text-subtle">
+                <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Equipo</h2>
+                <span className="tabular-nums text-[11px] text-subtle">
                   {members.length}/{maxMembers}
                 </span>
               </div>
@@ -203,7 +203,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                         className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-hover"
                       >
                         <span
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium text-white"
                           style={{ backgroundColor: member.avatarColor }}
                         >
                           {memberInitials(member.displayName)}
@@ -219,7 +219,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                               setShowForm(false);
                               setEditingId(member.id);
                             }}
-                            className="cursor-pointer rounded-md p-1 text-subtle hover:bg-background hover:text-foreground"
+                            className="cursor-pointer rounded-md p-1 text-subtle hover:bg-surface-hover hover:text-foreground"
                             aria-label={`Editar ${member.displayName}`}
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -255,12 +255,12 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
             </div>
 
             {!showForm && !editingId ? (
-              <footer className="shrink-0 border-t border-border/60 p-3">
+              <footer className="shrink-0 border-t border-border p-3">
                 <button
                   type="button"
                   disabled={atLimit}
                   onClick={() => setShowForm(true)}
-                  className="cursor-pointer flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-bold text-muted transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -282,7 +282,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
         onClick={handleToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="cursor-pointer flex shrink-0 items-center gap-2 rounded-xl border border-border bg-background/60 px-2.5 py-1.5 text-sm transition-colors hover:border-primary/30 hover:bg-surface-hover focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20"
+        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm transition-colors hover:bg-surface-hover focus:border-border-strong focus:outline-none"
       >
         <span className="flex items-center">
           {visibleAvatars.length > 0 ? (
@@ -290,7 +290,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
               {visibleAvatars.map((member) => (
                 <span
                   key={member.id}
-                  className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[9px] font-bold text-white"
+                  className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface text-[9px] font-medium text-white"
                   style={{ backgroundColor: member.avatarColor }}
                   title={member.displayName}
                 >
@@ -298,7 +298,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
                 </span>
               ))}
               {overflow > 0 ? (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-surface-hover text-[9px] font-bold text-muted">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-surface-hover text-[9px] font-medium text-muted">
                   +{overflow}
                 </span>
               ) : null}

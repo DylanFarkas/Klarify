@@ -63,9 +63,7 @@ export function FrameworkSelector({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        Metodología
-      </label>
+      <label className="text-[11px] font-medium text-subtle">Metodología</label>
       <div className="flex flex-wrap gap-1.5">
         {FRAMEWORK_OPTIONS.map((opt) => {
           const desc = FRAMEWORK_DESCRIPTIONS[opt.id];
@@ -74,6 +72,7 @@ export function FrameworkSelector({
           return (
             <div key={opt.id} className="relative">
               <button
+                type="button"
                 ref={(el) => {
                   if (el) buttonRefs.current.set(opt.id, el);
                   else buttonRefs.current.delete(opt.id);
@@ -82,13 +81,15 @@ export function FrameworkSelector({
                 onClick={() => opt.enabled && onChange(opt.id)}
                 onMouseEnter={() => opt.enabled && showTooltip(opt.id)}
                 onMouseLeave={hideTooltip}
-                className={`relative inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                className={[
+                  'inline-flex cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors',
                   isActive
-                    ? 'border-primary/40 bg-primary/10 text-primary shadow-sm'
+                    ? 'border-foreground bg-foreground text-background'
                     : opt.enabled
-                      ? 'border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/50'
-                      : 'cursor-not-allowed border-border/40 bg-muted/30 text-muted-foreground/40'
-                } disabled:opacity-60`}
+                      ? 'border-border bg-background text-muted hover:border-border-strong hover:bg-surface-hover hover:text-foreground'
+                      : 'cursor-not-allowed border-border text-subtle opacity-40',
+                  'disabled:cursor-not-allowed disabled:opacity-40',
+                ].join(' ')}
               >
                 {desc.label}
               </button>
@@ -97,37 +98,36 @@ export function FrameworkSelector({
         })}
       </div>
 
-      {hoveredId && createPortal(
-        <div
-          className="fixed z-9999 w-72 rounded-lg border border-border bg-surface p-3 shadow-xl"
-          style={{
-            top: tooltipPos.top,
-            left: tooltipPos.left,
-            transform: 'translate(-50%, -100%)',
-          }}
-          onMouseEnter={() => {
-            if (hideTimeout.current) {
-              clearTimeout(hideTimeout.current);
-              hideTimeout.current = null;
-            }
-          }}
-          onMouseLeave={hideTooltip}
-        >
-          <p className="text-[11px] font-semibold text-foreground">
-            {FRAMEWORK_DESCRIPTIONS[hoveredId].label}
-          </p>
-          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-            {FRAMEWORK_DESCRIPTIONS[hoveredId].summary}
-          </p>
-          <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground/70">
-            {FRAMEWORK_DESCRIPTIONS[hoveredId].details}
-          </p>
-          <div
-            className="absolute left-1/2 -bottom-1 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-border bg-surface"
-          />
-        </div>,
-        document.body
-      )}
+      {hoveredId
+        ? createPortal(
+            <div
+              className="fixed z-9999 w-72 rounded-lg border border-border bg-surface p-3"
+              style={{
+                top: tooltipPos.top,
+                left: tooltipPos.left,
+                transform: 'translate(-50%, -100%)',
+              }}
+              onMouseEnter={() => {
+                if (hideTimeout.current) {
+                  clearTimeout(hideTimeout.current);
+                  hideTimeout.current = null;
+                }
+              }}
+              onMouseLeave={hideTooltip}
+            >
+              <p className="text-[12px] font-medium text-foreground">
+                {FRAMEWORK_DESCRIPTIONS[hoveredId].label}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                {FRAMEWORK_DESCRIPTIONS[hoveredId].summary}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-subtle">
+                {FRAMEWORK_DESCRIPTIONS[hoveredId].details}
+              </p>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

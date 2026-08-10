@@ -9,8 +9,10 @@ export function GeneralSettingsPanel() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-foreground">Configuraciones generales</h3>
-        <p className="mt-1 text-xs text-subtle">
+        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+          Configuraciones generales
+        </h3>
+        <p className="mt-1 text-[12px] text-muted">
           Ajusta el comportamiento del workspace mientras los agentes procesan tu solicitud.
         </p>
       </div>

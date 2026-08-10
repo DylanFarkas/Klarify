@@ -15,7 +15,7 @@ export function NewSessionButton({ className = '' }: NewSessionButtonProps) {
     <Link
       href="/agentes/proyectos"
       className={[
-        'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium',
+        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm',
         'text-muted transition-colors hover:bg-surface-hover hover:text-foreground',
         className,
       ]
@@ -23,7 +23,7 @@ export function NewSessionButton({ className = '' }: NewSessionButtonProps) {
         .join(' ')}
     >
       <svg
-        className="h-5 w-5 shrink-0"
+        className="h-4.5 w-4.5 shrink-0"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

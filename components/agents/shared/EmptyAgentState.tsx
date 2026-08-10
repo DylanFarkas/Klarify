@@ -9,26 +9,15 @@ interface EmptyAgentStateProps {
 
 export function EmptyAgentState({ title, description, icon, action }: EmptyAgentStateProps) {
   return (
-    <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted/50 py-20 text-center animate-[fadeIn_0.4s_ease-out]">
-      <div
-        className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-primary/4 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -bottom-16 -right-16 h-40 w-40 rounded-full bg-primary/3 blur-3xl"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 max-w-md px-6">
-        <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-primary/15 bg-linear-to-br from-primary/10 to-primary/5">
-          {icon}
-        </div>
-
-        <h3 className="mb-2 text-xl font-bold text-foreground">{title}</h3>
-        <p className="mb-8 text-sm leading-relaxed text-muted">{description}</p>
-
-        {action}
+    <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-5 py-14 text-center animate-[fadeIn_0.3s_ease-out]">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-surface-muted text-muted [&>svg]:h-6 [&>svg]:w-6">
+        {icon}
       </div>
+
+      <h3 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">{title}</h3>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">{description}</p>
+
+      <div className="mt-6">{action}</div>
     </div>
   );
 }

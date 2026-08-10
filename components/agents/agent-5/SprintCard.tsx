@@ -93,18 +93,18 @@ export function SprintCard({
       <div
         ref={setNodeRef}
         className={[
-          'overflow-hidden rounded-xl border bg-surface shadow-sm transition-all hover:shadow-md',
+          'group overflow-hidden rounded-xl border bg-surface transition-colors',
           colorClass,
-          isOver ? 'border-primary ring-2 ring-primary/20' : 'border-border',
-          isOverCapacity ? 'ring-1 ring-amber-400/40' : '',
+          isOver ? 'border-border-strong bg-surface-hover/40' : 'border-border',
+          isOverCapacity ? 'border-amber-500/40' : '',
         ].join(' ')}
       >
-        <div className={`px-4 py-3 sm:px-5 ${isExpanded ? 'border-b border-border bg-surface-muted/40' : ''}`}>
+        <div className={`px-4 py-3 sm:px-5 ${isExpanded ? 'border-b border-border' : ''}`}>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-muted hover:bg-surface-hover cursor-pointer transition-colors"
+              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               title={isExpanded ? 'Colapsar historias' : 'Ver historias'}
               aria-expanded={isExpanded}
             >
@@ -122,30 +122,28 @@ export function SprintCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted">
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-subtle">
                   Sprint {sprintIndex + 1}
                 </span>
                 {sprint.isEdited && (
-                  <span className="shrink-0 rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-amber-600">
-                    editado
-                  </span>
+                  <span className="shrink-0 text-[11px] text-subtle">· Editado</span>
                 )}
               </div>
               <h4
-                className={`truncate text-sm font-semibold text-foreground ${isEditable ? 'cursor-pointer hover:text-primary' : ''}`}
+                className={`truncate text-[15px] font-medium text-foreground ${isEditable ? 'cursor-pointer hover:text-muted' : ''}`}
                 onClick={openEditModal}
                 title={isEditable ? 'Click para editar sprint' : sprint.sprintGoal}
               >
                 {sprint.sprintGoal}
               </h4>
-              <p className="mt-0.5 text-[10px] text-muted">
+              <p className="mt-0.5 text-[12px] text-subtle">
                 {sprintStories.length} historia{sprintStories.length !== 1 ? 's' : ''} · {sprint.velocitySp} SP
                 <span className="mx-1.5 text-border">·</span>
                 <button
                   type="button"
                   onClick={openEditModal}
                   disabled={!isEditable}
-                  className={isEditable ? 'hover:text-foreground cursor-pointer' : 'cursor-default'}
+                  className={isEditable ? 'cursor-pointer hover:text-foreground' : 'cursor-default'}
                 >
                   {formatDateRangeEs(sprint.startDate, sprint.endDate)}
                 </button>
@@ -154,7 +152,7 @@ export function SprintCard({
 
             <div className="flex shrink-0 items-center gap-2">
               <div
-                className="h-2 w-20 rounded-full bg-surface-muted overflow-hidden sm:w-24"
+                className="h-1.5 w-20 overflow-hidden rounded-full bg-border sm:w-24"
                 title={capacityTitle}
               >
                 <div
@@ -166,7 +164,7 @@ export function SprintCard({
                 <button
                   type="button"
                   onClick={onDeleteSprint}
-                  className="rounded-lg px-1.5 py-1 text-[10px] text-muted hover:text-danger cursor-pointer"
+                  className="cursor-pointer rounded-lg px-1.5 py-1 text-muted opacity-100 transition-opacity hover:text-danger sm:opacity-0 sm:group-hover:opacity-100"
                   title="Eliminar sprint vacío"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
@@ -198,7 +196,7 @@ export function SprintCard({
         )}
 
         {isExpanded && sprintStories.length === 0 && (
-          <div className="px-5 py-6 text-center text-xs text-muted">
+          <div className="px-5 py-6 text-center text-sm text-muted">
             {isEditable ? 'Sin historias — arrastra aquí para asignar.' : 'Sin historias asignadas.'}
           </div>
         )}

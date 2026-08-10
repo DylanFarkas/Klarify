@@ -169,13 +169,8 @@ export default function Agent5Page() {
 
   if (isLoading || !isHydrated) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <div className="animate-[fadeIn_0.3s_ease-out]">
-          <div className="mb-5 h-7 w-28 rounded-full bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-          <div className="mb-4 h-11 w-72 rounded-xl bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite] md:h-12" />
-          <div className="mb-2 h-5 w-96 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-          <div className="mb-8 h-5 w-64 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-foreground" />
       </div>
     );
   }
@@ -184,7 +179,12 @@ export default function Agent5Page() {
   const isApproved = state.status === 'approved';
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
+    <div
+      className={[
+        'mx-auto flex w-full flex-col gap-7',
+        hasInput ? 'max-w-5xl' : 'max-w-3xl',
+      ].join(' ')}
+    >
       <AgentPageHero
         step={5}
         variant="structure"
@@ -192,7 +192,7 @@ export default function Agent5Page() {
         description="Organiza las historias priorizadas en sprints concretos: define Sprint Goals, respeta prioridad MoSCoW y capacidad, calcula velocidad y genera el cronograma."
         statusBadge={
           isApproved ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-success">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
@@ -205,7 +205,7 @@ export default function Agent5Page() {
             <>
               <AgentStat
                 icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
                   </svg>
                 }
@@ -214,7 +214,7 @@ export default function Agent5Page() {
               />
               <AgentStat
                 icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
                   </svg>
                 }
@@ -223,7 +223,7 @@ export default function Agent5Page() {
               />
               <AgentStat
                 icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
@@ -232,35 +232,24 @@ export default function Agent5Page() {
               />
               <AgentStat
                 icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
                   </svg>
                 }
                 value={priorityCount}
                 label={`priorizada${priorityCount !== 1 ? 's' : ''}`}
               />
-              {hasPlan && (
-                <>
-                  <AgentStat
-                    icon={
-                      <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                      </svg>
-                    }
-                    value={sprintCount}
-                    label={`sprint${sprintCount !== 1 ? 's' : ''}`}
-                  />
-                  <AgentStat
-                    icon={
-                      <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                      </svg>
-                    }
-                    value={avgVelocity}
-                    label="velocidad promedio"
-                  />
-                </>
-              )}
+              {hasPlan ? (
+                <AgentStat
+                  icon={
+                    <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  }
+                  value={sprintCount}
+                  label={`sprint${sprintCount !== 1 ? 's' : ''}`}
+                />
+              ) : null}
             </>
           ) : undefined
         }
@@ -292,33 +281,30 @@ export default function Agent5Page() {
               title="Plan de Sprints consolidado"
               description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${sprintCount} sprint${sprintCount !== 1 ? 's' : ''} planificado${sprintCount !== 1 ? 's' : ''}`}
               extra={
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2.5 py-0.5 text-[10px] font-bold text-success/80">
-                    {totalPoints} SP totales
-                  </span>
-                  {hasPlan && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2.5 py-0.5 text-[10px] font-bold text-success/80">
-                      {avgVelocity} SP/sprint
-                    </span>
-                  )}
-                </div>
+                <p className="mt-1.5 text-[12px] text-subtle">
+                  {totalPoints} SP totales
+                  {hasPlan ? ` · ${avgVelocity} SP/sprint promedio` : ''}
+                </p>
               }
               action={
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/agentes/dashboard"
-                    className="rounded-xl border border-success/30 bg-success/10 px-5 py-2.5 text-sm font-bold text-success transition-colors hover:bg-success/20"
-                  >
-                    Dashboard
-                  </Link>
+                <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
                   {plan?.limits.executionBoard ? (
                     <Link
                       href="/agentes/board"
-                      className="rounded-xl border border-success/20 px-5 py-2.5 text-sm font-bold text-success/90 transition-colors hover:bg-success/10"
+                      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground sm:w-auto"
                     >
                       Ir al tablero
                     </Link>
                   ) : null}
+                  <Link
+                    href="/agentes/dashboard"
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 sm:w-auto"
+                  >
+                    Dashboard
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </Link>
                 </div>
               }
             />

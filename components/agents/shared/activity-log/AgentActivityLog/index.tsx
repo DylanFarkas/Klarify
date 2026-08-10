@@ -27,23 +27,18 @@ export function AgentActivityLog({ entries, variant = 'default' }: AgentActivity
   return (
     <div className={isLive ? 'flex min-h-0 flex-1 flex-col' : 'w-full'}>
       {!isLive && (
-        <div className="mb-3 flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-          </span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
-            Actividad del agente
-          </span>
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-foreground/40" />
+          <span className="text-xs font-medium text-subtle">Actividad del agente</span>
         </div>
       )}
       <div
         ref={scrollRef}
         className={[
-          'flex flex-col gap-5',
+          'flex flex-col gap-4',
           isLive
             ? 'min-h-0 flex-1'
-            : 'max-h-64 overflow-y-auto rounded-xl border border-primary/20 bg-surface-muted px-4 py-3 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--primary)_8%,transparent)]',
+            : 'max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-muted/40 px-3.5 py-3',
         ].join(' ')}
       >
         {phaseGroups.map((group) => (

@@ -15,54 +15,64 @@ interface WorkspaceHomeShellProps {
 export function WorkspaceHomeShell({ children }: WorkspaceHomeShellProps) {
   return (
     <div className="flex h-full min-h-0 bg-background text-foreground">
-      <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface px-6 py-8 scrollbar-gutter-stable lg:flex">
-        <div className="mb-8">
-          <Link
-            href="/agentes/proyectos"
-            className="block text-center text-4xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
-          >
-            <span className="text-primary">K</span>larify
-          </Link>
-          <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
-            Tu workspace
-          </p>
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
+        <div className="flex min-h-0 flex-1 flex-col px-3.5 pt-5">
+          <div className="mb-5">
+            <Link
+              href="/agentes/proyectos"
+              className="block text-center text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
+            >
+              <span className="text-primary">K</span>larify
+            </Link>
+            <p className="mt-1.5 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
+              Tu workspace
+            </p>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+            <WorkspaceHomeNav />
+
+            <div className="mt-1">
+              <ProjectSwitcher />
+            </div>
+          </div>
         </div>
 
-        <WorkspaceHomeNav />
-
-        <div className="mt-4">
-          <ProjectSwitcher />
-        </div>
-
-        <div className="mt-auto pt-8">
-          <div className="overflow-hidden rounded-2xl border border-border/70 bg-linear-to-b from-background/70 to-surface-muted/40 shadow-sm">
-            <WorkspacePlanSummary />
+        <div className="mt-auto shrink-0 border-t border-border px-3.5 py-3.5">
+          <WorkspacePlanSummary />
+          <div className="mt-2.5">
+            <AgentSidebarSettings />
+          </div>
+          <div className="mt-2.5">
             <WorkspaceAccountSection />
           </div>
-          <AgentSidebarSettings className="mt-3 border-t-0 pt-0" />
-          <p className="mt-5 text-center text-[11px] text-subtle">Klarify v0.1.0 — MVP</p>
         </div>
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceGridBackground />
 
-        <div className="relative z-10 border-b border-border bg-surface/90 px-6 py-4 backdrop-blur-md lg:hidden">
-          <div className="flex items-center justify-between gap-4">
+        <div className="relative z-10 border-b border-border bg-surface/90 px-4 py-3 backdrop-blur-md lg:hidden">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <Link href="/agentes/proyectos" className="text-lg font-extrabold tracking-tight text-foreground">
+              <Link
+                href="/agentes/proyectos"
+                className="text-lg font-extrabold tracking-tight text-foreground"
+              >
                 <span className="text-primary">K</span>larify
               </Link>
-              <p className="truncate text-xs text-muted">Tu workspace</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-subtle">
+                Tu workspace
+              </p>
             </div>
           </div>
-          <div className="mt-3">
+          <div className="mt-2.5">
             <ProjectSwitcher />
           </div>
-          <AgentSidebarSettings className="mt-3 border-t border-border pt-3" />
+          <AgentSidebarSettings className="mt-2.5" />
         </div>
 
-        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-10 lg:py-10">
+        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-12 lg:py-10">
           {children}
         </main>
       </div>
