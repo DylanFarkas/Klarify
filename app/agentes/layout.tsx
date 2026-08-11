@@ -1,6 +1,7 @@
 import { AgentThemeProvider } from '@/context/AgentThemeContext';
 import { AgentThemeScript } from '@/components/agents/shared/theme/AgentThemeScript';
 import { AgentAuthGuard } from '@/components/agents/shared/auth/AgentAuthGuard';
+import { AiProviderProvider } from '@/context/AiProviderContext';
 import { WorkspaceProvider } from '@/context/WorkspaceContext';
 import { WorkspaceSettingsProvider } from '@/context/WorkspaceSettingsContext';
 import { AgentToaster } from '@/components/agents/shared/notifications/AgentToaster';
@@ -20,9 +21,11 @@ export default function AgentesLayout({
         <ConfirmDialogProvider>
           <WorkspaceSettingsProvider>
             <AgentAuthGuard>
-              <WorkspaceProvider>
-                <AgentesShell>{children}</AgentesShell>
-              </WorkspaceProvider>
+              <AiProviderProvider>
+                <WorkspaceProvider>
+                  <AgentesShell>{children}</AgentesShell>
+                </WorkspaceProvider>
+              </AiProviderProvider>
             </AgentAuthGuard>
           </WorkspaceSettingsProvider>
           <AgentToaster />

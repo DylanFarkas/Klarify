@@ -3,6 +3,7 @@
  */
 
 import { FieldValue } from 'firebase-admin/firestore';
+import type { DocumentSnapshot } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 import { canChangeProjectSlotSelection } from '@/lib/plans/project-slot-selection';
 import { assertCanCreateProject, assertProjectSlotAccessible, ensureUserAccount, resolveUserPlan } from '@/lib/plans/plan-service';
@@ -101,12 +102,23 @@ function toSummary(
   data: FirebaseFirestore.DocumentData
 ): ProjectSummary {
   const doc = data as ProjectDocument;
-  const workspace = normalizeWorkspace(doc.workspace);
-  const progress = computePipelineProgress(workspace);
   const updatedAt =
     doc.updatedAt && typeof (doc.updatedAt as FirebaseFirestore.Timestamp).toMillis === 'function'
       ? (doc.updatedAt as FirebaseFirestore.Timestamp).toMillis()
       : Date.now();
+
+  const hasDenorm =
+    typeof doc.pipelineStep === 'number' &&
+    typeof doc.completionPercentage === 'number' &&
+    typeof doc.pipelineLabel === 'string';
+
+  const progress = hasDenorm
+    ? {
+        pipelineStep: doc.pipelineStep as number,
+        pipelineLabel: doc.pipelineLabel as string,
+        completionPercentage: doc.completionPercentage as number,
+      }
+    : computePipelineProgress(normalizeWorkspace(doc.workspace));
 
   return {
     id,
@@ -254,9 +266,13 @@ export async function requireUnlockedProject(uid: string, projectId: string): Pr
 /**
  * Resuelve el proyecto activo con lecturas mínimas (sin sincronizar slots).
  * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
+ * Acepta snapshot de usuario precargado para evitar ensureUserAccount duplicado.
  */
-export async function readActiveProjectId(uid: string): Promise<string | null> {
-  const userSnapshot = await ensureUserAccount(uid);
+export async function readActiveProjectId(
+  uid: string,
+  preloadedUserSnapshot?: DocumentSnapshot
+): Promise<string | null> {
+  const userSnapshot = preloadedUserSnapshot ?? (await ensureUserAccount(uid));
   const preferredId =
     (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
       ?.activeProjectId ?? null;
@@ -302,6 +318,8 @@ async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
 
   const projectId = 'default';
   const prefs = data?.preferences as { lastAgent?: string } | undefined;
+  const workspace = normalizeWorkspace(legacyWorkspace);
+  const progress = computePipelineProgress(workspace);
 
   await projectDoc(uid, projectId).set({
     name: 'Mi proyecto',
@@ -309,7 +327,8 @@ async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     lastAgent: prefs?.lastAgent ?? '1',
-    workspace: normalizeWorkspace(legacyWorkspace),
+    workspace,
+    ...progress,
   });
 
   await userDoc(uid).set(
@@ -392,6 +411,8 @@ export async function createProject(uid: string, name: string): Promise<ProjectS
   await assertCanCreateProject(uid, projects.length);
 
   const projectId = generateProjectId();
+  const emptyWorkspace = createEmptyWorkspace();
+  const progress = computePipelineProgress(emptyWorkspace);
 
   await projectDoc(uid, projectId).set({
     name: projectName,
@@ -399,7 +420,8 @@ export async function createProject(uid: string, name: string): Promise<ProjectS
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     lastAgent: '1',
-    workspace: createEmptyWorkspace(),
+    workspace: emptyWorkspace,
+    ...progress,
   });
 
   await syncProjectSlots(uid);
@@ -415,26 +437,42 @@ export async function createProject(uid: string, name: string): Promise<ProjectS
   return toSummary(projectId, doc.data()!);
 }
 
-export async function switchProject(uid: string, projectId: string): Promise<ProjectSummary> {
-  await requireUnlockedProject(uid, projectId);
-
+export async function switchProject(
+  uid: string,
+  projectId: string
+): Promise<{
+  project: ProjectSummary;
+  workspace: UserWorkspace;
+  preferences: { lastAgent: string };
+  plan: Awaited<ReturnType<typeof resolveUserPlan>>;
+}> {
   const doc = await projectDoc(uid, projectId).get();
   if (!doc.exists) {
     throw new Error('PROJECT_NOT_FOUND');
   }
 
   const data = doc.data() as ProjectDocument;
+  assertProjectSlotAccessible(normalizeProjectStatus(data.status));
+
+  const lastAgent = data.lastAgent ?? '1';
   await userDoc(uid).set(
     {
       preferences: {
         activeProjectId: projectId,
-        lastAgent: data.lastAgent ?? '1',
+        lastAgent,
       },
     },
     { merge: true }
   );
 
-  return toSummary(projectId, doc.data()!);
+  const plan = await resolveUserPlan(uid);
+
+  return {
+    project: toSummary(projectId, data),
+    workspace: normalizeWorkspace(data.workspace),
+    preferences: { lastAgent },
+    plan,
+  };
 }
 
 /** Activa los proyectos indicados y bloquea el resto (máx. según plan). Elección única por plan. */

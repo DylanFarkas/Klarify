@@ -147,6 +147,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastPersistedAgent = useRef<string | null>(null);
   const lastFetchedRouteKey = useRef<string | null>(null);
   const sprintFilterRequestId = useRef(0);
+  const bootstrapInFlight = useRef<Promise<void> | null>(null);
+  /** lastAgent conocido del servidor (evita PATCH innecesario al montar). */
+  const serverLastAgent = useRef<string | null>(null);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
@@ -243,6 +246,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       });
       setPlan(data.plan);
       setActiveProjectId(data.activeProjectId);
+      if (data.preferences?.lastAgent) {
+        serverLastAgent.current = data.preferences.lastAgent;
+      }
     } catch (err) {
       if (!options?.silent) {
         setError(err instanceof Error ? err.message : 'Error al cargar el workspace');
@@ -276,15 +282,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const bootstrapWorkspace = useCallback(async () => {
     if (!user) return;
+    if (bootstrapInFlight.current) {
+      await bootstrapInFlight.current;
+      return;
+    }
     setIsLoading(true);
     setError(null);
-    try {
-      // Esperar ambas cargas: si solo esperamos workspace, la UI muestra
-      // "sin proyectos" mientras /api/projects sigue en vuelo.
-      await Promise.all([fetchWorkspace({ silent: true }), refreshProjects()]);
-    } finally {
-      setIsLoading(false);
-    }
+    const promise = (async () => {
+      try {
+        // Esperar ambas cargas: si solo esperamos workspace, la UI muestra
+        // "sin proyectos" mientras /api/projects sigue en vuelo.
+        await Promise.all([fetchWorkspace({ silent: true }), refreshProjects()]);
+      } finally {
+        setIsLoading(false);
+        bootstrapInFlight.current = null;
+      }
+    })();
+    bootstrapInFlight.current = promise;
+    await promise;
   }, [user, fetchWorkspace, refreshProjects]);
 
   const createProject = useCallback(
@@ -324,20 +339,38 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         persistSprintPlan().catch(() => undefined),
       ]);
       cancelPendingSaves();
-      const response = await authFetch('/api/projects', user, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
-      if (!response.ok) {
-        const err = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await authFetch('/api/projects', user, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId }),
+        });
+        if (!response.ok) {
+          const err = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+        }
+        const data = (await response.json()) as WorkspaceResponse & {
+          project: ProjectSummary;
+          activeProjectId: string;
+        };
+        setWorkspace(data.workspace);
+        setPlan(data.plan);
+        setActiveProjectId(data.activeProjectId);
+        if (data.preferences?.lastAgent) {
+          serverLastAgent.current = data.preferences.lastAgent;
+          lastPersistedAgent.current = data.preferences.lastAgent;
+        }
+        setSessionVersion((v) => v + 1);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cambiar de proyecto');
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-      setActiveProjectId(projectId);
-      setSessionVersion((v) => v + 1);
-      await fetchWorkspace();
     },
-    [user, cancelPendingSaves, fetchWorkspace, persistBulkReorder, persistSprintPlan]
+    [user, cancelPendingSaves, persistBulkReorder, persistSprintPlan]
   );
 
   const activateProjects = useCallback(
@@ -425,6 +458,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveProjectId(null);
       setPlan(null);
       setIsLoading(false);
+      serverLastAgent.current = null;
+      lastPersistedAgent.current = null;
+      bootstrapInFlight.current = null;
       return;
     }
     void bootstrapWorkspace();
@@ -467,27 +503,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Persistir el último agente visitado en preferencias (p. ej. tras login).
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;
+    // Esperar bootstrap para comparar contra preferences del servidor.
+    if (isLoading) return;
+
+    const persistIfChanged = (agentKey: string) => {
+      if (lastPersistedAgent.current === agentKey) return;
+      // Evita write si el servidor ya tiene este valor (p. ej. reentrada al dashboard).
+      if (serverLastAgent.current === agentKey) {
+        lastPersistedAgent.current = agentKey;
+        return;
+      }
+      lastPersistedAgent.current = agentKey;
+      void saveLastAgent(user, agentKey)
+        .then(() => {
+          serverLastAgent.current = agentKey;
+        })
+        .catch(() => {
+          lastPersistedAgent.current = null;
+        });
+    };
 
     if (pathname === '/agentes/dashboard' || pathname.startsWith('/agentes/dashboard/')) {
-      if (lastPersistedAgent.current === 'dashboard') return;
-      lastPersistedAgent.current = 'dashboard';
-      void saveLastAgent(user, 'dashboard').catch(() => {
-        lastPersistedAgent.current = null;
-      });
+      persistIfChanged('dashboard');
       return;
     }
 
     const match = pathname.match(/^\/agentes\/(\d+)/);
     if (!match) return;
-
-    const agentId = match[1];
-    if (lastPersistedAgent.current === agentId) return;
-    lastPersistedAgent.current = agentId;
-
-    void saveLastAgent(user, agentId).catch(() => {
-      lastPersistedAgent.current = null;
-    });
-  }, [pathname, user]);
+    persistIfChanged(match[1]);
+  }, [pathname, user, isLoading]);
 
   useEffect(() => {
     const flushOnUnload = () => {

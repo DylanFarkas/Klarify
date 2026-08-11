@@ -90,10 +90,41 @@ async function fetchModelsSafe(
 }
 
 let klarifyModelsMemory: { at: number; models: AiModelInfo[] } | null = null;
+let klarifyModelsRefresh: Promise<void> | null = null;
 
-async function getKlarifyOfficialModels(): Promise<AiModelInfo[]> {
+async function refreshKlarifyModelsInBackground(): Promise<void> {
+  if (klarifyModelsRefresh) return klarifyModelsRefresh;
+  klarifyModelsRefresh = (async () => {
+    try {
+      const apiKey = getKlarifyDeepSeekKey();
+      if (!apiKey) {
+        klarifyModelsMemory = { at: Date.now(), models: klarifyFallbackModels() };
+        return;
+      }
+      const models = await fetchModelsSafe('deepseek', apiKey);
+      klarifyModelsMemory = { at: Date.now(), models };
+    } catch (error) {
+      console.error('[getKlarifyOfficialModels] background refresh:', error);
+    } finally {
+      klarifyModelsRefresh = null;
+    }
+  })();
+  return klarifyModelsRefresh;
+}
+
+/**
+ * Modelos oficiales Klarify. Con `nonBlocking`, no espera la API externa:
+ * usa caché/fallback y refresca en background.
+ */
+async function getKlarifyOfficialModels(options?: {
+  nonBlocking?: boolean;
+}): Promise<AiModelInfo[]> {
   if (klarifyModelsMemory && Date.now() - klarifyModelsMemory.at < MODELS_CACHE_TTL_MS) {
     return klarifyModelsMemory.models;
+  }
+  if (options?.nonBlocking) {
+    void refreshKlarifyModelsInBackground();
+    return klarifyModelsMemory?.models ?? klarifyFallbackModels();
   }
   const apiKey = getKlarifyDeepSeekKey();
   if (!apiKey) return klarifyFallbackModels();
@@ -102,21 +133,21 @@ async function getKlarifyOfficialModels(): Promise<AiModelInfo[]> {
   return models;
 }
 
-export async function getStoredAiProvider(
-  uid: string
-): Promise<StoredAiProvider | null> {
-  const snapshot = await userDoc(uid).get();
-  return normalizeStored(snapshot.data()?.aiProvider as Partial<StoredAiProvider> | undefined);
+function readUserAiFields(data: Record<string, unknown> | undefined): {
+  stored: StoredAiProvider | null;
+  klarifyPref: string | null;
+} {
+  const stored = normalizeStored(data?.aiProvider as Partial<StoredAiProvider> | undefined);
+  const pref = data?.aiModelPreference;
+  const klarifyPref =
+    typeof pref === 'string' && isPlausibleModelId(pref) ? pref.trim() : null;
+  return { stored, klarifyPref };
 }
 
-/**
- * Resuelve credenciales efectivas para una petición de agente/Klark.
- */
-export async function resolveLlmCredentials(
-  uid: string
-): Promise<LlmCredentials | null> {
-  const stored = await getStoredAiProvider(uid);
-
+function credentialsFromStored(
+  stored: StoredAiProvider | null,
+  klarifyPref: string | null
+): LlmCredentials | null {
   if (stored?.active && stored.apiKeyEncrypted) {
     try {
       const apiKey = decryptSecret(stored.apiKeyEncrypted);
@@ -133,30 +164,66 @@ export async function resolveLlmCredentials(
     }
   }
 
-  const klarifyPref = await getKlarifyModelPreference(uid);
   const model = klarifyPref ?? DEFAULT_KLARIFY_MODEL;
   return klarifyDefaultCredentials(model);
 }
 
-async function getKlarifyModelPreference(uid: string): Promise<string | null> {
+export async function getStoredAiProvider(
+  uid: string
+): Promise<StoredAiProvider | null> {
   const snapshot = await userDoc(uid).get();
-  const pref = snapshot.data()?.aiModelPreference;
-  if (typeof pref === 'string' && isPlausibleModelId(pref)) {
-    return pref.trim();
-  }
-  return null;
+  return normalizeStored(snapshot.data()?.aiProvider as Partial<StoredAiProvider> | undefined);
+}
+
+/**
+ * Resuelve credenciales efectivas para una petición de agente/Klark.
+ */
+export async function resolveLlmCredentials(
+  uid: string
+): Promise<LlmCredentials | null> {
+  const snapshot = await userDoc(uid).get();
+  const { stored, klarifyPref } = readUserAiFields(snapshot.data() as Record<string, unknown> | undefined);
+  return credentialsFromStored(stored, klarifyPref);
 }
 
 async function resolveAvailableModels(
   uid: string,
   stored: StoredAiProvider | null,
-  active: boolean
+  active: boolean,
+  options?: { nonBlocking?: boolean }
 ): Promise<{ available: AiModelInfo[]; klarify: AiModelInfo[] }> {
-  const klarify = await getKlarifyOfficialModels();
+  const klarify = await getKlarifyOfficialModels({ nonBlocking: options?.nonBlocking });
 
   if (active && stored?.apiKeyEncrypted) {
     if (cacheIsFresh(stored.modelsCachedAt) && stored.cachedModels?.length) {
       return { available: stored.cachedModels, klarify };
+    }
+    // En GET de status: no bloquear en refresh externo; devolver stale/fallback.
+    if (options?.nonBlocking) {
+      void (async () => {
+        try {
+          const apiKey = decryptSecret(stored.apiKeyEncrypted);
+          const models = await fetchModelsSafe(stored.provider, apiKey);
+          await userDoc(uid).set(
+            {
+              aiProvider: {
+                ...stored,
+                cachedModels: models,
+                modelsCachedAt: new Date().toISOString(),
+              },
+            },
+            { merge: true }
+          );
+        } catch (error) {
+          console.error('[resolveAvailableModels] BYOK background:', error);
+        }
+      })();
+      return {
+        available: stored.cachedModels?.length
+          ? stored.cachedModels
+          : fallbackModelsForProvider(stored.provider),
+        klarify,
+      };
     }
     try {
       const apiKey = decryptSecret(stored.apiKeyEncrypted);
@@ -189,14 +256,16 @@ async function resolveAvailableModels(
 export async function getAiProviderPublicStatus(
   uid: string
 ): Promise<AiProviderPublicStatus> {
-  const stored = await getStoredAiProvider(uid);
-  const klarifyPref = await getKlarifyModelPreference(uid);
-  const credentials = await resolveLlmCredentials(uid);
+  const snapshot = await userDoc(uid).get();
+  const { stored, klarifyPref } = readUserAiFields(snapshot.data() as Record<string, unknown> | undefined);
+  const credentials = credentialsFromStored(stored, klarifyPref);
 
   const connected = Boolean(stored?.apiKeyEncrypted);
   const active = Boolean(stored?.active && connected);
 
-  const { available, klarify } = await resolveAvailableModels(uid, stored, active);
+  const { available, klarify } = await resolveAvailableModels(uid, stored, active, {
+    nonBlocking: true,
+  });
 
   return {
     connected,

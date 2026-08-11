@@ -119,8 +119,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'projectId es requerido' }, { status: 400 });
     }
 
-    const project = await switchProject(uid, body.projectId);
-    return NextResponse.json({ project, activeProjectId: project.id });
+    const result = await switchProject(uid, body.projectId);
+    return NextResponse.json({
+      project: result.project,
+      activeProjectId: result.project.id,
+      workspace: result.workspace,
+      preferences: result.preferences,
+      plan: planPayload(result.plan),
+    });
   } catch (error) {
     return handleError(error, 'Error al actualizar proyectos');
   }

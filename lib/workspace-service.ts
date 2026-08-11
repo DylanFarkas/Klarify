@@ -22,6 +22,7 @@ import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agen
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
+import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
   addStoryToSprintPlan,
   adjustSprintVelocityForStoryPoints,
@@ -138,9 +139,29 @@ async function saveProjectWorkspace(
   projectId: string,
   workspacePartial: Record<string, unknown>
 ): Promise<void> {
+  const current = await getProjectWorkspace(uid, projectId);
+  const partial = workspacePartial as Partial<UserWorkspace>;
+  const nextWorkspace: UserWorkspace = {
+    ...current,
+    agent1: partial.agent1 ? { ...current.agent1, ...partial.agent1 } : current.agent1,
+    agent2: partial.agent2 ? { ...current.agent2, ...partial.agent2 } : current.agent2,
+    agent3: partial.agent3 ? { ...current.agent3, ...partial.agent3 } : current.agent3,
+    agent4: partial.agent4 ? { ...current.agent4, ...partial.agent4 } : current.agent4,
+    agent5: partial.agent5 ? { ...current.agent5, ...partial.agent5 } : current.agent5,
+    pipeline: partial.pipeline
+      ? { ...current.pipeline, ...partial.pipeline }
+      : current.pipeline,
+    execution:
+      partial.execution !== undefined ? partial.execution : current.execution,
+  };
+  const progress = computePipelineProgress(nextWorkspace);
+
   await projectDoc(uid, projectId).set(
     {
       workspace: workspacePartial,
+      pipelineStep: progress.pipelineStep,
+      pipelineLabel: progress.pipelineLabel,
+      completionPercentage: progress.completionPercentage,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }
@@ -627,46 +648,36 @@ export async function updateExecutionSprintFilter(
 
 /** Lee el workspace del proyecto activo + preferencias y plan del usuario. */
 export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
-  const projectId = await readActiveProjectId(uid);
+  const snapshot = await ensureUserAccount(uid);
+  const projectId = await readActiveProjectId(uid, snapshot);
+  const plan = await resolveUserPlan(uid, snapshot);
+  const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
+  const preferences: WorkspacePreferences = {
+    lastAgent: prefs?.lastAgent ?? '1',
+  };
+  const planSnapshot = {
+    id: plan.id,
+    limits: plan.limits,
+    usage: plan.usage,
+    subscription: plan.subscription,
+  };
 
   if (!projectId) {
-    const snapshot = await ensureUserAccount(uid);
-    const plan = await resolveUserPlan(uid, snapshot);
-    const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
     return {
       workspace: createEmptyWorkspace(),
-      preferences: {
-        lastAgent: prefs?.lastAgent ?? '1',
-      },
+      preferences,
       activeProjectId: null,
-      plan: {
-        id: plan.id,
-        limits: plan.limits,
-        usage: plan.usage,
-        subscription: plan.subscription,
-      },
+      plan: planSnapshot,
     };
   }
 
-  const [snapshot, workspace] = await Promise.all([
-    ensureUserAccount(uid),
-    getProjectWorkspace(uid, projectId),
-  ]);
-  const plan = await resolveUserPlan(uid, snapshot);
-  const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
+  const workspace = await getProjectWorkspace(uid, projectId);
 
   return {
     workspace,
-    preferences: {
-      lastAgent: prefs?.lastAgent ?? '1',
-    },
+    preferences,
     activeProjectId: projectId,
-    plan: {
-      id: plan.id,
-      limits: plan.limits,
-      usage: plan.usage,
-      subscription: plan.subscription,
-    },
+    plan: planSnapshot,
   };
 }
 

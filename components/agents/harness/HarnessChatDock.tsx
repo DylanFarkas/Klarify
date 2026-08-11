@@ -45,7 +45,7 @@ function clampWidth(width: number): number {
 }
 
 export function HarnessChatDock() {
-  const { workspace, isLoading, plan, refreshWorkspace } = useWorkspace();
+  const { workspace, plan, refreshWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
@@ -135,7 +135,9 @@ export function HarnessChatDock() {
     setIsResizing(true);
   };
 
-  if (!mounted || isLoading) {
+  // Mantener montado durante isLoading para no perder historial/refs de Klark
+  // (el loader lo muestran las páginas con DashboardLoadingState / spinners).
+  if (!mounted) {
     return null;
   }
 

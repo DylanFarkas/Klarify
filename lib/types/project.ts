@@ -15,6 +15,10 @@ export interface ProjectDocument {
   workspace: UserWorkspace;
   lastAgent?: string;
   githubExport?: GithubExportRecord;
+  /** Denormalizados para listados sin normalizar el workspace completo */
+  pipelineStep?: number;
+  pipelineLabel?: string;
+  completionPercentage?: number;
 }
 
 export interface ProjectSummary {
