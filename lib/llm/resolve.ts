@@ -98,7 +98,7 @@ async function refreshKlarifyModelsInBackground(): Promise<void> {
     try {
       const apiKey = getKlarifyDeepSeekKey();
       if (!apiKey) {
-        klarifyModelsMemory = { at: Date.now(), models: klarifyFallbackModels() };
+        klarifyModelsMemory = { at: Date.now(), models: [] };
         return;
       }
       const models = await fetchModelsSafe('deepseek', apiKey);
@@ -113,12 +113,15 @@ async function refreshKlarifyModelsInBackground(): Promise<void> {
 }
 
 /**
- * Modelos oficiales Klarify. Con `nonBlocking`, no espera la API externa:
- * usa caché/fallback y refresca en background.
+ * Modelos oficiales Klarify. Sin DEEPSEEK_API_KEY → lista vacía (no inventar catálogo).
+ * Con `nonBlocking`, no espera la API externa: usa caché/fallback y refresca en background.
  */
 async function getKlarifyOfficialModels(options?: {
   nonBlocking?: boolean;
 }): Promise<AiModelInfo[]> {
+  if (!getKlarifyDeepSeekKey()) {
+    return [];
+  }
   if (klarifyModelsMemory && Date.now() - klarifyModelsMemory.at < MODELS_CACHE_TTL_MS) {
     return klarifyModelsMemory.models;
   }
@@ -127,7 +130,7 @@ async function getKlarifyOfficialModels(options?: {
     return klarifyModelsMemory?.models ?? klarifyFallbackModels();
   }
   const apiKey = getKlarifyDeepSeekKey();
-  if (!apiKey) return klarifyFallbackModels();
+  if (!apiKey) return [];
   const models = await fetchModelsSafe('deepseek', apiKey);
   klarifyModelsMemory = { at: Date.now(), models };
   return models;
@@ -189,16 +192,16 @@ export async function resolveLlmCredentials(
 async function resolveAvailableModels(
   uid: string,
   stored: StoredAiProvider | null,
-  active: boolean,
   options?: { nonBlocking?: boolean }
 ): Promise<{ available: AiModelInfo[]; klarify: AiModelInfo[] }> {
   const klarify = await getKlarifyOfficialModels({ nonBlocking: options?.nonBlocking });
 
-  if (active && stored?.apiKeyEncrypted) {
+  // BYOK conectado (activo o en pausa): catálogo de la key del usuario.
+  // No sustituir por fallbacks Klarify — provoca "Modelo no válido" al elegir.
+  if (stored?.apiKeyEncrypted) {
     if (cacheIsFresh(stored.modelsCachedAt) && stored.cachedModels?.length) {
       return { available: stored.cachedModels, klarify };
     }
-    // En GET de status: no bloquear en refresh externo; devolver stale/fallback.
     if (options?.nonBlocking) {
       void (async () => {
         try {
@@ -221,7 +224,7 @@ async function resolveAvailableModels(
       return {
         available: stored.cachedModels?.length
           ? stored.cachedModels
-          : fallbackModelsForProvider(stored.provider),
+          : [],
         klarify,
       };
     }
@@ -242,14 +245,13 @@ async function resolveAvailableModels(
     } catch (error) {
       console.error('[resolveAvailableModels] BYOK:', error);
       return {
-        available: stored.cachedModels?.length
-          ? stored.cachedModels
-          : fallbackModelsForProvider(stored.provider),
+        available: stored.cachedModels?.length ? stored.cachedModels : [],
         klarify,
       };
     }
   }
 
+  // Sin BYOK: solo modelos Klarify si hay DEEPSEEK_API_KEY en el servidor.
   return { available: klarify, klarify };
 }
 
@@ -262,22 +264,39 @@ export async function getAiProviderPublicStatus(
 
   const connected = Boolean(stored?.apiKeyEncrypted);
   const active = Boolean(stored?.active && connected);
+  const hasKlarify = hasKlarifyDefaultLlm();
 
-  const { available, klarify } = await resolveAvailableModels(uid, stored, active, {
+  const { available, klarify } = await resolveAvailableModels(uid, stored, {
     nonBlocking: true,
   });
+
+  // availableModels: catálogo BYOK si hay key conectada (activo o pausa);
+  // si no, catálogo Klarify (vacío sin DEEPSEEK_API_KEY).
+  const availableModels = connected ? available : klarify;
+
+  let model: string;
+  if (active && stored) {
+    model = stored.model;
+  } else if (credentials?.model) {
+    model = credentials.model;
+  } else if (klarifyPref && (klarify.length === 0 || klarify.some((m) => m.id === klarifyPref))) {
+    model = klarifyPref;
+  } else if (hasKlarify) {
+    model = DEFAULT_KLARIFY_MODEL;
+  } else {
+    model = connected && stored ? stored.model : '';
+  }
 
   return {
     connected,
     active,
-    provider: active && stored ? stored.provider : credentials?.provider ?? 'deepseek',
-    model:
-      credentials?.model ??
-      klarifyPref ??
-      DEFAULT_KLARIFY_MODEL,
+    provider: active && stored
+      ? stored.provider
+      : credentials?.provider ?? (hasKlarify ? 'deepseek' : connected && stored ? stored.provider : null),
+    model,
     keyHint: connected && stored ? stored.keyHint : null,
     source: active ? 'byok' : 'klarify',
-    availableModels: available,
+    availableModels,
     klarifyModels: klarify,
   };
 }
@@ -343,9 +362,13 @@ export async function updateAiProvider(
 ): Promise<AiProviderPublicStatus> {
   const stored = await getStoredAiProvider(uid);
 
+  // Sin BYOK: solo preferencia Klarify (requiere catálogo real si hay key de servidor).
   if (!stored?.apiKeyEncrypted) {
     if (typeof patch.model === 'string') {
       if (!isPlausibleModelId(patch.model)) {
+        throw new Error('INVALID_MODEL');
+      }
+      if (!hasKlarifyDefaultLlm()) {
         throw new Error('INVALID_MODEL');
       }
       const klarify = await getKlarifyOfficialModels();
@@ -359,6 +382,43 @@ export async function updateAiProvider(
       return getAiProviderPublicStatus(uid);
     }
     throw new Error('AI_PROVIDER_NOT_CONNECTED');
+  }
+
+  // Solo pausar/activar BYOK: no tocar ni validar modelo.
+  if (
+    typeof patch.active === 'boolean' &&
+    patch.model === undefined &&
+    patch.provider === undefined
+  ) {
+    await userDoc(uid).set(
+      {
+        aiProvider: {
+          ...stored,
+          active: patch.active,
+        },
+      },
+      { merge: true }
+    );
+    return getAiProviderPublicStatus(uid);
+  }
+
+  // En pausa + cambio de modelo → preferencia Klarify (no validar contra catálogo BYOK).
+  if (!stored.active && typeof patch.model === 'string' && patch.active === undefined) {
+    if (!isPlausibleModelId(patch.model)) {
+      throw new Error('INVALID_MODEL');
+    }
+    if (!hasKlarifyDefaultLlm()) {
+      throw new Error('INVALID_MODEL');
+    }
+    const klarify = await getKlarifyOfficialModels();
+    if (klarify.length > 0 && !klarify.some((m) => m.id === patch.model)) {
+      throw new Error('INVALID_MODEL');
+    }
+    await userDoc(uid).set(
+      { aiModelPreference: patch.model.trim() },
+      { merge: true }
+    );
+    return getAiProviderPublicStatus(uid);
   }
 
   const nextProvider = patch.provider ?? stored.provider;

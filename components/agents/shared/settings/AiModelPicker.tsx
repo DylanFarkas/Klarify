@@ -18,15 +18,14 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
   const { status, loading, saving, update, error } = useAiProvider();
 
   const options = useMemo(() => {
+    // BYOK activo → catálogo de la key; si no → solo Klarify (vacío sin DEEPSEEK_API_KEY).
     const models =
-      status.availableModels.length > 0
-        ? status.availableModels
-        : status.klarifyModels;
+      status.source === 'byok' ? status.availableModels : status.klarifyModels;
     return models.map((m) => ({
       value: m.id,
       label: m.label,
     }));
-  }, [status.availableModels, status.klarifyModels]);
+  }, [status.source, status.availableModels, status.klarifyModels]);
 
   const providerLabel =
     status.provider && status.provider in AI_PROVIDER_LABELS
@@ -52,6 +51,23 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     );
   }
 
+  if (!loading && options.length === 0) {
+    return (
+      <div
+        className={[
+          'rounded-lg border border-border bg-surface px-2.5 py-2 text-[11px] text-muted',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {status.source === 'byok'
+          ? 'Sin modelos en el catálogo de tu key'
+          : 'Sin modelos disponibles'}
+      </div>
+    );
+  }
+
   return (
     <div className={['space-y-1.5', className].filter(Boolean).join(' ')}>
       {!compact ? (
@@ -68,7 +84,7 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
       <DropdownSelect
         value={status.model}
         onChange={handleChange}
-        options={options.length > 0 ? options : [{ value: status.model, label: status.model }]}
+        options={options}
         placeholder="Modelo"
         disabled={saving || options.length === 0}
       />

@@ -90,6 +90,6 @@ export interface AiProviderPublicStatus {
   keyHint: string | null;
   source: 'byok' | 'klarify';
   availableModels: AiModelInfo[];
-  /** Modelos del catálogo Klarify (DeepSeek) siempre disponibles sin BYOK. */
+  /** Modelos del catálogo Klarify (DeepSeek). Vacío si no hay DEEPSEEK_API_KEY. */
   klarifyModels: AiModelInfo[];
 }

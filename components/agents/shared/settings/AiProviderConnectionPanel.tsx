@@ -152,23 +152,39 @@ export function AiProviderConnectionPanel() {
           <div>
             <label className="mb-1.5 block text-[11px] font-medium text-subtle">Modelo</label>
             <DropdownSelect
-              value={status.model}
+              value={
+                connectedModelOptions.some((o) => o.value === status.model)
+                  ? status.model
+                  : connectedModelOptions[0]?.value ?? status.model
+              }
               onChange={(value) => void handleModelChange(value)}
               options={connectedModelOptions}
-              placeholder="Elige un modelo"
-              disabled={saving || connectedModelOptions.length === 0}
+              placeholder={
+                connectedModelOptions.length === 0
+                  ? 'Sin modelos en tu catálogo'
+                  : 'Elige un modelo'
+              }
+              disabled={
+                saving ||
+                !status.active ||
+                connectedModelOptions.length === 0
+              }
             />
             <p className="mt-1.5 text-[11px] text-subtle">
-              Catálogo oficial de {connectedProviderLabel} (según tu API key).
+              {status.active
+                ? `Catálogo oficial de ${connectedProviderLabel} (según tu API key).`
+                : 'Reactiva tu API key para cambiar el modelo BYOK. En pausa, Klarify usa DeepSeek del servidor si está configurado.'}
             </p>
           </div>
 
-          <SettingsToggle
-            checked={status.active}
-            onChange={(v) => void handleToggleActive(v)}
-            label="Usar mi API key"
-            description="Si lo desactivas, Klarify vuelve a DeepSeek por defecto. Ante fallos o cuotas de tu key, Klarify reintenta con DeepSeek."
-          />
+          <div className="overflow-hidden rounded-lg border border-border">
+            <SettingsToggle
+              checked={status.active}
+              onChange={(v) => void handleToggleActive(v)}
+              label="Usar mi API key"
+              description="Si lo desactivas, Klarify vuelve a DeepSeek por defecto. Ante fallos o cuotas de tu key, Klarify reintenta con DeepSeek."
+            />
+          </div>
 
           {!confirmDisconnect ? (
             <button

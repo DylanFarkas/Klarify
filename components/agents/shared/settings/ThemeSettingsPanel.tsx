@@ -12,17 +12,10 @@ export function ThemeSettingsPanel() {
   const activeCarbonAccent = getCarbonAccentMeta(carbonAccent);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
-          Tema del workspace
-        </h3>
-        <p className="mt-1 text-[12px] text-muted">
-          Elige la apariencia que prefieras para trabajar con tus agentes.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label="Tema del workspace">
+        <p className="mb-2.5 text-[13px] font-medium text-foreground">Tema del workspace</p>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label="Tema del workspace">
         {AGENT_THEMES.map((option) => {
           const isSelected = theme === option.id;
           const previewAccent =
@@ -80,13 +73,14 @@ export function ThemeSettingsPanel() {
             </button>
           );
         })}
+        </div>
       </div>
 
       {theme === 'carbon' && (
-        <div className="rounded-xl border border-border bg-surface px-3.5 py-3">
-          <div className="mb-2.5">
+        <div className="rounded-lg border border-border px-4 py-3.5">
+          <div className="mb-3">
             <p className="text-[13px] font-medium text-foreground">Acento</p>
-            <p className="mt-0.5 text-[11px] text-muted">
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
               Combina la base oscura de Carbón con el color que prefieras.
             </p>
           </div>
