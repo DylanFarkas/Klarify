@@ -3,13 +3,13 @@
 import { useAgentTheme } from '@/context/AgentThemeContext';
 import {
   AGENT_THEMES,
-  CARBON_ACCENTS,
-  getCarbonAccentMeta,
+  KLARIFY_ACCENTS,
+  getKlarifyAccentMeta,
 } from '@/lib/constants/agent-theme';
 
 export function ThemeSettingsPanel() {
-  const { theme, setTheme, carbonAccent, setCarbonAccent } = useAgentTheme();
-  const activeCarbonAccent = getCarbonAccentMeta(carbonAccent);
+  const { theme, setTheme, klarifyAccent, setKlarifyAccent } = useAgentTheme();
+  const activeKlarifyAccent = getKlarifyAccentMeta(klarifyAccent);
 
   return (
     <div className="space-y-5">
@@ -19,7 +19,7 @@ export function ThemeSettingsPanel() {
         {AGENT_THEMES.map((option) => {
           const isSelected = theme === option.id;
           const previewAccent =
-            option.id === 'carbon' ? activeCarbonAccent.primary : option.preview.accent;
+            option.id === 'klarify' ? activeKlarifyAccent.primary : option.preview.accent;
 
           return (
             <button
@@ -76,21 +76,21 @@ export function ThemeSettingsPanel() {
         </div>
       </div>
 
-      {theme === 'carbon' && (
+      {theme === 'klarify' && (
         <div className="rounded-lg border border-border px-4 py-3.5">
           <div className="mb-3">
             <p className="text-[13px] font-medium text-foreground">Acento</p>
             <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-              Combina la base oscura de Carbón con el color que prefieras.
+              Combina la base oscura de Klarify con el color que prefieras.
             </p>
           </div>
           <div
             className="flex flex-wrap gap-2"
             role="radiogroup"
-            aria-label="Acento de Carbón"
+            aria-label="Acento de Klarify"
           >
-            {CARBON_ACCENTS.map((accent) => {
-              const isSelected = carbonAccent === accent.id;
+            {KLARIFY_ACCENTS.map((accent) => {
+              const isSelected = klarifyAccent === accent.id;
               return (
                 <button
                   key={accent.id}
@@ -99,7 +99,7 @@ export function ThemeSettingsPanel() {
                   aria-checked={isSelected}
                   aria-label={accent.label}
                   title={accent.label}
-                  onClick={() => setCarbonAccent(accent.id)}
+                  onClick={() => setKlarifyAccent(accent.id)}
                   className={[
                     'relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-opacity',
                     isSelected

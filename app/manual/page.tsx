@@ -516,7 +516,7 @@ export default function ManualPage() {
                 <ManualStep
                   stepNumber={1}
                   title="Apariencia"
-                  description="Elige modo claro u oscuro, o temas light, dark, carbon, ocean, forest y rose."
+                  description="Elige Claro, Klarify (con acentos) u otros temas oscuros de desarrollo: One Dark Pro, Catppuccin, Solarized, Monokai, Nord y Gruvbox."
                 />
                 <ManualStep
                   stepNumber={2}
