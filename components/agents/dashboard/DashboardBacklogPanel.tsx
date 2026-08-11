@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { Epic } from '@/lib/types/agent-2';
+import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
+import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
+import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
+import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import type { DashboardMetrics, DashboardSprintStoryRow } from './dashboardMetrics';
 
 interface DashboardBacklogPanelProps {
@@ -116,7 +119,8 @@ function DashboardEpicGroup({
 	framework: PrioritizationFramework | null;
 	sprintByStoryId: Map<string, { label: string }>;
 }) {
-	const [isExpanded, setIsExpanded] = useState(true);
+	const [isExpanded, setIsExpanded] = useState(false);
+	const [detailStory, setDetailStory] = useState<UserStory | null>(null);
 	const displayNumber = String(index + 1).padStart(2, '0');
 	const epicPoints = epic.userStories.reduce(
 		(sum, story) => sum + (estimations[story.id]?.points ?? 0),
@@ -210,6 +214,10 @@ function DashboardEpicGroup({
 										{sprint ? (
 											<span className="text-[11px] text-subtle">{sprint.label}</span>
 										) : null}
+										<ViewDetailsButton
+											onClick={() => setDetailStory(story)}
+											label="Ver HU en detalle"
+										/>
 									</div>
 								</li>
 							);
@@ -217,6 +225,24 @@ function DashboardEpicGroup({
 					)}
 				</ul>
 			) : null}
+
+			<DetailModal
+				open={Boolean(detailStory)}
+				onClose={() => setDetailStory(null)}
+				title={detailStory?.title ?? ''}
+				subtitle={detailStory?.id}
+				eyebrow="Historia de usuario"
+			>
+				{detailStory ? (
+					<UserStoryDetailContent
+						story={detailStory}
+						epicTitle={epic.title}
+						estimation={estimations[detailStory.id]}
+						prioritization={priorities[detailStory.id]}
+						framework={framework ?? undefined}
+					/>
+				) : null}
+			</DetailModal>
 		</article>
 	);
 }
