@@ -48,8 +48,13 @@ const EXAMPLES = [
   },
   {
     label: 'Gestionar épicas y sprints',
-    example: '«Crea un sprint para…» o «Asigna esa historia al sprint…»',
+    example: '«Inicia el sprint 1» o «Cierra el sprint y mueve incompletas al backlog»',
     hint: 'Organización',
+  },
+  {
+    label: 'Ejecución',
+    example: '«Pasa HU-012 a in progress» o «Asigna esa historia a Ana»',
+    hint: 'Kanban',
   },
   {
     label: 'Priorizar',

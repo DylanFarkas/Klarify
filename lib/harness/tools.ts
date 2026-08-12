@@ -17,14 +17,22 @@ import {
   createEpicAcrossWorkspace,
   createSprintAcrossWorkspace,
   createUserStoryAcrossWorkspace,
+  completeSprintAcrossWorkspace,
   deleteEpicAcrossWorkspace,
   deleteSprintAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   getWorkspaceData,
+  startSprintAcrossWorkspace,
   updateEpicAcrossWorkspace,
+  updateSprintAcrossWorkspace,
+  updateStoryExecution,
   updateUserStoryAcrossWorkspace,
 } from '@/lib/workspace-service';
 import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
+import { findActiveSprint } from '@/lib/utils/sprint-plan-mutations';
+import { getSprintStatus } from '@/lib/types/agent-5';
+import type { KanbanStatus } from '@/lib/types/execution';
+import { KANBAN_COLUMNS } from '@/lib/types/execution';
 
 export interface HarnessToolContext {
   uid: string;
@@ -82,22 +90,46 @@ export function buildBacklogIndex(workspace: UserWorkspace): string {
     return `- ${epic.id} «${truncate(epic.title)}»: ${stories}`;
   });
 
+  const active = plan ? findActiveSprint(plan) : null;
   const sprintLines =
     !plan || plan.sprints.length === 0
       ? ['- (sin sprints)']
       : plan.sprints.map((sprint) => {
+          const status = getSprintStatus(sprint);
           const stories =
             sprint.storyIds.length === 0
               ? 'vacío'
               : `${sprint.storyIds.length} HU: ${sprint.storyIds.join(', ')}`;
-          return `- ${sprint.id} «${truncate(sprint.sprintGoal)}» (${stories})`;
+          return `- ${sprint.id} [${status}] «${truncate(sprint.sprintGoal)}» (${stories})`;
         });
+
+  const statusLines =
+    workspace.execution?.stories && Object.keys(workspace.execution.stories).length > 0
+      ? (() => {
+          const counts = { todo: 0, in_progress: 0, code_review: 0, done: 0 };
+          for (const exec of Object.values(workspace.execution.stories)) {
+            counts[exec.status] += 1;
+          }
+          return [
+            `Kanban: todo=${counts.todo}, in_progress=${counts.in_progress}, code_review=${counts.code_review}, done=${counts.done}.`,
+            `Estados válidos: ${KANBAN_COLUMNS.map((c) => c.id).join(', ')}.`,
+          ];
+        })()
+      : ['Kanban: sin inicializar (usa update_story_status / assign_story tras abrir el tablero).'];
+
+  const members = workspace.execution?.members ?? [];
+  const memberLines =
+    members.length === 0
+      ? ['Equipo: (sin miembros)']
+      : members.map((m) => `- ${m.id} «${truncate(m.displayName)}» (${m.role})`);
 
   return [
     `Épicas: ${epics.length}. Historias: ${epics.reduce((n, e) => n + e.userStories.length, 0)}.`,
     ...epicLines,
-    `Sprints: ${plan?.sprints.length ?? 0}.`,
+    `Sprints: ${plan?.sprints.length ?? 0}. Activo: ${active ? `${active.id} (Sprint ${active.number})` : 'ninguno'}.`,
     ...sprintLines,
+    ...statusLines,
+    ...memberLines,
   ].join('\n');
 }
 
@@ -337,9 +369,13 @@ function summarizeBacklog(workspace: UserWorkspace) {
         id: sprint.id,
         number: sprint.number,
         goal: sprint.sprintGoal,
+        status: getSprintStatus(sprint),
         storyIds: sprint.storyIds,
         velocitySp: sprint.velocitySp,
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
       })) ?? [],
+    activeSprintId: plan ? findActiveSprint(plan)?.id ?? null : null,
     unassignedStoryIds: plan?.unassignedStoryIds ?? [],
     epics: live.epics.map((epic) => ({
       id: epic.id,
@@ -555,6 +591,83 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
           description: 'Objetivo del sprint. Ej: "Login y agenda" o "Sprint 3: Pagos".',
         },
       },
+    },
+  },
+  {
+    name: 'update_sprint',
+    description:
+      'Actualiza el goal y/o fechas de un sprint existente (SPRINT-XXX o número).',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: { type: 'string' },
+        goal: { type: 'string' },
+        startDate: { type: 'string', description: 'YYYY-MM-DD' },
+        endDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+      required: ['sprintId'],
+    },
+  },
+  {
+    name: 'start_sprint',
+    description:
+      'Inicia un sprint planificado (planned → active). Solo puede haber un sprint activo a la vez.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: { type: 'string' },
+      },
+      required: ['sprintId'],
+    },
+  },
+  {
+    name: 'complete_sprint',
+    description:
+      'Cierra el sprint activo. Las HU no hechas salen al backlog o al siguiente sprint planned (rollover).',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: { type: 'string' },
+        rollover: {
+          type: 'string',
+          enum: ['backlog', 'next_planned'],
+          description: 'Destino de historias incompletas. Default: backlog.',
+        },
+      },
+      required: ['sprintId'],
+    },
+  },
+  {
+    name: 'update_story_status',
+    description:
+      'Cambia el estado Kanban de una historia (todo, in_progress, code_review, done). Requiere tablero de ejecución.',
+    parameters: {
+      type: 'object',
+      properties: {
+        storyId: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['todo', 'in_progress', 'code_review', 'done'],
+        },
+      },
+      required: ['storyId', 'status'],
+    },
+  },
+  {
+    name: 'assign_story',
+    description:
+      'Asigna o desasigna un responsable del equipo a una historia (tablero). Usa memberId o nombre.',
+    parameters: {
+      type: 'object',
+      properties: {
+        storyId: { type: 'string' },
+        memberId: {
+          type: 'string',
+          description: 'ID del miembro, nombre, o null/vacío para desasignar',
+          nullable: true,
+        },
+      },
+      required: ['storyId'],
     },
   },
   {
@@ -888,6 +1001,164 @@ export async function executeHarnessTool(
           },
           mutated: true,
         });
+      }
+
+      case 'update_sprint': {
+        const rawSprintId = asString(args.sprintId);
+        if (!rawSprintId) {
+          return toolError('Falta sprintId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveSprintId(workspace, rawSprintId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'SPRINT_NOT_FOUND');
+        }
+        const goal = asString(args.goal);
+        const startDate = asString(args.startDate);
+        const endDate = asString(args.endDate);
+        if (!goal && !startDate && !endDate) {
+          return toolError('Indica goal y/o fechas (startDate/endDate).', 'INVALID_ARGS');
+        }
+        const dates =
+          startDate || endDate
+            ? {
+                ...(startDate ? { startDate } : {}),
+                ...(endDate ? { endDate } : {}),
+              }
+            : undefined;
+        await updateSprintAcrossWorkspace(ctx.uid, resolved.sprintId, { goal, dates });
+        return toolSuccess(`Sprint ${resolved.sprintId} actualizado.`, {
+          data: { sprintId: resolved.sprintId, goal, startDate, endDate },
+          mutated: true,
+        });
+      }
+
+      case 'start_sprint': {
+        const rawSprintId = asString(args.sprintId);
+        if (!rawSprintId) {
+          return toolError('Falta sprintId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveSprintId(workspace, rawSprintId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'SPRINT_NOT_FOUND');
+        }
+        await startSprintAcrossWorkspace(ctx.uid, resolved.sprintId);
+        return toolSuccess(`Sprint ${resolved.sprintId} iniciado.`, {
+          data: { sprintId: resolved.sprintId },
+          mutated: true,
+        });
+      }
+
+      case 'complete_sprint': {
+        const rawSprintId = asString(args.sprintId);
+        if (!rawSprintId) {
+          return toolError('Falta sprintId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveSprintId(workspace, rawSprintId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'SPRINT_NOT_FOUND');
+        }
+        const rollover =
+          asString(args.rollover) === 'next_planned' ? 'next_planned' : 'backlog';
+        await completeSprintAcrossWorkspace(ctx.uid, resolved.sprintId, rollover);
+        return toolSuccess(
+          `Sprint ${resolved.sprintId} cerrado (incompletas → ${rollover}).`,
+          { data: { sprintId: resolved.sprintId, rollover }, mutated: true }
+        );
+      }
+
+      case 'update_story_status': {
+        const rawStoryId = asString(args.storyId);
+        const statusRaw = asString(args.status);
+        if (!rawStoryId || !statusRaw) {
+          return toolError('Faltan storyId o status.', 'INVALID_ARGS');
+        }
+        const allowed = new Set(KANBAN_COLUMNS.map((c) => c.id));
+        if (!allowed.has(statusRaw as KanbanStatus)) {
+          return toolError(
+            `Estado inválido "${statusRaw}". Usa: ${[...allowed].join(', ')}.`,
+            'INVALID_ARGS'
+          );
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveStoryId(workspace, rawStoryId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'STORY_NOT_FOUND');
+        }
+        await updateStoryExecution(ctx.uid, resolved.storyId, {
+          status: statusRaw as KanbanStatus,
+        });
+        return toolSuccess(`Historia ${resolved.storyId} → ${statusRaw}.`, {
+          data: { storyId: resolved.storyId, status: statusRaw },
+          mutated: true,
+        });
+      }
+
+      case 'assign_story': {
+        const rawStoryId = asString(args.storyId);
+        if (!rawStoryId) {
+          return toolError('Falta storyId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveStoryId(workspace, rawStoryId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'STORY_NOT_FOUND');
+        }
+
+        let assigneeId: string | null = null;
+        if (args.memberId !== null && args.memberId !== undefined && args.memberId !== '') {
+          const rawMember = asString(args.memberId);
+          if (!rawMember) {
+            return toolError('memberId inválido.', 'INVALID_ARGS');
+          }
+          const members = workspace.execution?.members ?? [];
+          if (members.length === 0) {
+            return toolError(
+              'No hay miembros en el equipo. Añádelos desde el tablero.',
+              'MEMBER_NOT_FOUND'
+            );
+          }
+          const byId = members.find((m) => m.id.toLowerCase() === rawMember.toLowerCase());
+          if (byId) {
+            assigneeId = byId.id;
+          } else {
+            const byName = members.filter(
+              (m) => m.displayName.toLowerCase() === rawMember.toLowerCase()
+            );
+            if (byName.length === 1) {
+              assigneeId = byName[0].id;
+            } else if (byName.length > 1) {
+              return toolError(
+                `Ambiguo: varios miembros coinciden con "${rawMember}". Usa el ID exacto.`,
+                'MEMBER_AMBIGUOUS'
+              );
+            } else {
+              const partial = members.filter((m) =>
+                m.displayName.toLowerCase().includes(rawMember.toLowerCase())
+              );
+              if (partial.length === 1) {
+                assigneeId = partial[0].id;
+              } else if (partial.length > 1) {
+                return toolError(
+                  `Ambiguo: varios miembros coinciden con "${rawMember}". Usa el ID exacto.`,
+                  'MEMBER_AMBIGUOUS'
+                );
+              } else {
+                return toolError(`No encontré al miembro "${rawMember}".`, 'MEMBER_NOT_FOUND');
+              }
+            }
+          }
+        }
+
+        await updateStoryExecution(ctx.uid, resolved.storyId, { assigneeId });
+        return toolSuccess(
+          assigneeId
+            ? `Historia ${resolved.storyId} asignada a ${assigneeId}.`
+            : `Historia ${resolved.storyId} sin responsable.`,
+          { data: { storyId: resolved.storyId, assigneeId }, mutated: true }
+        );
       }
 
       case 'delete_sprint': {

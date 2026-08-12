@@ -13,18 +13,27 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
 import { DependencyBadge } from '@/components/agents/agent-5/DependencyBadge';
 import { SprintEditModal } from '@/components/agents/agent-5/SprintEditModal';
+import { StartSprintModal } from './StartSprintModal';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
+import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
+import { getFrameworkShortLabels, getFrameworkCategories } from '@/lib/constants/agent-4';
 import { SPRINT_COLORS } from '@/lib/constants/agent-5';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
-import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
+import type {
+	FrameworkCategory,
+	PrioritizationFramework,
+	StoryPrioritization,
+} from '@/lib/types/agent-4';
 import type { PlannedSprint, SprintDatePatch, SprintPlan } from '@/lib/types/agent-5';
+import { getSprintStatus } from '@/lib/types/agent-5';
+import type { ProjectMember, KanbanStatus } from '@/lib/types/execution';
 import { formatDateRangeEs } from '@/lib/utils/dates';
 import {
 	addSprintToPlan,
@@ -52,6 +61,8 @@ interface DashboardSprintStoriesTableProps {
 	plan: SprintPlan | null;
 	rows: DashboardSprintStoryRow[];
 	unassignedRows: DashboardSprintStoryRow[];
+	members?: ProjectMember[];
+	executionStatusByStoryId?: Record<string, KanbanStatus>;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -62,12 +73,19 @@ interface DashboardSprintStoriesTableProps {
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
 	onUpdateSprintPlan?: (plan: SprintPlan) => void;
+	onStartSprint?: (sprintId: string) => Promise<void>;
+	onCompleteSprint?: (
+		sprintId: string,
+		rollover?: 'backlog' | 'next_planned'
+	) => Promise<void>;
 	onManageEpic?: (epicId: string) => void;
 	/** When true, skips the outer section chrome (used inside DashboardSprintPlan). */
 	embedded?: boolean;
 	/** Controlled create-panel open state (used when embedded). */
 	isCreating?: boolean;
 	onCreatingChange?: (open: boolean) => void;
+	/** When searching, hide sprint/backlog groups with no matching stories. */
+	hideEmptyGroups?: boolean;
 }
 
 function parseDragId(id: string): { type: 'story' | 'sprint'; value: string } | null {
@@ -93,14 +111,19 @@ export function DashboardSprintStoriesTable({
 	plan,
 	rows,
 	unassignedRows,
+	members = [],
+	executionStatusByStoryId = {},
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
 	onUpdateSprintPlan,
+	onStartSprint,
+	onCompleteSprint,
 	onManageEpic,
 	embedded = false,
 	isCreating: controlledCreating,
 	onCreatingChange,
+	hideEmptyGroups = false,
 }: DashboardSprintStoriesTableProps) {
 	const confirm = useConfirm();
 	const [detailRow, setDetailRow] = useState<DashboardSprintStoryRow | null>(null);
@@ -109,14 +132,35 @@ export function DashboardSprintStoriesTable({
 	const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
 	const [depsExpanded, setDepsExpanded] = useState(false);
 	const [editingSprint, setEditingSprint] = useState<PlannedSprint | null>(null);
+	const [startingSprint, setStartingSprint] = useState<PlannedSprint | null>(null);
+	const [completingSprint, setCompletingSprint] = useState<PlannedSprint | null>(null);
+	const [lifecycleBusy, setLifecycleBusy] = useState(false);
 	const isCreating = controlledCreating ?? internalCreating;
 	const setIsCreating = onCreatingChange ?? setInternalCreating;
+
+	const memberNameById = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const member of members) {
+			map.set(member.id, member.displayName);
+		}
+		return map;
+	}, [members]);
 
 	const safePlan = useMemo(() => (plan ? normalizeSprintPlan(plan) : null), [plan]);
 	const planRef = useRef(safePlan);
 	planRef.current = safePlan;
 	const repairAttempted = useRef(false);
 	const canManagePlan = Boolean(safePlan && onUpdateSprintPlan);
+
+	const hasNextPlannedAfter = useCallback(
+		(sprint: PlannedSprint) => {
+			if (!safePlan) return false;
+			const idx = safePlan.sprints.findIndex((s) => s.id === sprint.id);
+			if (idx < 0) return false;
+			return safePlan.sprints.slice(idx + 1).some((s) => getSprintStatus(s) === 'planned');
+		},
+		[safePlan]
+	);
 
 	useEffect(() => {
 		if (!safePlan || !onUpdateSprintPlan || repairAttempted.current) return;
@@ -126,11 +170,14 @@ export function DashboardSprintStoriesTable({
 	}, [plan, safePlan, onUpdateSprintPlan]);
 
 	const sprintOptions = useMemo(() => getSprintOptions(safePlan, rows), [safePlan, rows]);
-	const groups = useMemo(
-		() => buildSprintGroups(safePlan, rows, unassignedRows),
-		[safePlan, rows, unassignedRows]
-	);
-	const hasContent = groups.some((g) => g.rows.length > 0) || Boolean(safePlan?.sprints.length);
+	const groups = useMemo(() => {
+		const all = buildSprintGroups(safePlan, rows, unassignedRows);
+		if (!hideEmptyGroups) return all;
+		return all.filter((group) => group.rows.length > 0);
+	}, [safePlan, rows, unassignedRows, hideEmptyGroups]);
+	const hasContent =
+		groups.some((g) => g.rows.length > 0) ||
+		(!hideEmptyGroups && Boolean(safePlan?.sprints.length));
 	const storyMap = useMemo(() => {
 		const map: Record<string, string> = {};
 		for (const row of [...rows, ...unassignedRows]) {
@@ -250,6 +297,53 @@ export function DashboardSprintStoriesTable({
 		[persistPlan]
 	);
 
+	const handleStartSprint = useCallback(
+		async (input: {
+			sprintId: string;
+			goal: string;
+			dates: SprintDatePatch;
+		}) => {
+			if (!onStartSprint || lifecycleBusy) return;
+			const current = planRef.current;
+			if (!current) return;
+
+			setLifecycleBusy(true);
+			try {
+				let nextPlan = updateSprintDates(current, input.sprintId, input.dates);
+				const target = nextPlan.sprints.find((s) => s.id === input.sprintId);
+				if (target && input.goal.trim() && input.goal.trim() !== target.sprintGoal) {
+					nextPlan = updateSprintGoal(nextPlan, input.sprintId, input.goal.trim());
+				}
+				persistPlan(nextPlan);
+				await onStartSprint(input.sprintId);
+				setStartingSprint(null);
+				notifySuccess('Sprint iniciado');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo iniciar el sprint'));
+			} finally {
+				setLifecycleBusy(false);
+			}
+		},
+		[lifecycleBusy, onStartSprint, persistPlan]
+	);
+
+	const handleCompleteSprint = useCallback(
+		async (sprintId: string, rollover: 'backlog' | 'next_planned') => {
+			if (!onCompleteSprint || lifecycleBusy) return;
+			setLifecycleBusy(true);
+			try {
+				await onCompleteSprint(sprintId, rollover);
+				setCompletingSprint(null);
+				notifySuccess('Sprint cerrado');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo cerrar el sprint'));
+			} finally {
+				setLifecycleBusy(false);
+			}
+		},
+		[lifecycleBusy, onCompleteSprint]
+	);
+
 	const handleDragStart = (event: DragStartEvent) => {
 		const parsed = parseDragId(String(event.active.id));
 		if (parsed?.type === 'story') setActiveStoryId(parsed.value);
@@ -348,71 +442,99 @@ export function DashboardSprintStoriesTable({
 					<tr className="text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">
 						<th className="hidden w-24 px-3 py-3 @3xl:table-cell @3xl:px-4">ID</th>
 						<th className="min-w-0 px-3 py-3 @lg:px-4">HU</th>
-						<th className="hidden w-[18%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
-						<th className="w-12 px-2 py-3 @lg:w-14 @lg:px-3">SP</th>
-						<th className="w-27 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
+						<th className="hidden w-[16%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
+						<th className="w-16 px-2 py-3 @lg:w-18 @lg:px-3">SP</th>
+						<th className="w-28 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
 						<th className="hidden w-22 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
+						<th className="hidden w-24 px-2 py-3 @2xl:table-cell @2xl:px-3">Asignado</th>
 						<th className="w-23 px-2 py-3 text-right @lg:w-27 @lg:px-3">Acciones</th>
 					</tr>
 				</thead>
 				<tbody>
-					{groups.map((group) => (
-						<SprintGroupRows
-							key={group.key}
-							framework={framework}
-							group={group}
-							canManagePlan={canManagePlan}
-							capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
-							onDeleteStory={handleDeleteStory}
-							onOpenDetail={setDetailRow}
-							onStartEdit={setEditingStoryId}
-							onEditSprint={
-								group.sprint
-									? () => setEditingSprint(group.sprint)
-									: undefined
-							}
-							onDeleteSprint={
-								group.sprintIndex != null && group.sprint?.storyIds.length === 0
-									? () => handleDeleteSprint(group.sprintIndex!)
-									: undefined
-							}
-							onManageEpic={onManageEpic}
-						/>
-					))}
+					{groups.map((group) => {
+						const status = group.sprint ? getSprintStatus(group.sprint) : null;
+						return (
+							<SprintGroupRows
+								key={group.key}
+								framework={framework}
+								group={group}
+								canManagePlan={canManagePlan}
+								capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
+								memberNameById={memberNameById}
+								lifecycleBusy={lifecycleBusy}
+								onDeleteStory={handleDeleteStory}
+								onEditStory={handleEditStory}
+								onOpenDetail={setDetailRow}
+								onStartEdit={setEditingStoryId}
+								onEditSprint={
+									group.sprint
+										? () => setEditingSprint(group.sprint)
+										: undefined
+								}
+								onDeleteSprint={
+									group.sprintIndex != null && group.sprint?.storyIds.length === 0
+										? () => handleDeleteSprint(group.sprintIndex!)
+										: undefined
+								}
+								onStartSprint={
+									group.sprint && status === 'planned' && onStartSprint
+										? () => setStartingSprint(group.sprint)
+										: undefined
+								}
+								onCompleteSprint={
+									group.sprint && status === 'active' && onCompleteSprint
+										? () => setCompletingSprint(group.sprint)
+										: undefined
+								}
+								onManageEpic={onManageEpic}
+							/>
+						);
+					})}
 				</tbody>
 			</table>
 		</div>
 	) : (
 		<div className="px-6 py-10">
 			<div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-8 text-center">
-				<p className="text-sm font-semibold text-foreground">
-					{canManagePlan
-						? 'Crea tu primer sprint'
-						: 'Todavía no hay sprints para mostrar.'}
-				</p>
-				<p className="mt-2 text-sm text-muted">
-					{canManagePlan
-						? 'Todas las historias están en el backlog. Crea un sprint y arrastra las HU que quieras incluir.'
-						: 'Cuando haya un plan de sprints, esta tabla mostrará las HU organizadas.'}
-				</p>
-				{canManagePlan && safePlan ? (
-					<button
-						type="button"
-						onClick={() => handleAddSprint()}
-						className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-					>
-						<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-							<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-						</svg>
-						Crear sprint
-					</button>
-				) : null}
+				{hideEmptyGroups ? (
+					<>
+						<p className="text-sm font-semibold text-foreground">No hay historias que coincidan</p>
+						<p className="mt-2 text-sm text-muted">
+							Prueba con el ID, título o épica de la HU.
+						</p>
+					</>
+				) : (
+					<>
+						<p className="text-sm font-semibold text-foreground">
+							{canManagePlan
+								? 'Crea tu primer sprint'
+								: 'Todavía no hay sprints para mostrar.'}
+						</p>
+						<p className="mt-2 text-sm text-muted">
+							{canManagePlan
+								? 'Todas las historias están en el backlog. Crea un sprint y arrastra las HU que quieras incluir.'
+								: 'Cuando haya un plan de sprints, esta tabla mostrará las HU organizadas.'}
+						</p>
+						{canManagePlan && safePlan ? (
+							<button
+								type="button"
+								onClick={() => handleAddSprint()}
+								className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+							>
+								<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+									<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+								</svg>
+								Crear sprint
+							</button>
+						) : null}
+					</>
+				)}
 			</div>
 		</div>
 	);
 
 	const addSprintButton =
-		canManagePlan && safePlan ? (
+		canManagePlan && safePlan && !hideEmptyGroups ? (
 			<div className="px-6 py-4">
 				<button
 					type="button"
@@ -453,7 +575,9 @@ export function DashboardSprintStoriesTable({
 				<SprintEditModal
 					open={Boolean(editingSprint)}
 					onClose={() => setEditingSprint(null)}
-					sprint={editingSprint}
+					sprint={
+						safePlan.sprints.find((s) => s.id === editingSprint.id) ?? editingSprint
+					}
 					sprintIndex={safePlan.sprints.findIndex((s) => s.id === editingSprint.id)}
 					allSprints={safePlan.sprints}
 					defaultDurationWeeks={safePlan.config.sprintDurationWeeks}
@@ -461,6 +585,35 @@ export function DashboardSprintStoriesTable({
 					onDatesChange={(patch) => handleDatesChange(editingSprint.id, patch)}
 				/>
 			)}
+
+			{startingSprint && safePlan ? (
+				<StartSprintModal
+					open={Boolean(startingSprint)}
+					sprint={
+						safePlan.sprints.find((s) => s.id === startingSprint.id) ?? startingSprint
+					}
+					plan={safePlan}
+					busy={lifecycleBusy}
+					onClose={() => {
+						if (!lifecycleBusy) setStartingSprint(null);
+					}}
+					onConfirm={handleStartSprint}
+				/>
+			) : null}
+
+			{completingSprint ? (
+				<CompleteSprintDialog
+					sprint={completingSprint}
+					incompleteCount={completingSprint.storyIds.filter((id) => {
+						const status = executionStatusByStoryId[id] ?? 'todo';
+						return status !== 'done';
+					}).length}
+					hasNextPlanned={hasNextPlannedAfter(completingSprint)}
+					busy={lifecycleBusy}
+					onCancel={() => setCompletingSprint(null)}
+					onConfirm={(rollover) => handleCompleteSprint(completingSprint.id, rollover)}
+				/>
+			) : null}
 
 			<DashboardCreateStoryModal
 				open={isCreating}
@@ -706,38 +859,57 @@ function SprintGroupRows({
 	group,
 	canManagePlan,
 	capacitySp,
+	memberNameById,
+	lifecycleBusy,
 	onDeleteStory,
+	onEditStory,
 	onOpenDetail,
 	onStartEdit,
 	onEditSprint,
 	onDeleteSprint,
+	onStartSprint,
+	onCompleteSprint,
 	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
 	group: SprintRowsGroup;
 	canManagePlan: boolean;
 	capacitySp: number;
+	memberNameById: Map<string, string>;
+	lifecycleBusy: boolean;
 	onDeleteStory: (storyId: string) => Promise<void>;
+	onEditStory: (
+		storyId: string,
+		updates: Partial<UserStory>,
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions,
+		prioritizationUpdates?: Partial<StoryPrioritization>
+	) => Promise<void>;
 	onOpenDetail: (row: DashboardSprintStoryRow) => void;
 	onStartEdit: (storyId: string) => void;
 	onEditSprint?: () => void;
 	onDeleteSprint?: () => void;
+	onStartSprint?: () => void;
+	onCompleteSprint?: () => void;
 	onManageEpic?: (epicId: string) => void;
 }) {
+	const dropDisabled =
+		!canManagePlan || (group.sprint ? getSprintStatus(group.sprint) === 'completed' : false);
 	const dropId = group.isUnassigned ? 'sprint:unassigned' : `sprint:${group.key}`;
 	const { setNodeRef, isOver } = useDroppable({
 		id: dropId,
 		data: { sprintId: group.isUnassigned ? null : group.key },
-		disabled: !canManagePlan,
+		disabled: dropDisabled,
 	});
 
 	const capacityPct = Math.round((group.velocitySp / capacitySp) * 100);
 	const isOverCapacity = group.velocitySp > capacitySp;
+	const status = group.sprint ? getSprintStatus(group.sprint) : null;
 
 	return (
 		<>
 			<tr
-				ref={canManagePlan ? setNodeRef : undefined}
+				ref={!dropDisabled ? setNodeRef : undefined}
 				className={[
 					'border-b border-border bg-surface-hover/50',
 					group.colorClass,
@@ -745,11 +917,12 @@ function SprintGroupRows({
 					isOver ? 'bg-primary/10 ring-2 ring-inset ring-primary/20' : '',
 				].join(' ')}
 			>
-				<td colSpan={7} className="px-3 py-3 @lg:px-6">
+				<td colSpan={8} className="px-3 py-3 @lg:px-6">
 					<div className="flex flex-wrap items-center gap-2 @lg:gap-3">
 						<div className="min-w-0 flex-1">
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="text-sm font-bold text-foreground">{group.label}</span>
+								{status ? <SprintStatusBadge status={status} /> : null}
 								{group.sprint?.isEdited && (
 									<span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-amber-600">
 										editado
@@ -786,13 +959,35 @@ function SprintGroupRows({
 							{group.rows.length} HU · {group.velocitySp} SP
 						</span>
 
+						{onStartSprint ? (
+							<button
+								type="button"
+								onClick={onStartSprint}
+								disabled={lifecycleBusy}
+								className="cursor-pointer rounded-lg border border-border bg-foreground px-2.5 py-1 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+							>
+								Iniciar
+							</button>
+						) : null}
+
+						{onCompleteSprint ? (
+							<button
+								type="button"
+								onClick={onCompleteSprint}
+								disabled={lifecycleBusy}
+								className="cursor-pointer rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+							>
+								Cerrar
+							</button>
+						) : null}
+
 						{onDeleteSprint && (
 							<button
 								type="button"
 								onClick={onDeleteSprint}
 								className="cursor-pointer rounded-lg px-1.5 py-1 text-muted transition-colors hover:text-danger"
-								title="Eliminar sprint vacÃ­o"
-								aria-label="Eliminar sprint vacÃ­o"
+								title="Eliminar sprint vacío"
+								aria-label="Eliminar sprint vacío"
 							>
 								<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
 									<path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -804,22 +999,28 @@ function SprintGroupRows({
 			</tr>
 			{group.rows.length === 0 ? (
 				<tr className={isOver ? 'bg-primary/5' : ''}>
-					<td colSpan={7} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
+					<td colSpan={8} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
 						{canManagePlan
 							? group.isUnassigned
 								? 'Suelta historias aquí para desasignarlas'
-								: 'Sin historias, arrastra aquí­ para asignar.'
+								: status === 'completed'
+									? 'Sprint cerrado.'
+									: 'Sin historias, arrastra aquí para asignar.'
 							: 'Sin historias asignadas.'}
 					</td>
 				</tr>
 			) : (
 				group.rows.map((row) => (
-					<StoryReadOnlyRow
+					<StoryRow
 						key={row.id}
 						framework={framework}
 						row={row}
-						canDrag={canManagePlan}
+						assigneeName={
+							row.assigneeId ? memberNameById.get(row.assigneeId) ?? null : null
+						}
+						canDrag={canManagePlan && status !== 'completed'}
 						onDelete={async () => onDeleteStory(row.story.id)}
+						onEditStory={onEditStory}
 						onOpenDetail={() => onOpenDetail(row)}
 						onStartEdit={() => onStartEdit(row.story.id)}
 						onManageEpic={onManageEpic}
@@ -830,25 +1031,36 @@ function SprintGroupRows({
 	);
 }
 
-function StoryReadOnlyRow({
+function StoryRow({
 	framework,
 	row,
+	assigneeName,
 	canDrag,
 	onDelete,
+	onEditStory,
 	onOpenDetail,
 	onStartEdit,
 	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
 	row: DashboardSprintStoryRow;
+	assigneeName: string | null;
 	canDrag: boolean;
 	onDelete: () => Promise<void>;
+	onEditStory: (
+		storyId: string,
+		updates: Partial<UserStory>,
+		estimationUpdates?: Partial<StoryEstimation>,
+		options?: UpdateDashboardUserStoryOptions,
+		prioritizationUpdates?: Partial<StoryPrioritization>
+	) => Promise<void>;
 	onOpenDetail: () => void;
 	onStartEdit: () => void;
 	onManageEpic?: (epicId: string) => void;
 }) {
 	const confirm = useConfirm();
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isSavingField, setIsSavingField] = useState<'points' | 'priority' | null>(null);
 	const dragId = `story:${row.story.id}`;
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: dragId,
@@ -861,6 +1073,68 @@ function StoryReadOnlyRow({
 		: isDragging
 			? { opacity: 0.5 }
 			: undefined;
+
+	const currentPoints = row.estimation?.points ?? 0;
+	const pointsOptions = useMemo(() => {
+		const scale = FIBONACCI_SCALE.map((value) => ({
+			value: String(value),
+			label: String(value),
+		}));
+		if (currentPoints > 0 && !FIBONACCI_SCALE.includes(currentPoints as (typeof FIBONACCI_SCALE)[number])) {
+			return [{ value: String(currentPoints), label: String(currentPoints) }, ...scale];
+		}
+		return scale;
+	}, [currentPoints]);
+
+	const priorityOptions = useMemo(() => {
+		if (!framework) return [];
+		const labels = getFrameworkShortLabels(framework);
+		return getFrameworkCategories(framework).map((category) => ({
+			value: category,
+			label: labels[category] ?? category,
+		}));
+	}, [framework]);
+
+	const handlePointsChange = async (nextValue: string) => {
+		const nextPoints = Number(nextValue);
+		if (!Number.isFinite(nextPoints) || nextPoints === currentPoints || isSavingField) return;
+		setIsSavingField('points');
+		try {
+			await onEditStory(row.story.id, {}, {
+				points: nextPoints,
+				justification:
+					row.estimation?.justification ||
+					'Estimacion ajustada manualmente desde el dashboard.',
+				isModified: true,
+			});
+		} finally {
+			setIsSavingField(null);
+		}
+	};
+
+	const handlePriorityChange = async (nextValue: string) => {
+		if (!framework || isSavingField) return;
+		const nextCategory = nextValue as FrameworkCategory;
+		if (nextCategory === row.prioritization?.category) return;
+		setIsSavingField('priority');
+		try {
+			await onEditStory(
+				row.story.id,
+				{},
+				undefined,
+				undefined,
+				{
+					category: nextCategory,
+					justification:
+						row.prioritization?.justification ||
+						'Priorizacion ajustada manualmente desde el dashboard.',
+					isModified: true,
+				}
+			);
+		} finally {
+			setIsSavingField(null);
+		}
+	};
 
 	return (
 		<tr
@@ -895,9 +1169,6 @@ function StoryReadOnlyRow({
 						</span>
 						<p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.story.title}>
 							{row.story.title}
-						</p>
-						<p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted @2xl:line-clamp-2">
-							{row.story.description}
 						</p>
 						{onManageEpic ? (
 							<button
@@ -936,21 +1207,44 @@ function StoryReadOnlyRow({
 				)}
 			</td>
 			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
-				<span className="inline-flex min-w-8 justify-center rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold text-foreground @lg:px-2">
-					{row.estimation?.points ?? 0}
-				</span>
+				<DropdownSelect
+					value={currentPoints > 0 ? String(currentPoints) : ''}
+					onChange={handlePointsChange}
+					options={pointsOptions}
+					placeholder="—"
+					disabled={isSavingField !== null}
+					size="compact"
+					className="w-14 @lg:w-16"
+					aria-label={`Story points de ${row.story.id}`}
+				/>
 			</td>
 			<td className="min-w-0 px-2 py-3 align-top @xl:px-3 @xl:py-4">
-				{framework && row.prioritization ? (
-					<div className="max-w-full overflow-hidden [&_span]:max-w-full [&_span]:truncate">
-						<CategoryBadge framework={framework} category={row.prioritization.category} />
-					</div>
+				{framework ? (
+					<DropdownSelect
+						value={row.prioritization?.category ?? ''}
+						onChange={handlePriorityChange}
+						options={priorityOptions}
+						placeholder="—"
+						disabled={isSavingField !== null}
+						size="compact"
+						className="w-full min-w-0"
+						aria-label={`Prioridad de ${row.story.id}`}
+					/>
 				) : (
 					<span className="text-xs text-muted">N/D</span>
 				)}
 			</td>
 			<td className="hidden px-2 py-3 align-top @xl:table-cell @xl:px-3 @xl:py-4">
 				<ExecutionStatusBadge status={row.executionStatus} />
+			</td>
+			<td className="hidden px-2 py-3 align-top text-xs text-muted @2xl:table-cell @2xl:px-3 @2xl:py-4">
+				{assigneeName ? (
+					<span className="line-clamp-1 font-medium text-foreground" title={assigneeName}>
+						{assigneeName}
+					</span>
+				) : (
+					<span className="text-subtle">—</span>
+				)}
 			</td>
 			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
 				<div className="flex justify-end gap-0.5 @lg:gap-1.5">
@@ -968,8 +1262,8 @@ function StoryReadOnlyRow({
 						type="button"
 						onClick={async () => {
 							const confirmed = await confirm({
-								title: `Â¿Eliminar ${row.story.id}?`,
-								description: `"${row.story.title}" se eliminarÃ¡ del backlog. Esta acciÃ³n no se puede deshacer.`,
+								title: `¿Eliminar ${row.story.id}?`,
+								description: `"${row.story.title}" se eliminará del backlog. Esta acción no se puede deshacer.`,
 								confirmLabel: 'Eliminar',
 								variant: 'danger',
 							});
@@ -1002,6 +1296,101 @@ function StoryReadOnlyRow({
 function formatDateRange(startDate: string | null, endDate: string | null): string {
 	if (!startDate || !endDate) return '';
 	return `${startDate} - ${endDate}`;
+}
+
+function SprintStatusBadge({ status }: { status: 'planned' | 'active' | 'completed' }) {
+	const styles =
+		status === 'active'
+			? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
+			: status === 'completed'
+				? 'border-border bg-surface-muted text-muted'
+				: 'border-border bg-surface text-foreground';
+	const label =
+		status === 'active' ? 'Activo' : status === 'completed' ? 'Cerrado' : 'Planificado';
+	return (
+		<span
+			className={`rounded-full border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider ${styles}`}
+		>
+			{label}
+		</span>
+	);
+}
+
+function CompleteSprintDialog({
+	sprint,
+	incompleteCount,
+	hasNextPlanned,
+	busy,
+	onCancel,
+	onConfirm,
+}: {
+	sprint: PlannedSprint;
+	incompleteCount: number;
+	hasNextPlanned: boolean;
+	busy: boolean;
+	onCancel: () => void;
+	onConfirm: (rollover: 'backlog' | 'next_planned') => void;
+}) {
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="complete-sprint-title"
+				className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-xl"
+			>
+				<h3 id="complete-sprint-title" className="text-base font-semibold text-foreground">
+					¿Cerrar Sprint {sprint.number}?
+				</h3>
+				<p className="mt-2 text-sm text-muted">
+					{incompleteCount === 0
+						? 'Todas las historias están hechas. El sprint quedará cerrado.'
+						: `${incompleteCount} historia${incompleteCount !== 1 ? 's' : ''} incompleta${incompleteCount !== 1 ? 's' : ''} saldrán del sprint.`}
+				</p>
+				<div className="mt-5 flex flex-col gap-2">
+					{incompleteCount > 0 ? (
+						<>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() => onConfirm('backlog')}
+								className="cursor-pointer rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
+							>
+								Mover incompletas al backlog
+							</button>
+							{hasNextPlanned ? (
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => onConfirm('next_planned')}
+									className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-40"
+								>
+									Mover al siguiente sprint planificado
+								</button>
+							) : null}
+						</>
+					) : (
+						<button
+							type="button"
+							disabled={busy}
+							onClick={() => onConfirm('backlog')}
+							className="cursor-pointer rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
+						>
+							Cerrar sprint
+						</button>
+					)}
+					<button
+						type="button"
+						disabled={busy}
+						onClick={onCancel}
+						className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-muted hover:text-foreground disabled:opacity-40"
+					>
+						Cancelar
+					</button>
+				</div>
+			</div>
+		</div>
+	);
 }
 
 function EditIcon() {

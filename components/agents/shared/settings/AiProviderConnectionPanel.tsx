@@ -116,7 +116,7 @@ export function AiProviderConnectionPanel() {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-surface p-4">
+    <div className="space-y-4 rounded-xl border border-border/80 bg-surface-muted/20 p-4">
       <div className="min-w-0">
         <h4 className="text-[15px] font-semibold tracking-tight text-foreground">Proveedor de IA</h4>
         <p className="mt-0.5 text-[12px] text-muted">

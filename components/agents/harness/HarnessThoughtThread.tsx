@@ -28,6 +28,11 @@ const TOOL_LABELS: Record<string, string> = {
   delete_epic: 'Eliminar épica',
   assign_story_sprint: 'Asignar a sprint',
   create_sprint: 'Crear sprint',
+  update_sprint: 'Actualizar sprint',
+  start_sprint: 'Iniciar sprint',
+  complete_sprint: 'Cerrar sprint',
+  update_story_status: 'Cambiar estado Kanban',
+  assign_story: 'Asignar responsable',
   delete_sprint: 'Eliminar sprint',
 };
 

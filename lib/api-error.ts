@@ -4,6 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
+import { SprintLifecycleError } from '@/lib/utils/sprint-plan-mutations';
 
 export function handleApiError(
   error: unknown,
@@ -30,6 +31,10 @@ export function handleApiError(
     );
   }
 
+  if (error instanceof SprintLifecycleError) {
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
   console.error(fallback, error);
-  return NextResponse.json({ error: fallback }, { status: 500 });
+  return NextResponse.json({ error: message || fallback }, { status: 500 });
 }

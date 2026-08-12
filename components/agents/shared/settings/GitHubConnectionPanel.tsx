@@ -145,7 +145,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
   const displayName = githubUsername ?? 'github';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+    <div className="overflow-hidden rounded-xl border border-border/80 bg-surface-muted/20">
       {/* Header */}
       <div className="flex items-start gap-3 border-b border-border px-3.5 py-3.5">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">

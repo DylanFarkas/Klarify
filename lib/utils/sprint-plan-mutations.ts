@@ -13,8 +13,18 @@ import type {
   SprintDatePatch,
   SprintPlan,
 } from '@/lib/types/agent-5';
+import { getSprintStatus } from '@/lib/types/agent-5';
 import type { Agent5Input, Agent6Input, UserWorkspace } from '@/lib/types/workspace';
 import { applySprintDatePatch, computeEndDateForDuration } from '@/lib/utils/sprint-dates';
+
+export type SprintCompleteRollover = 'backlog' | 'next_planned';
+
+export class SprintLifecycleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SprintLifecycleError';
+  }
+}
 
 /** Plan vacío: todas las HU en backlog, sin sprints (planificación manual tipo Jira). */
 export function createEmptySprintPlan(epics: Epic[]): SprintPlan {
@@ -242,9 +252,133 @@ export function addSprintToPlan(plan: SprintPlan, goal?: string): SprintPlan {
     ),
     durationUnit: 'weeks',
     durationWeeks: normalized.config.sprintDurationWeeks,
+    status: 'planned',
     isEdited: true,
   };
   return normalizeSprintPlan({ ...normalized, sprints: [...normalized.sprints, newSprint] });
+}
+
+/** Devuelve el sprint activo del plan, si existe. */
+export function findActiveSprint(plan: SprintPlan): PlannedSprint | null {
+  return normalizeSprintPlan(plan).sprints.find((s) => getSprintStatus(s) === 'active') ?? null;
+}
+
+/**
+ * Inicia un sprint planned → active.
+ * Solo puede haber un sprint active a la vez.
+ */
+export function startSprintInPlan(plan: SprintPlan, sprintId: string): SprintPlan {
+  const normalized = normalizeSprintPlan(plan);
+  const target = normalized.sprints.find((s) => s.id === sprintId);
+  if (!target) {
+    throw new SprintLifecycleError(`Sprint no encontrado: ${sprintId}`);
+  }
+
+  const status = getSprintStatus(target);
+  if (status === 'active') {
+    return normalized;
+  }
+  if (status === 'completed') {
+    throw new SprintLifecycleError(`No se puede iniciar ${sprintId}: el sprint ya está completado.`);
+  }
+
+  const otherActive = normalized.sprints.find(
+    (s) => s.id !== sprintId && getSprintStatus(s) === 'active'
+  );
+  if (otherActive) {
+    throw new SprintLifecycleError(
+      `Ya hay un sprint activo (Sprint ${otherActive.number}). Ciérralo antes de iniciar otro.`
+    );
+  }
+
+  return normalizeSprintPlan({
+    ...normalized,
+    sprints: normalized.sprints.map((s) =>
+      s.id === sprintId ? { ...s, status: 'active', isEdited: true } : s
+    ),
+  });
+}
+
+/**
+ * Cierra un sprint active → completed.
+ * Las historias incompletas (incompleteStoryIds) salen del sprint hacia el backlog
+ * o hacia el siguiente sprint planned, según rollover.
+ * Las historias hechas permanecen en el sprint completado.
+ */
+export function completeSprintInPlan(
+  plan: SprintPlan,
+  sprintId: string,
+  incompleteStoryIds: string[],
+  storyPointsById: Record<string, number>,
+  rollover: SprintCompleteRollover = 'backlog'
+): SprintPlan {
+  const normalized = normalizeSprintPlan(plan);
+  const targetIndex = normalized.sprints.findIndex((s) => s.id === sprintId);
+  if (targetIndex < 0) {
+    throw new SprintLifecycleError(`Sprint no encontrado: ${sprintId}`);
+  }
+
+  const target = normalized.sprints[targetIndex];
+  const status = getSprintStatus(target);
+  if (status === 'completed') {
+    return normalized;
+  }
+  if (status !== 'active') {
+    throw new SprintLifecycleError(
+      `Solo se puede cerrar un sprint activo. ${sprintId} está en estado «${status}».`
+    );
+  }
+
+  const incompleteSet = new Set(
+    incompleteStoryIds.filter((id) => target.storyIds.includes(id))
+  );
+  const remainingStoryIds = target.storyIds.filter((id) => !incompleteSet.has(id));
+  const movedPoints = [...incompleteSet].reduce(
+    (sum, id) => sum + (storyPointsById[id] ?? 0),
+    0
+  );
+
+  let unassignedStoryIds = [...normalized.unassignedStoryIds];
+  let sprints = normalized.sprints.map((s) => ({ ...s, storyIds: [...s.storyIds] }));
+
+  sprints[targetIndex] = {
+    ...sprints[targetIndex],
+    storyIds: remainingStoryIds,
+    velocitySp: Math.max(0, sprints[targetIndex].velocitySp - movedPoints),
+    status: 'completed',
+    isEdited: true,
+  };
+
+  if (incompleteSet.size > 0) {
+    if (rollover === 'next_planned') {
+      const nextPlannedIndex = sprints.findIndex(
+        (s, idx) => idx > targetIndex && getSprintStatus(s) === 'planned'
+      );
+      if (nextPlannedIndex < 0) {
+        unassignedStoryIds = [
+          ...unassignedStoryIds,
+          ...[...incompleteSet].filter((id) => !unassignedStoryIds.includes(id)),
+        ];
+      } else {
+        const next = sprints[nextPlannedIndex];
+        const toAdd = [...incompleteSet].filter((id) => !next.storyIds.includes(id));
+        const addPoints = toAdd.reduce((sum, id) => sum + (storyPointsById[id] ?? 0), 0);
+        sprints[nextPlannedIndex] = {
+          ...next,
+          storyIds: [...next.storyIds, ...toAdd],
+          velocitySp: next.velocitySp + addPoints,
+          isEdited: true,
+        };
+      }
+    } else {
+      unassignedStoryIds = [
+        ...unassignedStoryIds,
+        ...[...incompleteSet].filter((id) => !unassignedStoryIds.includes(id)),
+      ];
+    }
+  }
+
+  return normalizeSprintPlan({ ...normalized, sprints, unassignedStoryIds });
 }
 
 /** Elimina un sprint vacío por índice (evita ambigüedad con ids duplicados). */

@@ -33,6 +33,8 @@ import {
   updateEpicAcrossWorkspace,
   deleteEpicAcrossWorkspace,
   updateSprintPlanAcrossWorkspace,
+  startSprintAcrossWorkspace,
+  completeSprintAcrossWorkspace,
   resetAgent1,
   resetAgent2,
   resetAgent3,
@@ -53,6 +55,7 @@ import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 import type { KanbanStatus, ProjectMember, ProjectMemberRole } from '@/lib/types/execution';
+import type { SprintCompleteRollover } from '@/lib/utils/sprint-plan-mutations';
 
 interface PatchBody {
   agent?: 'agent1' | 'agent2' | 'agent3' | 'agent4' | 'agent5';
@@ -75,6 +78,8 @@ interface PostBody {
     | 'updateEpic'
     | 'deleteEpic'
     | 'updateSprintPlan'
+    | 'startSprint'
+    | 'completeSprint'
     | 'initializeExecution'
     | 'upsertProjectMember'
     | 'deleteProjectMember'
@@ -103,6 +108,10 @@ interface PostBody {
       }
     | {
         plan: SprintPlan;
+      }
+    | {
+        sprintId: string;
+        rollover?: SprintCompleteRollover;
       }
     | {
         epicId: string;
@@ -325,6 +334,26 @@ export async function POST(request: NextRequest) {
         }
         await updateSprintPlanAcrossWorkspace(uid, payload.plan);
         return NextResponse.json({ ok: true });
+      }
+      case 'startSprint': {
+        const payload = body.payload as { sprintId?: string };
+        if (!payload.sprintId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await startSprintAcrossWorkspace(uid, payload.sprintId);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'completeSprint': {
+        const payload = body.payload as {
+          sprintId?: string;
+          rollover?: SprintCompleteRollover;
+        };
+        if (!payload.sprintId) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const rollover = payload.rollover === 'next_planned' ? 'next_planned' : 'backlog';
+        const workspace = await completeSprintAcrossWorkspace(uid, payload.sprintId, rollover);
+        return NextResponse.json({ ok: true, workspace });
       }
       case 'initializeExecution': {
         const workspace = await ensureExecutionInitialized(uid);

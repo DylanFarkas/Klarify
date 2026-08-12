@@ -108,6 +108,11 @@ export interface UseWorkspaceResult {
     prioritizationUpdates?: Partial<StoryPrioritization>
   ) => Promise<void>;
   updateSprintPlan: (plan: SprintPlan) => void;
+  startSprint: (sprintId: string) => Promise<void>;
+  completeSprint: (
+    sprintId: string,
+    rollover?: 'backlog' | 'next_planned'
+  ) => Promise<void>;
   initializeExecution: () => Promise<void>;
   upsertMember: (member: ProjectMemberInput) => Promise<void>;
   deleteMember: (memberId: string) => Promise<void>;
@@ -707,7 +712,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ action, payload }),
       });
       if (!response.ok) {
-        throw new Error('No se pudo actualizar el workspace');
+        let message = 'No se pudo actualizar el workspace';
+        try {
+          const err = (await response.json()) as { error?: string };
+          if (err.error?.trim()) message = err.error.trim();
+        } catch {
+          /* keep fallback */
+        }
+        throw new Error(message);
       }
       const data = (await response.json()) as { workspace?: UserWorkspace };
       return data.workspace ?? null;
@@ -945,6 +957,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }, SPRINT_PLAN_DEBOUNCE_MS);
     },
     [user, persistSprintPlan]
+  );
+
+  const startSprint = useCallback(
+    async (sprintId: string) => {
+      if (!user) return;
+      await persistSprintPlan().catch(() => undefined);
+      const ws = await runActionWithWorkspace('startSprint', { sprintId });
+      if (ws) setWorkspace(ws);
+    },
+    [user, persistSprintPlan, runActionWithWorkspace]
+  );
+
+  const completeSprint = useCallback(
+    async (sprintId: string, rollover: 'backlog' | 'next_planned' = 'backlog') => {
+      if (!user) return;
+      await persistSprintPlan().catch(() => undefined);
+      const ws = await runActionWithWorkspace('completeSprint', { sprintId, rollover });
+      if (ws) setWorkspace(ws);
+    },
+    [user, persistSprintPlan, runActionWithWorkspace]
   );
 
   const postWorkspaceAction = useCallback(
@@ -1264,6 +1296,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         deleteEpic,
         updateUserStory,
         updateSprintPlan,
+        startSprint,
+        completeSprint,
         initializeExecution,
         upsertMember,
         deleteMember,

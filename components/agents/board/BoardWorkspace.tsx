@@ -9,11 +9,13 @@ import {
   type BoardFilters as BoardFiltersState,
 } from '@/lib/board/board-utils';
 import type { KanbanStatus } from '@/lib/types/execution';
+import { findActiveSprint } from '@/lib/utils/sprint-plan-mutations';
 import { BoardFilters } from './BoardFilters';
 import { BoardEmptyState } from './BoardEmptyState';
 import { KanbanBoard } from './KanbanBoard';
 import { TeamPanel } from './TeamPanel';
 import { StoryExecutionDrawer } from './StoryExecutionDrawer';
+import { ActiveSprintHeader } from './ActiveSprintHeader';
 
 export function BoardWorkspace() {
   const {
@@ -41,6 +43,7 @@ export function BoardWorkspace() {
   const execution = workspace?.execution ?? null;
   const snapshot = workspace?.pipeline.agent6Input ?? null;
   const isExecutionReady = Boolean(execution?.initializedAt);
+  const activeSprint = snapshot?.plan ? findActiveSprint(snapshot.plan) : null;
 
   useEffect(() => {
     if (!hasPipeline || isExecutionReady || isInitializing) return;
@@ -51,22 +54,31 @@ export function BoardWorkspace() {
   }, [hasPipeline, isExecutionReady, isInitializing, initializeExecution]);
 
   useEffect(() => {
-    if (sprintFilterHydrated.current || !isExecutionReady || !execution?.sprintFilter) return;
+    if (sprintFilterHydrated.current || !isExecutionReady) return;
     sprintFilterHydrated.current = true;
-    if (execution.sprintFilter !== 'all') {
-      setFilters((prev) => ({ ...prev, sprintFilter: execution.sprintFilter }));
+
+    const saved = execution?.sprintFilter ?? 'all';
+    const nextFilter =
+      activeSprint && (saved === 'all' || saved === activeSprint.id)
+        ? activeSprint.id
+        : saved;
+
+    setFilters((prev) => ({ ...prev, sprintFilter: nextFilter }));
+    if (nextFilter !== saved) {
+      void updateExecutionSprintFilter(nextFilter);
     }
-  }, [execution?.sprintFilter, isExecutionReady]);
+  }, [activeSprint, execution?.sprintFilter, isExecutionReady, updateExecutionSprintFilter]);
 
   useEffect(() => {
     if (!workspace || !isExecutionReady || filters.sprintFilter === 'all') return;
     const allStories = resolveBoardData(workspace, { ...filters, sprintFilter: 'all' }).stories;
     const filteredStories = resolveBoardData(workspace, filters).stories;
     if (allStories.length > 0 && filteredStories.length === 0) {
-      setFilters((prev) => ({ ...prev, sprintFilter: 'all' }));
-      void updateExecutionSprintFilter('all');
+      const fallback = activeSprint?.id ?? 'all';
+      setFilters((prev) => ({ ...prev, sprintFilter: fallback }));
+      void updateExecutionSprintFilter(fallback);
     }
-  }, [workspace, isExecutionReady, filters, updateExecutionSprintFilter]);
+  }, [workspace, isExecutionReady, filters, updateExecutionSprintFilter, activeSprint?.id]);
 
   const boardData = useMemo(() => {
     if (!workspace) {
@@ -89,6 +101,8 @@ export function BoardWorkspace() {
 
   const progress = computeExecutionProgress(boardData.stories);
   const maxMembers = plan?.limits.maxTeamMembers ?? 0;
+  const viewingActiveSprint =
+    Boolean(activeSprint) && filters.sprintFilter === activeSprint?.id;
 
   const handleFilterChange = useCallback(
     (patch: Partial<BoardFiltersState>) => {
@@ -158,12 +172,21 @@ export function BoardWorkspace() {
         </div>
       </header>
 
+      {viewingActiveSprint && activeSprint ? (
+        <ActiveSprintHeader
+          sprint={activeSprint}
+          stories={boardData.stories}
+          capacitySp={snapshot?.plan.config.sprintCapacitySp}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <BoardFilters
           filters={filters}
           sprints={snapshot?.plan.sprints ?? []}
           epics={snapshot?.epics ?? []}
           members={boardData.members}
+          activeSprintId={activeSprint?.id ?? null}
           onChange={handleFilterChange}
         />
         <TeamPanel

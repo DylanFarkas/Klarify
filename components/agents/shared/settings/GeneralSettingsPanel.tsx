@@ -7,7 +7,7 @@ export function GeneralSettingsPanel() {
   const { showModelReasoning, setShowModelReasoning } = useWorkspaceSettings();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-xl border border-border/80 bg-surface-muted/20">
       <SettingsToggle
         checked={showModelReasoning}
         onChange={setShowModelReasoning}

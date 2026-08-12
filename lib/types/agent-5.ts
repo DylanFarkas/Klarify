@@ -26,6 +26,9 @@ export interface SprintStoryAssignment {
   order: number;
 }
 
+/** Ciclo de vida operativo del sprint. Ausente en datos legacy → tratar como 'planned'. */
+export type SprintStatus = 'planned' | 'active' | 'completed';
+
 export interface PlannedSprint {
   id: string;
   number: number;
@@ -40,7 +43,14 @@ export interface PlannedSprint {
   durationWeeks?: number;
   /** Duración en días naturales (inclusive) cuando durationUnit es 'days'. */
   durationDays?: number;
+  /** Estado del ciclo; sprints sin campo se tratan como 'planned'. */
+  status?: SprintStatus;
   isEdited: boolean;
+}
+
+/** Resuelve el status con migración lazy para sprints guardados sin el campo. */
+export function getSprintStatus(sprint: PlannedSprint): SprintStatus {
+  return sprint.status ?? 'planned';
 }
 
 export type SprintDurationUnit = 'weeks' | 'days';

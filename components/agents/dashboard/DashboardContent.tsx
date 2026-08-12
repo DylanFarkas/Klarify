@@ -1,6 +1,7 @@
 import { DashboardEmptyState } from './DashboardEmptyState';
 import { DashboardHero } from './DashboardHero';
 import { DashboardSummaryStrip } from './DashboardSummaryStrip';
+import { DashboardEpicProgress } from './DashboardEpicProgress';
 import { ProjectExportPanel } from '@/components/agents/export/ProjectExportPanel';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { DashboardMetrics } from './dashboardMetrics';
@@ -29,6 +30,11 @@ interface DashboardContentProps {
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
 	onUpdateSprintPlan: (plan: SprintPlan) => void;
+	onStartSprint: (sprintId: string) => Promise<void>;
+	onCompleteSprint: (
+		sprintId: string,
+		rollover?: 'backlog' | 'next_planned'
+	) => Promise<void>;
 	onCreateEpic: (input: { title: string; description: string }) => Promise<void>;
 	onUpdateEpic: (epicId: string, updates: { title?: string; description?: string }) => Promise<void>;
 	onDeleteEpic: (epicId: string) => Promise<void>;
@@ -46,6 +52,8 @@ export function DashboardContent({
 	onDeleteStory,
 	onEditStory,
 	onUpdateSprintPlan,
+	onStartSprint,
+	onCompleteSprint,
 	onCreateEpic,
 	onUpdateEpic,
 	onDeleteEpic,
@@ -75,6 +83,7 @@ export function DashboardContent({
 						plan={metrics.plan}
 						rows={metrics.sprintStoryRows}
 						unassignedRows={metrics.unassignedStoryRows}
+						members={workspace.execution?.members ?? []}
 						onCreateStory={onCreateStory}
 						onDeleteStory={onDeleteStory}
 						onEditStory={onEditStory}
@@ -82,7 +91,11 @@ export function DashboardContent({
 						onUpdateEpic={onUpdateEpic}
 						onDeleteEpic={onDeleteEpic}
 						onUpdateSprintPlan={onUpdateSprintPlan}
+						onStartSprint={onStartSprint}
+						onCompleteSprint={onCompleteSprint}
 					/>
+
+					<DashboardEpicProgress metrics={metrics} />
 
 					{projectId ? (
 						<section className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5">

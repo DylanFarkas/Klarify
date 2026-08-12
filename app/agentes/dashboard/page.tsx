@@ -24,6 +24,8 @@ export default function DashboardPage() {
 		updateEpic,
 		deleteEpic,
 		updateSprintPlan,
+		startSprint,
+		completeSprint,
 		bootstrapDashboardFromAgent4,
 	} = useWorkspace();
 	const bootstrapped = useRef(false);
@@ -63,6 +65,8 @@ export default function DashboardPage() {
 			onUpdateEpic={updateEpic}
 			onDeleteEpic={deleteEpic}
 			onUpdateSprintPlan={updateSprintPlan}
+			onStartSprint={startSprint}
+			onCompleteSprint={completeSprint}
 			workspace={workspace}
 		/>
 	);

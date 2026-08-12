@@ -3,6 +3,7 @@
 import type { BoardFilters as BoardFiltersState } from '@/lib/board/board-utils';
 import type { Epic } from '@/lib/types/agent-2';
 import type { PlannedSprint } from '@/lib/types/agent-5';
+import { getSprintStatus } from '@/lib/types/agent-5';
 import type { ProjectMember } from '@/lib/types/execution';
 
 interface BoardFiltersProps {
@@ -10,13 +11,21 @@ interface BoardFiltersProps {
   sprints: PlannedSprint[];
   epics: Epic[];
   members: ProjectMember[];
+  activeSprintId?: string | null;
   onChange: (patch: Partial<BoardFiltersState>) => void;
 }
 
 const controlClass =
   'rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none';
 
-export function BoardFilters({ filters, sprints, epics, members, onChange }: BoardFiltersProps) {
+export function BoardFilters({
+  filters,
+  sprints,
+  epics,
+  members,
+  activeSprintId = null,
+  onChange,
+}: BoardFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-2.5">
       <div className="relative min-w-35 flex-1 sm:max-w-xs">
@@ -37,11 +46,21 @@ export function BoardFilters({ filters, sprints, epics, members, onChange }: Boa
       >
         <option value="all">Todo el backlog</option>
         <option value="unassigned">Sin sprint</option>
-        {sprints.map((s) => (
-          <option key={s.id} value={s.id}>
-            Sprint {s.number}
-          </option>
-        ))}
+        {sprints.map((s) => {
+          const status = getSprintStatus(s);
+          const suffix =
+            s.id === activeSprintId
+              ? ' (activo)'
+              : status === 'completed'
+                ? ' (cerrado)'
+                : '';
+          return (
+            <option key={s.id} value={s.id}>
+              Sprint {s.number}
+              {suffix}
+            </option>
+          );
+        })}
       </select>
 
       <select

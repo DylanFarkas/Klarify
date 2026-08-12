@@ -87,14 +87,14 @@ export function DetailModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-200 flex items-end justify-center p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-200 flex items-end justify-center p-0 sm:items-center sm:p-5"
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-modal-title"
     >
       <div
         className={[
-          'absolute inset-0 bg-background/70 backdrop-blur-sm',
+          'absolute inset-0 bg-background/75 backdrop-blur-md',
           closing ? 'detail-modal-backdrop-out' : 'detail-modal-backdrop-in',
         ].join(' ')}
         aria-hidden="true"
@@ -108,17 +108,17 @@ export function DetailModal({
           closing ? 'detail-modal-panel-out' : 'detail-modal-panel-in',
         ].join(' ')}
       >
-        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-xl border border-border bg-surface sm:rounded-xl">
-          <header className="relative shrink-0 border-b border-border px-4 py-3.5 sm:px-5">
+        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-2xl border border-border/70 bg-surface shadow-2xl sm:rounded-2xl">
+          <header className="relative shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <button
               ref={closeBtnRef}
               type="button"
               onClick={handleClose}
-              className="absolute right-3 top-3 cursor-pointer rounded-lg p-2 text-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
+              className="absolute right-4 top-4 cursor-pointer rounded-xl p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong sm:right-5 sm:top-5"
               aria-label="Cerrar detalles"
             >
               <svg
-                className="h-4 w-4"
+                className="h-5 w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -128,25 +128,34 @@ export function DetailModal({
               </svg>
             </button>
 
-            <div className="pr-10">
+            <div className="min-w-0 pr-10">
               {eyebrow ? (
-                <p className="mb-1 text-[11px] font-medium text-subtle">{eyebrow}</p>
+                <p className="text-[11px] font-medium tracking-[0.04em] text-subtle">{eyebrow}</p>
               ) : null}
-              <div className="flex flex-wrap items-baseline gap-2">
-                {subtitle ? (
-                  <span className="font-mono text-[11px] text-subtle">{subtitle}</span>
-                ) : null}
-                <h2
-                  id="detail-modal-title"
-                  className="text-[15px] font-semibold tracking-tight text-foreground sm:text-base"
+              {subtitle ? (
+                <p
+                  className={[
+                    'font-mono text-[12px] text-muted',
+                    eyebrow ? 'mt-1.5' : '',
+                  ].join(' ')}
                 >
-                  {title}
-                </h2>
-              </div>
+                  {subtitle}
+                </p>
+              ) : null}
+              <h2
+                id="detail-modal-title"
+                className={[
+                  'font-semibold tracking-tight text-foreground',
+                  'text-xl sm:text-2xl sm:leading-tight',
+                  eyebrow || subtitle ? 'mt-1' : '',
+                ].join(' ')}
+              >
+                {title}
+              </h2>
             </div>
           </header>
 
-          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto border-t border-border/60 px-5 py-5 sm:px-6">
             {children}
           </div>
         </div>

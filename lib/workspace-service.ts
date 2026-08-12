@@ -22,14 +22,19 @@ import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
-import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
+import type { Agent5State, SprintDatePatch, SprintPlan } from '@/lib/types/agent-5';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
   addSprintToPlan,
   buildAgent6InputFromAgent4,
+  completeSprintInPlan,
   deleteEmptySprintFromPlan,
   normalizeSprintPlan,
+  startSprintInPlan,
+  updateSprintDates,
+  updateSprintGoal,
   withUpdatedSprintPlan,
+  type SprintCompleteRollover,
 } from '@/lib/utils/sprint-plan-mutations';
 import {
   getLiveBacklog,
@@ -625,6 +630,85 @@ export async function deleteSprintAcrossWorkspace(
   if (!nextPlan) {
     throw new Error(`No se puede eliminar ${sprintId}: el sprint no está vacío.`);
   }
+  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
+}
+
+export async function updateSprintAcrossWorkspace(
+  uid: string,
+  sprintId: string,
+  updates: { goal?: string; dates?: SprintDatePatch }
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const plan = resolveSprintPlan(workspace);
+  if (!plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  let nextPlan = normalizeSprintPlan(plan);
+  const sprint = nextPlan.sprints.find((item) => item.id === sprintId);
+  if (!sprint) {
+    throw new Error(`Sprint no encontrado: ${sprintId}`);
+  }
+  if (updates.goal !== undefined) {
+    nextPlan = updateSprintGoal(nextPlan, sprintId, updates.goal);
+  }
+  if (updates.dates && Object.keys(updates.dates).length > 0) {
+    nextPlan = updateSprintDates(nextPlan, sprintId, updates.dates);
+  }
+  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
+}
+
+export async function startSprintAcrossWorkspace(
+  uid: string,
+  sprintId: string
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const plan = resolveSprintPlan(workspace);
+  if (!plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  const nextPlan = startSprintInPlan(plan, sprintId);
+  let nextWorkspace = await updateSprintPlanAcrossWorkspace(uid, nextPlan);
+
+  if (nextWorkspace.execution?.initializedAt) {
+    nextWorkspace = await updateExecutionSprintFilter(uid, sprintId);
+  }
+  return nextWorkspace;
+}
+
+export async function completeSprintAcrossWorkspace(
+  uid: string,
+  sprintId: string,
+  rollover: SprintCompleteRollover = 'backlog'
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const plan = resolveSprintPlan(workspace);
+  if (!plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  const normalized = normalizeSprintPlan(plan);
+  const sprint = normalized.sprints.find((item) => item.id === sprintId);
+  if (!sprint) {
+    throw new Error(`Sprint no encontrado: ${sprintId}`);
+  }
+
+  const { estimations } = getLiveBacklog(workspace);
+  const storyPointsById: Record<string, number> = {};
+  for (const storyId of sprint.storyIds) {
+    storyPointsById[storyId] = estimations[storyId]?.points ?? 0;
+  }
+
+  const incompleteStoryIds = sprint.storyIds.filter((storyId) => {
+    const status = workspace.execution?.stories[storyId]?.status ?? 'todo';
+    return status !== 'done';
+  });
+
+  const nextPlan = completeSprintInPlan(
+    normalized,
+    sprintId,
+    incompleteStoryIds,
+    storyPointsById,
+    rollover
+  );
   return updateSprintPlanAcrossWorkspace(uid, nextPlan);
 }
 

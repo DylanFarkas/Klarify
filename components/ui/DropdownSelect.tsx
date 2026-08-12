@@ -20,6 +20,9 @@ interface DropdownSelectProps {
   placeholder: string;
   disabled?: boolean;
   className?: string;
+  /** Compact trigger for dense tables / inline editors. */
+  size?: 'default' | 'compact';
+  'aria-label'?: string;
 }
 
 function computeListStyle(triggerRect: DOMRect) {
@@ -50,7 +53,10 @@ export function DropdownSelect({
   placeholder,
   disabled = false,
   className = '',
+  size = 'default',
+  'aria-label': ariaLabel,
 }: DropdownSelectProps) {
+  const isCompact = size === 'compact';
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [listStyle, setListStyle] = useState({
@@ -141,7 +147,8 @@ export function DropdownSelect({
                       setOpen(false);
                     }}
                     className={[
-                      'block w-full cursor-pointer px-3 py-2.5 text-left text-sm transition-colors',
+                      'block w-full cursor-pointer text-left transition-colors',
+                      isCompact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2.5 text-sm',
                       isSelected
                         ? 'bg-surface-hover text-foreground'
                         : 'text-foreground hover:bg-surface-hover',
@@ -164,6 +171,7 @@ export function DropdownSelect({
         id={id}
         type="button"
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -172,17 +180,22 @@ export function DropdownSelect({
           setOpen((current) => !current);
         }}
         className={[
-          'flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-left text-sm transition-colors cursor-pointer',
+          'flex w-full cursor-pointer items-center justify-between text-left transition-colors',
           'disabled:cursor-not-allowed disabled:opacity-50',
+          isCompact
+            ? 'gap-1 rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold'
+            : 'gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm',
           open ? 'border-border-strong' : 'hover:border-border',
           selectedLabel ? 'text-foreground' : 'text-muted',
         ].join(' ')}
       >
         <span className="min-w-0 truncate">{selectedLabel ?? placeholder}</span>
         <svg
-          className={['h-4 w-4 shrink-0 text-subtle transition-transform', open ? 'rotate-180' : ''].join(
-            ' '
-          )}
+          className={[
+            'shrink-0 text-subtle transition-transform',
+            isCompact ? 'h-3 w-3' : 'h-4 w-4',
+            open ? 'rotate-180' : '',
+          ].join(' ')}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

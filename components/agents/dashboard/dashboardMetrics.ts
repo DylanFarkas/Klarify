@@ -50,6 +50,7 @@ export interface DashboardMetrics {
 		title: string;
 		description: string;
 		storyCount: number;
+		doneCount: number;
 		points: number;
 		highPriorityCount: number;
 		mediumPriorityCount: number;
@@ -290,6 +291,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		const storyEntries = epic.userStories.map((story) => ({
 			priority: priorities[story.id],
 			points: estimations[story.id]?.points ?? 0,
+			done: (workspace.execution?.stories[story.id]?.status ?? 'todo') === 'done',
 		}));
 
 		return {
@@ -297,6 +299,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 			title: epic.title,
 			description: epic.description,
 			storyCount: epic.userStories.length,
+			doneCount: storyEntries.filter((entry) => entry.done).length,
 			points: storyEntries.reduce((sum, entry) => sum + entry.points, 0),
 			highPriorityCount: storyEntries.filter(
 				(entry) => entry.priority && getPriorityBucket(framework, entry.priority.category) === 'alta'
