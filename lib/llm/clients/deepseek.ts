@@ -40,6 +40,7 @@ export async function deepseekToolTurn(
     systemInstruction: string;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     tools: LlmToolDefinition[];
+    onThought?: (text: string) => void;
   }
 ): Promise<LlmToolLoopTurn> {
   return openAiSdkToolTurn(createDeepSeekClient(credentials.apiKey), credentials, params);

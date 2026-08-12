@@ -25,7 +25,7 @@ import type { ProjectSlotsInfo, ProjectSummary } from '@/lib/types/project';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { WorkspacePlanSnapshot } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
-import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
+import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
@@ -37,6 +37,14 @@ import {
   normalizeSprintPlan,
   withUpdatedSprintPlan,
 } from '@/lib/utils/sprint-plan-mutations';
+import {
+  withCreatedEpic,
+  withCreatedUserStory,
+  withDeletedEpic,
+  withDeletedUserStory,
+  withUpdatedEpic,
+  withUpdatedUserStory,
+} from '@/lib/utils/user-story-mutations';
 
 const SAVE_DEBOUNCE_MS = 500;
 const BULK_REORDER_DEBOUNCE_MS = 400;
@@ -882,22 +890,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       prioritizationUpdates?: Partial<StoryPrioritization>
     ) => {
       if (!user) return;
-      const response = await authFetch('/api/workspace', user, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'updateUserStory',
-          payload: { storyId, updates, estimationUpdates, prioritizationUpdates, ...options },
-        }),
+
+      let previous: UserWorkspace | null = null;
+      // Optimistic UI: la tabla se actualiza al instante; Firestore sigue en segundo plano.
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev
+          ? withUpdatedUserStory(
+              prev,
+              storyId,
+              updates,
+              estimationUpdates,
+              options,
+              prioritizationUpdates
+            )
+          : prev;
       });
 
-      if (!response.ok) {
-        throw new Error('No se pudo actualizar la historia de usuario');
-      }
+      try {
+        const response = await authFetch('/api/workspace', user, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'updateUserStory',
+            payload: { storyId, updates, estimationUpdates, prioritizationUpdates, ...options },
+          }),
+        });
 
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
+        if (!response.ok) {
+          throw new Error('No se pudo actualizar la historia de usuario');
+        }
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
       }
     },
     [user]
@@ -922,68 +947,150 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user, persistSprintPlan]
   );
 
-  const applyWorkspaceAction = useCallback(
-    async (action: string, payload: unknown, fallbackError: string) => {
-      if (!user) return;
+  const postWorkspaceAction = useCallback(
+    async <T,>(action: string, payload: unknown, fallbackError: string): Promise<T> => {
+      if (!user) throw new Error(fallbackError);
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, payload }),
       });
-      const data = (await response.json().catch(() => null)) as
-        | { workspace?: UserWorkspace; error?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
       if (!response.ok) {
         throw new Error(data?.error ?? fallbackError);
       }
-      if (data?.workspace) {
-        setWorkspace(data.workspace);
-      }
+      return (data ?? {}) as T;
     },
     [user]
   );
 
   const createUserStory = useCallback(
     async (input: CreateDashboardUserStoryInput) => {
-      await applyWorkspaceAction('createUserStory', input, 'No se pudo crear la historia de usuario');
+      if (!user) return;
+      const { storyId } = await postWorkspaceAction<{ storyId?: string }>(
+        'createUserStory',
+        input,
+        'No se pudo crear la historia de usuario'
+      );
+      if (!storyId) {
+        throw new Error('No se pudo crear la historia de usuario');
+      }
+      const story: UserStory = {
+        id: storyId,
+        title: input.title,
+        description: input.description,
+        acceptanceCriteria: input.acceptanceCriteria,
+        sourceWishIds: [],
+        source: 'manual',
+        isEdited: false,
+        createdAt: Date.now(),
+      };
+      setWorkspace((prev) =>
+        prev
+          ? withCreatedUserStory(prev, {
+              story,
+              epicId: input.epicId,
+              sprintId: input.sprintId,
+              estimation: {
+                points: input.points,
+                justification: 'Estimacion creada manualmente desde el dashboard.',
+                isModified: true,
+              },
+              prioritization: input.category
+                ? {
+                    category: input.category,
+                    justification: 'Priorizacion creada manualmente desde el dashboard.',
+                    isModified: true,
+                  }
+                : null,
+            })
+          : prev
+      );
     },
-    [applyWorkspaceAction]
+    [postWorkspaceAction, user]
   );
 
   const deleteUserStory = useCallback(
     async (storyId: string) => {
-      await applyWorkspaceAction(
-        'deleteUserStory',
-        { storyId },
-        'No se pudo eliminar la historia de usuario'
-      );
+      if (!user) return;
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withDeletedUserStory(prev, storyId) : prev;
+      });
+      try {
+        await postWorkspaceAction('deleteUserStory', { storyId }, 'No se pudo eliminar la historia de usuario');
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
+      }
     },
-    [applyWorkspaceAction]
+    [postWorkspaceAction, user]
   );
 
   const createEpic = useCallback(
     async (input: { title: string; description: string }) => {
-      await applyWorkspaceAction('createEpic', input, 'No se pudo crear la épica');
+      if (!user) return;
+      const { epicId } = await postWorkspaceAction<{ epicId?: string }>(
+        'createEpic',
+        input,
+        'No se pudo crear la épica'
+      );
+      if (!epicId) {
+        throw new Error('No se pudo crear la épica');
+      }
+      const epic: Epic = {
+        id: epicId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        userStories: [],
+        source: 'manual',
+        isEdited: false,
+        createdAt: Date.now(),
+      };
+      setWorkspace((prev) => (prev ? withCreatedEpic(prev, epic) : prev));
     },
-    [applyWorkspaceAction]
+    [postWorkspaceAction, user]
   );
 
   const updateEpic = useCallback(
     async (epicId: string, updates: { title?: string; description?: string }) => {
-      await applyWorkspaceAction(
-        'updateEpic',
-        { epicId, ...updates },
-        'No se pudo actualizar la épica'
-      );
+      if (!user) return;
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withUpdatedEpic(prev, epicId, updates) : prev;
+      });
+      try {
+        await postWorkspaceAction(
+          'updateEpic',
+          { epicId, ...updates },
+          'No se pudo actualizar la épica'
+        );
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
+      }
     },
-    [applyWorkspaceAction]
+    [postWorkspaceAction, user]
   );
 
   const deleteEpic = useCallback(
     async (epicId: string) => {
-      await applyWorkspaceAction('deleteEpic', { epicId }, 'No se pudo eliminar la épica');
+      if (!user) return;
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withDeletedEpic(prev, epicId) : prev;
+      });
+      try {
+        await postWorkspaceAction('deleteEpic', { epicId }, 'No se pudo eliminar la épica');
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
+      }
     },
-    [applyWorkspaceAction]
+    [postWorkspaceAction, user]
   );
 
   const initializeExecution = useCallback(async () => {

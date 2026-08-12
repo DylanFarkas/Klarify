@@ -13,6 +13,7 @@ import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { RegenerationAgent } from '@/lib/plans/types';
 import {
   getProjectWorkspace,
+  loadActiveProjectWorkspace,
   projectDoc,
   readActiveProjectId,
 } from '@/lib/project-service';
@@ -24,14 +25,27 @@ import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
-  addStoryToSprintPlan,
-  adjustSprintVelocityForStoryPoints,
-  assignStoryToSprintInPlan,
+  addSprintToPlan,
   buildAgent6InputFromAgent4,
+  deleteEmptySprintFromPlan,
   normalizeSprintPlan,
-  removeStoryFromSprintPlan,
   withUpdatedSprintPlan,
 } from '@/lib/utils/sprint-plan-mutations';
+import {
+  getLiveBacklog,
+  isDashboardPhase,
+  nextLiveEpicId,
+  nextLiveStoryId,
+} from '@/lib/utils/live-backlog';
+import {
+  withCreatedEpic,
+  withCreatedUserStory,
+  withDeletedEpic,
+  withDeletedUserStory,
+  withUpdatedEpic,
+  withUpdatedUserStory,
+  type UpdateUserStoryOptions,
+} from '@/lib/utils/user-story-mutations';
 import { buildInitialExecutionState, createDefaultStoryExecution, syncExecutionStories } from '@/lib/board/board-utils';
 import { assertExecutionBoardAllowed, assertTeamMemberLimit } from '@/lib/plans/execution-guard';
 import type {
@@ -127,20 +141,20 @@ async function activeProject(uid: string): Promise<string> {
 async function loadProjectWorkspace(
   uid: string
 ): Promise<{ projectId: string; workspace: UserWorkspace }> {
-  const projectId = await readActiveProjectId(uid);
-  if (!projectId) {
+  const loaded = await loadActiveProjectWorkspace(uid);
+  if (!loaded) {
     throw new Error('NO_PROJECTS');
   }
-  const workspace = await getProjectWorkspace(uid, projectId);
-  return { projectId, workspace };
+  return loaded;
 }
 
 async function saveProjectWorkspace(
   uid: string,
   projectId: string,
-  workspacePartial: Record<string, unknown>
+  workspacePartial: Record<string, unknown>,
+  currentWorkspace?: UserWorkspace
 ): Promise<void> {
-  const current = await getProjectWorkspace(uid, projectId);
+  const current = currentWorkspace ?? (await getProjectWorkspace(uid, projectId));
   const partial = workspacePartial as Partial<UserWorkspace>;
   const nextWorkspace: UserWorkspace = {
     ...current,
@@ -179,215 +193,43 @@ async function resetAgentWithRegenerationCheck(
   await saveProjectWorkspace(uid, projectId, emptyState);
 }
 
-function updateStoryInEpics(
-  epics: Epic[] | null | undefined,
-  storyId: string,
-  updates: Partial<UserStory>
-): Epic[] | null | undefined {
-  if (!epics) return epics;
+export type { UpdateUserStoryOptions };
 
-  return epics.map((epic) => ({
-    ...epic,
-    userStories: epic.userStories.map((story) =>
-      story.id === storyId ? { ...story, ...updates, isEdited: true } : story
-    ),
-  }));
-}
-
-function addStoryToEpics(
-  epics: Epic[] | null | undefined,
-  epicId: string,
-  story: UserStory
-): Epic[] | null | undefined {
-  if (!epics) return epics;
-
-  return epics.map((epic) =>
-    epic.id === epicId
-      ? { ...epic, userStories: [...epic.userStories, story], isEdited: true }
-      : epic
-  );
-}
-
-function deleteStoryFromEpics(
-  epics: Epic[] | null | undefined,
-  storyId: string
-): Epic[] | null | undefined {
-  if (!epics) return epics;
-
-  return epics.map((epic) => ({
-    ...epic,
-    userStories: epic.userStories.filter((story) => story.id !== storyId),
-  }));
-}
-
-function updateStoryEstimation(
-  estimations: Record<string, StoryEstimation>,
-  storyId: string,
-  updates?: Partial<StoryEstimation>
-): Record<string, StoryEstimation> {
-  if (!updates) return estimations;
-
-  const current = estimations[storyId] ?? {
-    points: 0,
-    justification: '',
-    isModified: false,
-  };
-
-  return {
-    ...estimations,
-    [storyId]: {
-      ...current,
-      ...updates,
-      isModified: true,
-    },
-  };
-}
-
-function updateStoryPrioritization(
-  priorities: Record<string, StoryPrioritization>,
-  storyId: string,
-  updates?: Partial<StoryPrioritization>
-): Record<string, StoryPrioritization> {
-  if (!updates) return priorities;
-
-  const current = priorities[storyId] ?? {
-    category: 'must' as FrameworkCategory,
-    justification: '',
-    isModified: false,
-  };
-
-  return {
-    ...priorities,
-    [storyId]: {
-      ...current,
-      ...updates,
-      isModified: true,
-    },
-  };
-}
-
-function deleteRecordEntry<T>(record: Record<string, T>, key: string): Record<string, T> {
-  const next = { ...record };
-  delete next[key];
-  return next;
-}
-
-export interface UpdateUserStoryOptions {
-  epicId?: string;
-  sprintId?: string | null;
-}
-
-function moveStoryBetweenEpics(
-  epics: Epic[] | null | undefined,
-  storyId: string,
-  toEpicId: string
-): Epic[] | null | undefined {
-  if (!epics) return epics;
-
-  let story: UserStory | null = null;
-  const withoutStory = epics.map((epic) => {
-    const found = epic.userStories.find((s) => s.id === storyId);
-    if (found) story = found;
-    return {
-      ...epic,
-      userStories: epic.userStories.filter((s) => s.id !== storyId),
+async function persistBacklogMutation(
+  uid: string,
+  projectId: string,
+  previous: UserWorkspace,
+  updated: UserWorkspace
+): Promise<void> {
+  if (isDashboardPhase(previous)) {
+    const partial: Record<string, unknown> = {
+      pipeline: { agent6Input: sanitize(updated.pipeline.agent6Input) },
     };
-  });
-
-  if (!story) return epics;
-
-  return withoutStory.map((epic) =>
-    epic.id === toEpicId
-      ? { ...epic, userStories: [...epic.userStories, story!], isEdited: true }
-      : epic
-  );
-}
-
-
-function findStoryEpicId(epics: Epic[], storyId: string): string | null {
-  for (const epic of epics) {
-    if (epic.userStories.some((story) => story.id === storyId)) {
-      return epic.id;
+    if (updated.execution !== previous.execution) {
+      partial.execution = sanitize(updated.execution ?? null);
     }
+    await saveProjectWorkspace(uid, projectId, partial, previous);
+    return;
   }
-  return null;
-}
 
-function collectEpics(workspace: UserWorkspace): Epic[] {
-  return [
-    ...workspace.agent2.epics,
-    ...(workspace.agent3.input?.epics ?? []),
-    ...(workspace.agent4.input?.epics ?? []),
-    ...(workspace.agent5.input?.epics ?? []),
-    ...(workspace.pipeline.agent3Input?.epics ?? []),
-    ...(workspace.pipeline.agent4Input?.epics ?? []),
-    ...(workspace.pipeline.agent5Input?.epics ?? []),
-    ...(workspace.pipeline.agent6Input?.epics ?? []),
-  ];
-}
-
-function generateUserStoryId(workspace: UserWorkspace): string {
-  const maxId = collectEpics(workspace)
-    .flatMap((epic) => epic.userStories)
-    .reduce((max, story) => {
-      const match = story.id.match(/^HU-(\d+)$/i);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-
-  return `HU-${String(maxId + 1).padStart(3, '0')}`;
-}
-
-function generateEpicIdFromWorkspace(workspace: UserWorkspace): string {
-  const maxId = collectEpics(workspace).reduce((max, epic) => {
-    const match = epic.id.match(/^EPIC-(\d+)$/i);
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-
-  return `EPIC-${String(maxId + 1).padStart(3, '0')}`;
-}
-
-function transformEpicsInWorkspace(
-  workspace: UserWorkspace,
-  transform: (epics: Epic[]) => Epic[]
-): UserWorkspace {
-  const mapInputEpics = <T extends { epics: Epic[] } | null | undefined>(
-    input: T
-  ): T => {
-    if (!input) return input;
-    return { ...input, epics: transform(input.epics) };
-  };
-
-  return {
-    ...workspace,
-    agent2: {
-      ...workspace.agent2,
-      epics: transform(workspace.agent2.epics),
+  await saveProjectWorkspace(
+    uid,
+    projectId,
+    {
+      agent2: sanitize(updated.agent2),
+      agent3: sanitize(updated.agent3),
+      agent4: sanitize(updated.agent4),
+      agent5: sanitize(updated.agent5),
+      pipeline: sanitize(updated.pipeline),
+      ...(updated.execution ? { execution: sanitize(updated.execution) } : {}),
     },
-    agent3: {
-      ...workspace.agent3,
-      input: mapInputEpics(workspace.agent3.input),
-    },
-    agent4: {
-      ...workspace.agent4,
-      input: mapInputEpics(workspace.agent4.input),
-    },
-    agent5: {
-      ...workspace.agent5,
-      input: mapInputEpics(workspace.agent5.input),
-    },
-    pipeline: {
-      agent2Input: workspace.pipeline.agent2Input,
-      agent3Input: mapInputEpics(workspace.pipeline.agent3Input),
-      agent4Input: mapInputEpics(workspace.pipeline.agent4Input),
-      agent5Input: mapInputEpics(workspace.pipeline.agent5Input),
-      agent6Input: mapInputEpics(workspace.pipeline.agent6Input),
-    },
-  };
+    previous
+  );
 }
 
 async function assertCanCreateEpic(uid: string, workspace: UserWorkspace): Promise<void> {
   const plan = await resolveUserPlan(uid);
-  if (workspace.agent2.epics.length >= plan.limits.maxEpics) {
+  if (getLiveBacklog(workspace).epics.length >= plan.limits.maxEpics) {
     throw new PlanLimitError(
       `Tu plan ${plan.id} permite hasta ${plan.limits.maxEpics} épica(s).`,
       'PLAN_EPIC_LIMIT',
@@ -402,10 +244,8 @@ async function assertCanCreateStory(
   epicId: string
 ): Promise<void> {
   const plan = await resolveUserPlan(uid);
-  const totalStories = workspace.agent2.epics.reduce(
-    (sum, epic) => sum + epic.userStories.length,
-    0
-  );
+  const liveEpics = getLiveBacklog(workspace).epics;
+  const totalStories = liveEpics.reduce((sum, epic) => sum + epic.userStories.length, 0);
   if (totalStories >= plan.limits.maxStories) {
     throw new PlanLimitError(
       `Tu plan ${plan.id} permite hasta ${plan.limits.maxStories} historia(s).`,
@@ -414,7 +254,7 @@ async function assertCanCreateStory(
     );
   }
 
-  const epic = workspace.agent2.epics.find((item) => item.id === epicId);
+  const epic = liveEpics.find((item) => item.id === epicId);
   if (epic && epic.userStories.length >= plan.limits.maxStoriesPerEpic) {
     throw new PlanLimitError(
       `Tu plan ${plan.id} permite hasta ${plan.limits.maxStoriesPerEpic} historia(s) por épica.`,
@@ -465,7 +305,7 @@ async function saveExecutionState(
   }
   const workspace = ctx?.workspace ?? (await getProjectWorkspace(uid, projectId));
   const sanitized = sanitize(execution);
-  await saveProjectWorkspace(uid, projectId, { execution: sanitized });
+  await saveProjectWorkspace(uid, projectId, { execution: sanitized }, workspace);
   return { ...workspace, execution: sanitized };
 }
 
@@ -650,12 +490,15 @@ export async function updateExecutionSprintFilter(
 /** Lee el workspace del proyecto activo + preferencias y plan del usuario. */
 export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
   const snapshot = await ensureUserAccount(uid);
-  const projectId = await readActiveProjectId(uid, snapshot);
-  const plan = await resolveUserPlan(uid, snapshot);
   const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
   const preferences: WorkspacePreferences = {
     lastAgent: prefs?.lastAgent ?? '1',
   };
+
+  const [plan, loaded] = await Promise.all([
+    resolveUserPlan(uid, snapshot),
+    loadActiveProjectWorkspace(uid, snapshot),
+  ]);
   const planSnapshot = {
     id: plan.id,
     limits: plan.limits,
@@ -663,7 +506,7 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     subscription: plan.subscription,
   };
 
-  if (!projectId) {
+  if (!loaded) {
     return {
       workspace: createEmptyWorkspace(),
       preferences,
@@ -672,12 +515,10 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     };
   }
 
-  const workspace = await getProjectWorkspace(uid, projectId);
-
   return {
-    workspace,
+    workspace: loaded.workspace,
     preferences,
-    activeProjectId: projectId,
+    activeProjectId: loaded.projectId,
     plan: planSnapshot,
   };
 }
@@ -707,172 +548,17 @@ export async function updateUserStoryAcrossWorkspace(
   options?: UpdateUserStoryOptions,
   prioritizationUpdates?: Partial<StoryPrioritization>
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const epics = workspace.agent2.epics;
-  const currentEpicId = findStoryEpicId(epics, storyId);
-  const shouldMoveEpic = options?.epicId !== undefined && options.epicId !== currentEpicId;
-  const oldPoints =
-    workspace.agent5.input?.estimations[storyId]?.points ??
-    workspace.agent3.estimations[storyId]?.points ??
-    0;
-  const newPoints = estimationUpdates?.points ?? oldPoints;
-
-  let updatedPlan = workspace.agent5.plan;
-  if (updatedPlan) {
-    if (options?.sprintId !== undefined) {
-      updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newPoints);
-    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
-      updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldPoints, newPoints);
-    }
-  }
-
-  let updatedPipelinePlan = workspace.pipeline.agent6Input?.plan ?? null;
-  if (updatedPipelinePlan) {
-    if (options?.sprintId !== undefined) {
-      updatedPipelinePlan = assignStoryToSprintInPlan(
-        updatedPipelinePlan,
-        storyId,
-        options.sprintId,
-        newPoints
-      );
-    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
-      updatedPipelinePlan = adjustSprintVelocityForStoryPoints(
-        updatedPipelinePlan,
-        storyId,
-        oldPoints,
-        newPoints
-      );
-    }
-  }
-
-  const applyStoryUpdate = (sourceEpics: Epic[] | null | undefined) => {
-    if (!sourceEpics) return sourceEpics;
-    if (shouldMoveEpic && options?.epicId) {
-      const moved = moveStoryBetweenEpics(sourceEpics, storyId, options.epicId) ?? [];
-      return updateStoryInEpics(moved, storyId, updates);
-    }
-    return updateStoryInEpics(sourceEpics, storyId, updates);
-  };
-
-  const agent3Estimations = updateStoryEstimation(workspace.agent3.estimations, storyId, estimationUpdates);
-  const agent4Priorities = updateStoryPrioritization(
-    workspace.agent4.priorities,
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const updatedWorkspace = withUpdatedUserStory(
+    workspace,
     storyId,
+    updates,
+    estimationUpdates,
+    options,
     prioritizationUpdates
   );
-  const updatedWorkspace: UserWorkspace = {
-    ...workspace,
-    agent2: {
-      ...workspace.agent2,
-      epics: applyStoryUpdate(workspace.agent2.epics) ?? [],
-    },
-    agent3: {
-      ...workspace.agent3,
-      estimations: agent3Estimations,
-      input: workspace.agent3.input
-        ? {
-            ...workspace.agent3.input,
-            epics: applyStoryUpdate(workspace.agent3.input.epics) ?? [],
-          }
-        : null,
-    },
-    agent4: {
-      ...workspace.agent4,
-      priorities: agent4Priorities,
-      input: workspace.agent4.input
-        ? {
-            ...workspace.agent4.input,
-            epics: applyStoryUpdate(workspace.agent4.input.epics) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.agent4.input.estimations,
-              storyId,
-              estimationUpdates
-            ),
-          }
-        : null,
-    },
-    agent5: {
-      ...workspace.agent5,
-      plan: updatedPlan,
-      input: workspace.agent5.input
-        ? {
-            ...workspace.agent5.input,
-            epics: applyStoryUpdate(workspace.agent5.input.epics) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.agent5.input.estimations,
-              storyId,
-              estimationUpdates
-            ),
-            priorities: updateStoryPrioritization(
-              workspace.agent5.input.priorities,
-              storyId,
-              prioritizationUpdates
-            ),
-          }
-        : null,
-    },
-    pipeline: {
-      agent2Input: workspace.pipeline.agent2Input,
-      agent3Input: workspace.pipeline.agent3Input
-        ? {
-            ...workspace.pipeline.agent3Input,
-            epics: applyStoryUpdate(workspace.pipeline.agent3Input.epics) ?? [],
-          }
-        : null,
-      agent4Input: workspace.pipeline.agent4Input
-        ? {
-            ...workspace.pipeline.agent4Input,
-            epics: applyStoryUpdate(workspace.pipeline.agent4Input.epics) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent4Input.estimations,
-              storyId,
-              estimationUpdates
-            ),
-          }
-        : null,
-      agent5Input: workspace.pipeline.agent5Input
-        ? {
-            ...workspace.pipeline.agent5Input,
-            epics: applyStoryUpdate(workspace.pipeline.agent5Input.epics) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent5Input.estimations,
-              storyId,
-              estimationUpdates
-            ),
-            priorities: updateStoryPrioritization(
-              workspace.pipeline.agent5Input.priorities,
-              storyId,
-              prioritizationUpdates
-            ),
-          }
-        : null,
-      agent6Input: workspace.pipeline.agent6Input
-        ? {
-            ...workspace.pipeline.agent6Input,
-            epics: applyStoryUpdate(workspace.pipeline.agent6Input.epics) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent6Input.estimations,
-              storyId,
-              estimationUpdates
-            ),
-            priorities: updateStoryPrioritization(
-              workspace.pipeline.agent6Input.priorities,
-              storyId,
-              prioritizationUpdates
-            ),
-            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
-          }
-        : null,
-    },
-  };
 
-  await saveProjectWorkspace(uid, (await activeProject(uid)), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-  });
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
 
   return updatedWorkspace;
 }
@@ -881,28 +567,77 @@ export async function updateSprintPlanAcrossWorkspace(
   uid: string,
   plan: SprintPlan
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
   const normalizedPlan = normalizeSprintPlan(plan);
   const updatedWorkspace = withUpdatedSprintPlan(workspace, normalizedPlan);
 
-  await saveProjectWorkspace(uid, (await activeProject(uid)), {
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-  });
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
 
   return updatedWorkspace;
+}
+
+function resolveSprintPlan(workspace: UserWorkspace): SprintPlan | null {
+  return getLiveBacklog(workspace).plan;
+}
+
+export async function createSprintAcrossWorkspace(
+  uid: string,
+  input?: { goal?: string }
+): Promise<{ workspace: UserWorkspace; sprintId: string; sprintGoal: string }> {
+  const { workspace } = await getWorkspaceData(uid);
+  const plan = resolveSprintPlan(workspace);
+  if (!plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  const updatedPlan = addSprintToPlan(plan, input?.goal);
+  const created = updatedPlan.sprints.at(-1);
+  if (!created) {
+    throw new Error('No se pudo crear el sprint.');
+  }
+  const nextWorkspace = await updateSprintPlanAcrossWorkspace(uid, updatedPlan);
+  return {
+    workspace: nextWorkspace,
+    sprintId: created.id,
+    sprintGoal: created.sprintGoal,
+  };
+}
+
+export async function deleteSprintAcrossWorkspace(
+  uid: string,
+  sprintId: string
+): Promise<UserWorkspace> {
+  const { workspace } = await getWorkspaceData(uid);
+  const plan = resolveSprintPlan(workspace);
+  if (!plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  const normalized = normalizeSprintPlan(plan);
+  const sprint = normalized.sprints.find((item) => item.id === sprintId);
+  if (!sprint) {
+    throw new Error(`Sprint no encontrado: ${sprintId}`);
+  }
+  if (sprint.storyIds.length > 0) {
+    throw new Error(
+      `No se puede eliminar ${sprintId}: tiene ${sprint.storyIds.length} historia(s) asignada(s). Reasígnalas o déjalas sin sprint primero.`
+    );
+  }
+  const nextPlan = deleteEmptySprintFromPlan(normalized, sprintId);
+  if (!nextPlan) {
+    throw new Error(`No se puede eliminar ${sprintId}: el sprint no está vacío.`);
+  }
+  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
 }
 
 export async function createUserStoryAcrossWorkspace(
   uid: string,
   input: CreateUserStoryInput
-): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  if (!workspace.agent2.epics.some((epic) => epic.id === input.epicId)) {
+): Promise<{ workspace: UserWorkspace; storyId: string }> {
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  if (!getLiveBacklog(workspace).epics.some((epic) => epic.id === input.epicId)) {
     throw new Error(`Épica no encontrada: ${input.epicId}`);
   }
   await assertCanCreateStory(uid, workspace, input.epicId);
-  const storyId = generateUserStoryId(workspace);
+  const storyId = nextLiveStoryId(workspace);
   const story: UserStory = {
     id: storyId,
     title: input.title,
@@ -925,266 +660,38 @@ export async function createUserStoryAcrossWorkspace(
         isModified: true,
       }
     : null;
-  const updatedAgent5Plan = workspace.agent5.plan
-    ? addStoryToSprintPlan(workspace.agent5.plan, storyId, input.sprintId, input.points)
-    : null;
-  const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
-    ? addStoryToSprintPlan(
-        workspace.pipeline.agent6Input.plan,
-        storyId,
-        input.sprintId,
-        input.points
-      )
-    : null;
-  const updatedWorkspace: UserWorkspace = {
-    ...workspace,
-    agent2: {
-      ...workspace.agent2,
-      epics: addStoryToEpics(workspace.agent2.epics, input.epicId, story) ?? [],
-    },
-    agent3: {
-      ...workspace.agent3,
-      estimations: updateStoryEstimation(workspace.agent3.estimations, storyId, estimation),
-      input: workspace.agent3.input
-        ? {
-            ...workspace.agent3.input,
-            epics: addStoryToEpics(workspace.agent3.input.epics, input.epicId, story) ?? [],
-          }
-        : null,
-    },
-    agent4: {
-      ...workspace.agent4,
-      priorities: prioritization
-        ? updateStoryPrioritization(workspace.agent4.priorities, storyId, prioritization)
-        : workspace.agent4.priorities,
-      input: workspace.agent4.input
-        ? {
-            ...workspace.agent4.input,
-            epics: addStoryToEpics(workspace.agent4.input.epics, input.epicId, story) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.agent4.input.estimations,
-              storyId,
-              estimation
-            ),
-          }
-        : null,
-    },
-    agent5: {
-      ...workspace.agent5,
-      plan: updatedAgent5Plan,
-      input: workspace.agent5.input
-        ? {
-            ...workspace.agent5.input,
-            epics: addStoryToEpics(workspace.agent5.input.epics, input.epicId, story) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.agent5.input.estimations,
-              storyId,
-              estimation
-            ),
-            priorities: prioritization
-              ? updateStoryPrioritization(workspace.agent5.input.priorities, storyId, prioritization)
-              : workspace.agent5.input.priorities,
-          }
-        : null,
-    },
-    pipeline: {
-      agent2Input: workspace.pipeline.agent2Input,
-      agent3Input: workspace.pipeline.agent3Input
-        ? {
-            ...workspace.pipeline.agent3Input,
-            epics: addStoryToEpics(workspace.pipeline.agent3Input.epics, input.epicId, story) ?? [],
-          }
-        : null,
-      agent4Input: workspace.pipeline.agent4Input
-        ? {
-            ...workspace.pipeline.agent4Input,
-            epics: addStoryToEpics(workspace.pipeline.agent4Input.epics, input.epicId, story) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent4Input.estimations,
-              storyId,
-              estimation
-            ),
-          }
-        : null,
-      agent5Input: workspace.pipeline.agent5Input
-        ? {
-            ...workspace.pipeline.agent5Input,
-            epics: addStoryToEpics(workspace.pipeline.agent5Input.epics, input.epicId, story) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent5Input.estimations,
-              storyId,
-              estimation
-            ),
-            priorities: prioritization
-              ? updateStoryPrioritization(
-                  workspace.pipeline.agent5Input.priorities,
-                  storyId,
-                  prioritization
-                )
-              : workspace.pipeline.agent5Input.priorities,
-          }
-        : null,
-      agent6Input: workspace.pipeline.agent6Input
-        ? {
-            ...workspace.pipeline.agent6Input,
-            epics: addStoryToEpics(workspace.pipeline.agent6Input.epics, input.epicId, story) ?? [],
-            estimations: updateStoryEstimation(
-              workspace.pipeline.agent6Input.estimations,
-              storyId,
-              estimation
-            ),
-            priorities: prioritization
-              ? updateStoryPrioritization(
-                  workspace.pipeline.agent6Input.priorities,
-                  storyId,
-                  prioritization
-                )
-              : workspace.pipeline.agent6Input.priorities,
-            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
-          }
-        : null,
-    },
-    execution: workspace.execution
-      ? {
-          ...workspace.execution,
-          stories: {
-            ...workspace.execution.stories,
-            [storyId]: createDefaultStoryExecution(
-              Object.keys(workspace.execution.stories).length
-            ),
-          },
-        }
-      : workspace.execution,
-  };
-
-  await saveProjectWorkspace(uid, (await activeProject(uid)), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-    ...(updatedWorkspace.execution ? { execution: sanitize(updatedWorkspace.execution) } : {}),
+  const updatedWorkspace = withCreatedUserStory(workspace, {
+    story,
+    epicId: input.epicId,
+    sprintId: input.sprintId,
+    estimation,
+    prioritization,
   });
 
-  return updatedWorkspace;
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
+
+  return { workspace: updatedWorkspace, storyId };
 }
 
 export async function deleteUserStoryAcrossWorkspace(
   uid: string,
   storyId: string
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const storyPoints =
-    workspace.agent5.input?.estimations[storyId]?.points ??
-    workspace.agent3.estimations[storyId]?.points ??
-    0;
-  const updatedAgent5Plan = workspace.agent5.plan
-    ? removeStoryFromSprintPlan(workspace.agent5.plan, storyId, storyPoints)
-    : null;
-  const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
-    ? removeStoryFromSprintPlan(workspace.pipeline.agent6Input.plan, storyId, storyPoints)
-    : null;
-  const updatedWorkspace: UserWorkspace = {
-    ...workspace,
-    agent2: {
-      ...workspace.agent2,
-      epics: deleteStoryFromEpics(workspace.agent2.epics, storyId) ?? [],
-    },
-    agent3: {
-      ...workspace.agent3,
-      estimations: deleteRecordEntry(workspace.agent3.estimations, storyId),
-      input: workspace.agent3.input
-        ? {
-            ...workspace.agent3.input,
-            epics: deleteStoryFromEpics(workspace.agent3.input.epics, storyId) ?? [],
-          }
-        : null,
-    },
-    agent4: {
-      ...workspace.agent4,
-      priorities: deleteRecordEntry(workspace.agent4.priorities, storyId),
-      input: workspace.agent4.input
-        ? {
-            ...workspace.agent4.input,
-            epics: deleteStoryFromEpics(workspace.agent4.input.epics, storyId) ?? [],
-            estimations: deleteRecordEntry(workspace.agent4.input.estimations, storyId),
-          }
-        : null,
-    },
-    agent5: {
-      ...workspace.agent5,
-      plan: updatedAgent5Plan,
-      input: workspace.agent5.input
-        ? {
-            ...workspace.agent5.input,
-            epics: deleteStoryFromEpics(workspace.agent5.input.epics, storyId) ?? [],
-            estimations: deleteRecordEntry(workspace.agent5.input.estimations, storyId),
-            priorities: deleteRecordEntry(workspace.agent5.input.priorities, storyId),
-          }
-        : null,
-    },
-    pipeline: {
-      agent2Input: workspace.pipeline.agent2Input,
-      agent3Input: workspace.pipeline.agent3Input
-        ? {
-            ...workspace.pipeline.agent3Input,
-            epics: deleteStoryFromEpics(workspace.pipeline.agent3Input.epics, storyId) ?? [],
-          }
-        : null,
-      agent4Input: workspace.pipeline.agent4Input
-        ? {
-            ...workspace.pipeline.agent4Input,
-            epics: deleteStoryFromEpics(workspace.pipeline.agent4Input.epics, storyId) ?? [],
-            estimations: deleteRecordEntry(workspace.pipeline.agent4Input.estimations, storyId),
-          }
-        : null,
-      agent5Input: workspace.pipeline.agent5Input
-        ? {
-            ...workspace.pipeline.agent5Input,
-            epics: deleteStoryFromEpics(workspace.pipeline.agent5Input.epics, storyId) ?? [],
-            estimations: deleteRecordEntry(workspace.pipeline.agent5Input.estimations, storyId),
-            priorities: deleteRecordEntry(workspace.pipeline.agent5Input.priorities, storyId),
-          }
-        : null,
-      agent6Input: workspace.pipeline.agent6Input
-        ? {
-            ...workspace.pipeline.agent6Input,
-            epics: deleteStoryFromEpics(workspace.pipeline.agent6Input.epics, storyId) ?? [],
-            estimations: deleteRecordEntry(workspace.pipeline.agent6Input.estimations, storyId),
-            priorities: deleteRecordEntry(workspace.pipeline.agent6Input.priorities, storyId),
-            plan: updatedPipelinePlan ?? workspace.pipeline.agent6Input.plan,
-          }
-        : null,
-    },
-    execution: workspace.execution
-      ? {
-          ...workspace.execution,
-          stories: deleteRecordEntry(workspace.execution.stories, storyId),
-        }
-      : workspace.execution,
-  };
-
-  await saveProjectWorkspace(uid, (await activeProject(uid)), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-    ...(updatedWorkspace.execution ? { execution: sanitize(updatedWorkspace.execution) } : {}),
-  });
-
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const updatedWorkspace = withDeletedUserStory(workspace, storyId);
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return updatedWorkspace;
 }
 
 export async function createEpicAcrossWorkspace(
   uid: string,
   input: CreateEpicInput
-): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
+): Promise<{ workspace: UserWorkspace; epicId: string }> {
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
   await assertCanCreateEpic(uid, workspace);
 
   const epic: Epic = {
-    id: generateEpicIdFromWorkspace(workspace),
+    id: nextLiveEpicId(workspace),
     title: input.title.trim(),
     description: input.description.trim(),
     userStories: [],
@@ -1193,17 +700,9 @@ export async function createEpicAcrossWorkspace(
     createdAt: Date.now(),
   };
 
-  const updatedWorkspace = transformEpicsInWorkspace(workspace, (epics) => [...epics, epic]);
-
-  await saveProjectWorkspace(uid, await activeProject(uid), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-  });
-
-  return updatedWorkspace;
+  const updatedWorkspace = withCreatedEpic(workspace, epic);
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
+  return { workspace: updatedWorkspace, epicId: epic.id };
 }
 
 export async function updateEpicAcrossWorkspace(
@@ -1211,35 +710,14 @@ export async function updateEpicAcrossWorkspace(
   epicId: string,
   updates: UpdateEpicInput
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const exists = workspace.agent2.epics.some((epic) => epic.id === epicId);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const exists = getLiveBacklog(workspace).epics.some((epic) => epic.id === epicId);
   if (!exists) {
     throw new Error(`Épica no encontrada: ${epicId}`);
   }
 
-  const updatedWorkspace = transformEpicsInWorkspace(workspace, (epics) =>
-    epics.map((epic) =>
-      epic.id === epicId
-        ? {
-            ...epic,
-            ...(updates.title !== undefined ? { title: updates.title.trim() } : {}),
-            ...(updates.description !== undefined
-              ? { description: updates.description.trim() }
-              : {}),
-            isEdited: true,
-          }
-        : epic
-    )
-  );
-
-  await saveProjectWorkspace(uid, await activeProject(uid), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-  });
-
+  const updatedWorkspace = withUpdatedEpic(workspace, epicId, updates);
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return updatedWorkspace;
 }
 
@@ -1247,32 +725,14 @@ export async function deleteEpicAcrossWorkspace(
   uid: string,
   epicId: string
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const target = workspace.agent2.epics.find((epic) => epic.id === epicId);
+  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const target = getLiveBacklog(workspace).epics.find((epic) => epic.id === epicId);
   if (!target) {
     throw new Error(`Épica no encontrada: ${epicId}`);
   }
 
-  const storyIds = target.userStories.map((story) => story.id);
-
-  for (const storyId of storyIds) {
-    await deleteUserStoryAcrossWorkspace(uid, storyId);
-  }
-
-  // Recargar por si deleteUserStory cambió el estado; luego quitar la épica vacía.
-  const { workspace: latest } = await getWorkspaceData(uid);
-  const updatedWorkspace = transformEpicsInWorkspace(latest, (epics) =>
-    epics.filter((epic) => epic.id !== epicId)
-  );
-
-  await saveProjectWorkspace(uid, await activeProject(uid), {
-    agent2: sanitize(updatedWorkspace.agent2),
-    agent3: sanitize(updatedWorkspace.agent3),
-    agent4: sanitize(updatedWorkspace.agent4),
-    agent5: sanitize(updatedWorkspace.agent5),
-    pipeline: sanitize(updatedWorkspace.pipeline),
-  });
-
+  const updatedWorkspace = withDeletedEpic(workspace, epicId);
+  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return updatedWorkspace;
 }
 

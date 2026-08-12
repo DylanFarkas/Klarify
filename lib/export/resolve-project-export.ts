@@ -10,7 +10,7 @@ import type { Epic } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan, StoryDependency, PlannedSprint } from '@/lib/types/agent-5';
-import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { getLiveBacklog } from '@/lib/utils/live-backlog';
 import type { ProjectExportPayload, ProjectExportStoryRow } from '@/lib/export/types';
 
 const KANBAN_LABELS = Object.fromEntries(
@@ -18,52 +18,23 @@ const KANBAN_LABELS = Object.fromEntries(
 ) as Record<string, string>;
 
 function resolveEpics(workspace: UserWorkspace): Epic[] {
-  return (
-    workspace.agent5.input?.epics ??
-    workspace.pipeline.agent6Input?.epics ??
-    workspace.pipeline.agent5Input?.epics ??
-    workspace.agent4.input?.epics ??
-    workspace.pipeline.agent4Input?.epics ??
-    workspace.agent3.input?.epics ??
-    workspace.pipeline.agent3Input?.epics ??
-    workspace.agent2.epics ??
-    []
-  );
+  return getLiveBacklog(workspace).epics;
 }
 
 function resolveEstimations(workspace: UserWorkspace): Record<string, StoryEstimation> {
-  return (
-    workspace.agent5.input?.estimations ??
-    workspace.pipeline.agent6Input?.estimations ??
-    workspace.pipeline.agent5Input?.estimations ??
-    workspace.agent3.estimations ??
-    {}
-  );
+  return getLiveBacklog(workspace).estimations;
 }
 
 function resolvePriorities(workspace: UserWorkspace): Record<string, StoryPrioritization> {
-  return (
-    workspace.agent5.input?.priorities ??
-    workspace.pipeline.agent6Input?.priorities ??
-    workspace.pipeline.agent5Input?.priorities ??
-    workspace.agent4.priorities ??
-    {}
-  );
+  return getLiveBacklog(workspace).priorities;
 }
 
 function resolveFramework(workspace: UserWorkspace): PrioritizationFramework | null {
-  return (
-    workspace.agent5.input?.framework ??
-    workspace.pipeline.agent6Input?.framework ??
-    workspace.pipeline.agent5Input?.framework ??
-    workspace.agent4.framework ??
-    null
-  );
+  return getLiveBacklog(workspace).framework;
 }
 
 function resolvePlan(workspace: UserWorkspace): SprintPlan | null {
-  const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
-  return plan ? normalizeSprintPlan(plan) : null;
+  return getLiveBacklog(workspace).plan;
 }
 
 function resolveDependencies(plan: SprintPlan | null): StoryDependency[] {

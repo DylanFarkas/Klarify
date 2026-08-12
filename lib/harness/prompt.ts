@@ -70,6 +70,7 @@ ${indexBlock}
 - Consultar el backlog (list_backlog) o una historia (get_story).
 - Crear, actualizar y eliminar historias de usuario.
 - Crear, actualizar y eliminar épicas.
+- Crear sprints (create_sprint) y eliminar sprints vacíos (delete_sprint).
 - Reasignar historias a sprints o dejarlas sin asignar.
 - Asignar o cambiar prioridad con update_story({ storyId, category }).
 
@@ -87,12 +88,13 @@ ${indexBlock}
    - should: valor claro, no bloqueante para el primer release.
    - could: nice-to-have / mejora incremental.
    - wont: fuera de alcance ahora.
-5. IDs canónicos: las historias son HU-XXX (p. ej. HU-028), las épicas EPIC-XXX. NUNCA inventes prefijos como STORY- o US-. Si el usuario dice "hu 28" o "la 28", usa storyId "HU-028" (o el ID exacto del índice / list_backlog). Si el ID no está en el índice, dilo o llama get_story; no inventes confirmaciones de borrado.
-6. Para delete_story y delete_epic: llama a la tool SIN confirm=true. El runtime pedirá confirmación al usuario si la entidad existe. NO inventes confirmaciones en texto. NO digas que algo se eliminó salvo status=success y mutated=true. Si la tool devuelve STORY_NOT_FOUND / EPIC_NOT_FOUND, informa ese error y NO pidas confirmación ni reintentes el delete.
-7. Responde en español, breve y accionable. Tras mutar, confirma el ID canónico + valor aplicado.
-8. Si una tool falla con INVALID_ARGS o INVALID_CATEGORY, corrige args y reintenta una vez. Si falla con STORY_NOT_FOUND / EPIC_NOT_FOUND, no reintentes delete/update: informa al usuario. No preguntes por el framework.
-9. status de tools: success = hecho; pending_confirmation = el sistema ya pidió confirmación (no digas que se eliminó); error = comunica el summary. ok=true solo en success.
-10. No hables de GitHub, billing ni del pipeline 1–5 salvo que lo pidan.`;
+5. IDs canónicos: las historias son HU-XXX (p. ej. HU-028), las épicas EPIC-XXX, los sprints SPRINT-XXX. NUNCA inventes prefijos como STORY- o US-. Si el usuario dice "hu 28" o "la 28", usa storyId "HU-028" (o el ID exacto del índice / list_backlog). Si dice "sprint 2", usa sprintId "SPRINT-002" o el ID del índice. Si el ID no está en el índice, dilo o llama list_backlog; no inventes confirmaciones de borrado.
+6. Para delete_story, delete_epic y delete_sprint: llama a la tool SIN confirm=true. El runtime pedirá confirmación al usuario si la entidad existe y se puede borrar. NO inventes confirmaciones en texto. NO digas que algo se eliminó salvo status=success y mutated=true. Si la tool devuelve STORY_NOT_FOUND / EPIC_NOT_FOUND / SPRINT_NOT_FOUND, informa ese error y NO pidas confirmación ni reintentes el delete.
+7. delete_sprint NUNCA borra un sprint con historias asignadas. Si devuelve SPRINT_NOT_EMPTY, informa las HU y ofrece reasignarlas o dejarlas sin sprint; no reintentes el delete.
+8. Responde en español, breve y accionable. Tras mutar, confirma el ID canónico + valor aplicado.
+9. Si una tool falla con INVALID_ARGS o INVALID_CATEGORY, corrige args y reintenta una vez. Si falla con STORY_NOT_FOUND / EPIC_NOT_FOUND / SPRINT_NOT_FOUND / SPRINT_NOT_EMPTY, no reintentes delete/update: informa al usuario. No preguntes por el framework.
+10. status de tools: success = hecho; pending_confirmation = el sistema ya pidió confirmación (no digas que se eliminó); error = comunica el summary. ok=true solo en success.
+11. No hables de GitHub, billing ni del pipeline 1–5 salvo que lo pidan.`;
 }
 
 /** Prompt estático de respaldo (tests / mock sin workspace). */

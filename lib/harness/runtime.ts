@@ -179,6 +179,9 @@ async function runProviderHarnessTurn(
       historyMessages,
       tools: HARNESS_TOOL_DECLARATIONS,
       maxIterations: HARNESS_MAX_TOOL_ITERATIONS,
+      onThought: (text) => {
+        if (text) onEvent({ type: 'thought', text, delta: true });
+      },
       executeTool: async (name, args) => {
         onEvent({ type: 'tool_start', name, args });
         onEvent({ type: 'thought', text: `Ejecutando ${name}…` });

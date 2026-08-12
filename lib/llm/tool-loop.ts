@@ -33,6 +33,7 @@ export interface ToolLoopParams {
   tools: LlmToolDefinition[];
   maxIterations: number;
   executeTool: ToolExecutor;
+  onThought?: (text: string) => void;
   onToolStart?: (name: string, args: Record<string, unknown>) => void;
   onToolEnd?: (name: string, summary: string, payload: Record<string, unknown>) => void;
   /** Si true, detiene el loop tras tools (p. ej. confirmación). */
@@ -63,6 +64,7 @@ async function runOpenAiProtocolLoop(
       systemInstruction: params.systemInstruction,
       messages,
       tools: params.tools,
+      onThought: params.onThought,
     });
 
     if (!turn.toolCalls.length) {
@@ -127,6 +129,7 @@ async function runGeminiLoop(
       systemInstruction: params.systemInstruction,
       contents,
       tools: params.tools,
+      onThought: params.onThought,
     });
 
     if (!turn.toolCalls.length) {

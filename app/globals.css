@@ -1470,6 +1470,237 @@ html[data-agent-theme="light"] .workspace-grid__star::after,
   color: var(--foreground);
 }
 
+.harness-thought {
+  min-width: 0;
+}
+
+.harness-thought__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--foreground-subtle);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+}
+
+.harness-thought__header:not(:disabled) {
+  cursor: pointer;
+}
+
+.harness-thought__header:not(:disabled):hover {
+  color: var(--foreground-muted);
+}
+
+.harness-thought__header:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+
+.harness-thought__pulse {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
+  animation: harness-thought-pulse 1.6s ease-out infinite;
+}
+
+.harness-thought__hint {
+  color: var(--foreground-subtle);
+  opacity: 0.7;
+}
+
+.harness-thought__dots {
+  display: inline-flex;
+  gap: 0.18rem;
+  margin-left: 0.1rem;
+}
+
+.harness-thought__dots span {
+  width: 0.2rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: var(--foreground-subtle);
+  animation: harness-thought-dot 1.1s ease-in-out infinite;
+}
+
+.harness-thought__dots span:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.harness-thought__dots span:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+.harness-thought__reel {
+  max-height: 4.5rem;
+  margin-top: 0.4rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 6px), #000);
+}
+
+.harness-thought--live .harness-thought__reel {
+  max-height: 7.75rem;
+}
+
+.harness-thought__reel::-webkit-scrollbar {
+  display: none;
+}
+
+.harness-thought:not(.harness-thought--live) .harness-thought__reel {
+  max-height: 6.5rem;
+  mask-image: none;
+}
+
+.harness-thought__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.harness-thought__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.55rem minmax(0, 1fr);
+  gap: 0.45rem;
+  padding: 0.08rem 0;
+  color: var(--foreground-subtle);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.harness-thought__step--current {
+  color: var(--foreground-muted);
+}
+
+.harness-thought__step--error {
+  color: var(--danger);
+}
+
+.harness-thought__step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 0.72rem;
+  bottom: -0.08rem;
+  left: 0.1rem;
+  width: 1px;
+  background: var(--border);
+}
+
+.harness-thought__mark {
+  z-index: 1;
+  display: block;
+  width: 0.28rem;
+  height: 0.28rem;
+  margin-top: 0.42rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.harness-thought__step--current .harness-thought__mark {
+  background: var(--primary);
+}
+
+.harness-thought__copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.harness-thought__step--reasoning .harness-thought__copy {
+  white-space: pre-wrap;
+  color: var(--foreground-muted);
+}
+
+.harness-thought__caret {
+  display: inline-block;
+  width: 0.08em;
+  height: 0.85em;
+  margin-left: 0.18em;
+  background: currentColor;
+  vertical-align: -0.08em;
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes harness-thought-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.35rem color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+
+@keyframes harness-thought-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.28;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.thought-md-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.thought-md-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+  line-height: 1.4;
+}
+
+.thought-md-table th,
+.thought-md-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.thought-md-table th {
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
+.thought-md-table td {
+  color: var(--foreground-muted);
+}
+
+.thought-md-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.thought-md-table-wrap--compact th,
+.thought-md-table-wrap--compact td {
+  padding: 0.28rem 0.45rem;
+}
+
 @media (max-width: 767px) {
   .harness-dock:not(.harness-dock--collapsed) {
     position: fixed;
@@ -1501,7 +1732,10 @@ html[data-agent-theme="light"] .workspace-grid__star::after,
 @media (prefers-reduced-motion: reduce) {
   .harness-chat__msg,
   .harness-dock,
-  .harness-fab {
+  .harness-fab,
+  .harness-thought__pulse,
+  .harness-thought__dots span,
+  .harness-thought__caret {
     animation: none;
     transition: none;
   }

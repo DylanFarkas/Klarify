@@ -15,13 +15,16 @@ import {
 } from '@/lib/harness/priority';
 import {
   createEpicAcrossWorkspace,
+  createSprintAcrossWorkspace,
   createUserStoryAcrossWorkspace,
   deleteEpicAcrossWorkspace,
+  deleteSprintAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   getWorkspaceData,
   updateEpicAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
 } from '@/lib/workspace-service';
+import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
 
 export interface HarnessToolContext {
   uid: string;
@@ -61,7 +64,7 @@ function toolNeedsConfirmation(
 
 /** Índice compacto de IDs reales para inyectar en el system prompt. */
 export function buildBacklogIndex(workspace: UserWorkspace): string {
-  const epics = workspace.agent2.epics;
+  const { epics, plan } = getLiveBacklog(workspace);
   if (epics.length === 0) {
     return 'Backlog vacío: no hay épicas ni historias.';
   }
@@ -79,9 +82,22 @@ export function buildBacklogIndex(workspace: UserWorkspace): string {
     return `- ${epic.id} «${truncate(epic.title)}»: ${stories}`;
   });
 
+  const sprintLines =
+    !plan || plan.sprints.length === 0
+      ? ['- (sin sprints)']
+      : plan.sprints.map((sprint) => {
+          const stories =
+            sprint.storyIds.length === 0
+              ? 'vacío'
+              : `${sprint.storyIds.length} HU: ${sprint.storyIds.join(', ')}`;
+          return `- ${sprint.id} «${truncate(sprint.sprintGoal)}» (${stories})`;
+        });
+
   return [
     `Épicas: ${epics.length}. Historias: ${epics.reduce((n, e) => n + e.userStories.length, 0)}.`,
     ...epicLines,
+    `Sprints: ${plan?.sprints.length ?? 0}.`,
+    ...sprintLines,
   ].join('\n');
 }
 
@@ -132,9 +148,7 @@ function extractEntityNumber(raw: string): number | null {
 }
 
 function listStories(workspace: UserWorkspace) {
-  return workspace.agent2.epics.flatMap((epic) =>
-    epic.userStories.map((story) => ({ ...story, epicId: epic.id }))
-  );
+  return listLiveStories(workspace);
 }
 
 /**
@@ -183,7 +197,7 @@ function resolveEpicId(
   workspace: UserWorkspace,
   rawId: string
 ): { ok: true; epicId: string; title: string; storyCount: number } | { ok: false; summary: string } {
-  const epics = workspace.agent2.epics;
+  const epics = getLiveBacklog(workspace).epics;
   const exact = epics.find((e) => e.id.toLowerCase() === rawId.toLowerCase());
   if (exact) {
     return {
@@ -221,8 +235,79 @@ function resolveEpicId(
   };
 }
 
+function resolveSprintId(
+  workspace: UserWorkspace,
+  rawId: string
+):
+  | {
+      ok: true;
+      sprintId: string;
+      number: number;
+      goal: string;
+      storyCount: number;
+      storyIds: string[];
+    }
+  | { ok: false; summary: string } {
+  const plan = getLiveBacklog(workspace).plan;
+  if (!plan) {
+    return { ok: false, summary: 'No hay plan de sprints.' };
+  }
+
+  const exact = plan.sprints.find((sprint) => sprint.id.toLowerCase() === rawId.toLowerCase());
+  if (exact) {
+    return {
+      ok: true,
+      sprintId: exact.id,
+      number: exact.number,
+      goal: exact.sprintGoal,
+      storyCount: exact.storyIds.length,
+      storyIds: exact.storyIds,
+    };
+  }
+
+  const sprintNumMatch = rawId.trim().match(/^(?:SPRINT|SP)?[\s_-]*0*(\d+)$/i);
+  if (sprintNumMatch) {
+    const n = Number(sprintNumMatch[1]);
+    const byNumber = plan.sprints.filter((sprint) => sprint.number === n);
+    if (byNumber.length === 1) {
+      const match = byNumber[0];
+      return {
+        ok: true,
+        sprintId: match.id,
+        number: match.number,
+        goal: match.sprintGoal,
+        storyCount: match.storyIds.length,
+        storyIds: match.storyIds,
+      };
+    }
+    const byId = plan.sprints.filter((sprint) => {
+      const idMatch = sprint.id.match(/^SPRINT-0*(\d+)$/i);
+      return idMatch && Number(idMatch[1]) === n;
+    });
+    if (byId.length === 1) {
+      const match = byId[0];
+      return {
+        ok: true,
+        sprintId: match.id,
+        number: match.number,
+        goal: match.sprintGoal,
+        storyCount: match.storyIds.length,
+        storyIds: match.storyIds,
+      };
+    }
+  }
+
+  const displayId = sprintNumMatch
+    ? `SPRINT-${String(Number(sprintNumMatch[1])).padStart(3, '0')}`
+    : rawId.trim();
+  return {
+    ok: false,
+    summary: `No encontré el ${displayId}.`,
+  };
+}
+
 function findSprintIdForStory(workspace: UserWorkspace, storyId: string): string | null {
-  const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
+  const plan = getLiveBacklog(workspace).plan;
   if (!plan) return null;
   for (const sprint of plan.sprints) {
     if (sprint.storyIds.includes(storyId)) return sprint.id;
@@ -232,17 +317,12 @@ function findSprintIdForStory(workspace: UserWorkspace, storyId: string): string
 }
 
 function summarizeBacklog(workspace: UserWorkspace) {
-  const estimations =
-    workspace.agent5.input?.estimations ??
-    workspace.pipeline.agent6Input?.estimations ??
-    workspace.agent3.estimations;
-  const priorities =
-    workspace.agent5.input?.priorities ??
-    workspace.pipeline.agent6Input?.priorities ??
-    workspace.agent4.priorities;
+  const live = getLiveBacklog(workspace);
+  const estimations = live.estimations;
+  const priorities = live.priorities;
   const framework = resolveWorkspaceFramework(workspace);
   const frameworkMeta = describeFrameworkCategories(framework);
-  const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
+  const plan = live.plan;
   const labels = frameworkMeta.categoryLabels;
 
   return {
@@ -250,8 +330,8 @@ function summarizeBacklog(workspace: UserWorkspace) {
     frameworkLabel: frameworkMeta.frameworkLabel,
     allowedPriorityCategories: frameworkMeta.allowedCategories,
     priorityCategoryLabels: labels,
-    epicCount: workspace.agent2.epics.length,
-    storyCount: workspace.agent2.epics.reduce((n, e) => n + e.userStories.length, 0),
+    epicCount: live.epics.length,
+    storyCount: live.epics.reduce((n, e) => n + e.userStories.length, 0),
     sprints:
       plan?.sprints.map((sprint) => ({
         id: sprint.id,
@@ -261,7 +341,7 @@ function summarizeBacklog(workspace: UserWorkspace) {
         velocitySp: sprint.velocitySp,
       })) ?? [],
     unassignedStoryIds: plan?.unassignedStoryIds ?? [],
-    epics: workspace.agent2.epics.map((epic) => ({
+    epics: live.epics.map((epic) => ({
       id: epic.id,
       title: epic.title,
       description: epic.description,
@@ -463,6 +543,39 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
       required: ['storyId'],
     },
   },
+  {
+    name: 'create_sprint',
+    description:
+      'Crea un sprint vacío al final del plan. goal es el objetivo (se prefija Sprint N: si no viene así).',
+    parameters: {
+      type: 'object',
+      properties: {
+        goal: {
+          type: 'string',
+          description: 'Objetivo del sprint. Ej: "Login y agenda" o "Sprint 3: Pagos".',
+        },
+      },
+    },
+  },
+  {
+    name: 'delete_sprint',
+    description:
+      'Elimina un sprint vacío. Falla con SPRINT_NOT_EMPTY si tiene historias asignadas. Requiere confirm=true tras confirmación del usuario.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: {
+          type: 'string',
+          description: 'ID del sprint (SPRINT-001) o número ("1", "sprint 2").',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Debe ser true solo tras confirmación del usuario',
+        },
+      },
+      required: ['sprintId'],
+    },
+  },
 ];
 
 export async function executeHarnessTool(
@@ -544,7 +657,7 @@ export async function executeHarnessTool(
           sprintRaw === null || sprintRaw === ''
             ? null
             : asString(sprintRaw) ?? undefined;
-        const workspace = await createUserStoryAcrossWorkspace(ctx.uid, {
+        const { workspace, storyId } = await createUserStoryAcrossWorkspace(ctx.uid, {
           epicId,
           title,
           description,
@@ -553,9 +666,7 @@ export async function executeHarnessTool(
           category,
           sprintId: sprintId === undefined ? undefined : sprintId,
         });
-        const created = workspace.agent2.epics
-          .flatMap((e) => e.userStories)
-          .find((s) => s.title === title);
+        const created = listLiveStories(workspace).find((s) => s.id === storyId);
         return toolSuccess(
           `Historia creada${created ? `: ${created.id}` : ''} — ${title}${
             category ? ` [${category}]` : ''
@@ -681,8 +792,11 @@ export async function executeHarnessTool(
         if (!title || !description) {
           return toolError('Faltan title o description.', 'INVALID_ARGS');
         }
-        const workspace = await createEpicAcrossWorkspace(ctx.uid, { title, description });
-        const created = workspace.agent2.epics.find((e) => e.title === title);
+        const { workspace, epicId } = await createEpicAcrossWorkspace(ctx.uid, {
+          title,
+          description,
+        });
+        const created = getLiveBacklog(workspace).epics.find((e) => e.id === epicId);
         return toolSuccess(
           `Épica creada${created ? `: ${created.id}` : ''} — ${title}`,
           { data: { epicId: created?.id, title }, mutated: true }
@@ -743,10 +857,18 @@ export async function executeHarnessTool(
           return toolError(resolved.summary, 'STORY_NOT_FOUND');
         }
         const storyId = resolved.storyId;
-        const sprintId =
+        const rawSprintId =
           args.sprintId === null || args.sprintId === ''
             ? null
             : asString(args.sprintId) ?? null;
+        let sprintId: string | null = rawSprintId;
+        if (rawSprintId) {
+          const sprint = resolveSprintId(workspace, rawSprintId);
+          if (!sprint.ok) {
+            return toolError(sprint.summary, 'SPRINT_NOT_FOUND');
+          }
+          sprintId = sprint.sprintId;
+        }
         await updateUserStoryAcrossWorkspace(ctx.uid, storyId, {}, undefined, { sprintId });
         return toolSuccess(
           sprintId
@@ -754,6 +876,51 @@ export async function executeHarnessTool(
             : `Historia ${storyId} dejada sin asignar.`,
           { data: { storyId, sprintId }, mutated: true }
         );
+      }
+
+      case 'create_sprint': {
+        const goal = asString(args.goal);
+        const created = await createSprintAcrossWorkspace(ctx.uid, { goal });
+        return toolSuccess(`Sprint creado: ${created.sprintId} — ${created.sprintGoal}`, {
+          data: {
+            sprintId: created.sprintId,
+            goal: created.sprintGoal,
+          },
+          mutated: true,
+        });
+      }
+
+      case 'delete_sprint': {
+        const rawSprintId = asString(args.sprintId);
+        if (!rawSprintId) {
+          return toolError('Falta sprintId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveSprintId(workspace, rawSprintId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'SPRINT_NOT_FOUND');
+        }
+        const { sprintId, goal, storyCount, storyIds } = resolved;
+        if (storyCount > 0) {
+          const preview = storyIds.slice(0, 8).join(', ');
+          const extra = storyIds.length > 8 ? '…' : '';
+          return toolError(
+            `No se puede eliminar ${sprintId}: tiene ${storyCount} historia(s) asignada(s) (${preview}${extra}). Reasígnalas o déjalas sin sprint primero.`,
+            'SPRINT_NOT_EMPTY'
+          );
+        }
+        if (!asBoolean(args.confirm)) {
+          return toolNeedsConfirmation(
+            `Se requiere confirmación para eliminar ${sprintId} (${goal}).`,
+            `¿Eliminar ${sprintId}: ${goal}?`,
+            { sprintId, goal }
+          );
+        }
+        await deleteSprintAcrossWorkspace(ctx.uid, sprintId);
+        return toolSuccess(`Sprint ${sprintId} eliminado.`, {
+          data: { sprintId },
+          mutated: true,
+        });
       }
 
       default:

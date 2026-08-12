@@ -483,7 +483,7 @@ export function DashboardSprintStoriesTable({
 					framework={framework}
 					sprintOptions={sprintOptions}
 					onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
-						await handleEditStory(
+						const savePromise = handleEditStory(
 							editingRow.story.id,
 							updates,
 							estimationUpdates,
@@ -491,6 +491,7 @@ export function DashboardSprintStoriesTable({
 							prioritizationUpdates
 						);
 						setEditingStoryId(null);
+						await savePromise;
 					}}
 				/>
 			) : null}

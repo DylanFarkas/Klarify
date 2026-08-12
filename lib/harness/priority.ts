@@ -10,6 +10,7 @@ import {
 } from '@/lib/constants/agent-4';
 import type { FrameworkCategory, PrioritizationFramework } from '@/lib/types/agent-4';
 import type { UserWorkspace } from '@/lib/types/workspace';
+import { getLiveBacklog } from '@/lib/utils/live-backlog';
 
 const CATEGORY_ALIASES: Record<string, FrameworkCategory> = {
   must: 'must',
@@ -57,12 +58,7 @@ const CATEGORY_ALIASES: Record<string, FrameworkCategory> = {
 };
 
 export function resolveWorkspaceFramework(workspace: UserWorkspace): PrioritizationFramework {
-  return (
-    workspace.pipeline.agent6Input?.framework ??
-    workspace.agent5.input?.framework ??
-    workspace.agent4.framework ??
-    DEFAULT_FRAMEWORK
-  );
+  return getLiveBacklog(workspace).framework ?? workspace.agent4.framework ?? DEFAULT_FRAMEWORK;
 }
 
 export function normalizePriorityCategory(

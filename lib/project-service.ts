@@ -264,14 +264,13 @@ export async function requireUnlockedProject(uid: string, projectId: string): Pr
 }
 
 /**
- * Resuelve el proyecto activo con lecturas mínimas (sin sincronizar slots).
- * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
- * Acepta snapshot de usuario precargado para evitar ensureUserAccount duplicado.
+ * Carga el proyecto activo y su workspace en una sola lectura del documento.
+ * Evita el doble get (resolver ID y luego volver a pedir el workspace).
  */
-export async function readActiveProjectId(
+export async function loadActiveProjectWorkspace(
   uid: string,
   preloadedUserSnapshot?: DocumentSnapshot
-): Promise<string | null> {
+): Promise<{ projectId: string; workspace: UserWorkspace } | null> {
   const userSnapshot = preloadedUserSnapshot ?? (await ensureUserAccount(uid));
   const preferredId =
     (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
@@ -280,31 +279,57 @@ export async function readActiveProjectId(
   if (preferredId) {
     const doc = await projectDoc(uid, preferredId).get();
     if (doc.exists) {
-      const status = normalizeProjectStatus((doc.data() as ProjectDocument).status);
+      const data = doc.data() as ProjectDocument;
+      const status = normalizeProjectStatus(data.status);
       if (status === 'active') {
-        return preferredId;
+        assertProjectSlotAccessible(status);
+        return { projectId: preferredId, workspace: normalizeWorkspace(data.workspace) };
       }
     }
   }
 
   const activeSnap = await projectsCol(uid).where('status', '==', 'active').limit(1).get();
   if (!activeSnap.empty) {
-    const projectId = activeSnap.docs[0].id;
+    const doc = activeSnap.docs[0];
+    const projectId = doc.id;
     if (projectId !== preferredId) {
       await userDoc(uid).set(
         { preferences: { activeProjectId: projectId } },
         { merge: true }
       );
     }
-    return projectId;
+    const data = doc.data() as ProjectDocument;
+    assertProjectSlotAccessible(normalizeProjectStatus(data.status));
+    return { projectId, workspace: normalizeWorkspace(data.workspace) };
   }
 
   const anyProject = await projectsCol(uid).limit(1).get();
   if (anyProject.empty) {
-    return migrateLegacyWorkspace(uid);
+    const migratedId = await migrateLegacyWorkspace(uid);
+    if (!migratedId) return null;
+    const migratedDoc = await projectDoc(uid, migratedId).get();
+    if (!migratedDoc.exists) return null;
+    const migratedData = migratedDoc.data() as ProjectDocument;
+    return {
+      projectId: migratedId,
+      workspace: normalizeWorkspace(migratedData.workspace),
+    };
   }
 
   return null;
+}
+
+/**
+ * Resuelve el proyecto activo con lecturas mínimas (sin sincronizar slots).
+ * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
+ * Acepta snapshot de usuario precargado para evitar ensureUserAccount duplicado.
+ */
+export async function readActiveProjectId(
+  uid: string,
+  preloadedUserSnapshot?: DocumentSnapshot
+): Promise<string | null> {
+  const loaded = await loadActiveProjectWorkspace(uid, preloadedUserSnapshot);
+  return loaded?.projectId ?? null;
 }
 
 async function migrateLegacyWorkspace(uid: string): Promise<string | null> {

@@ -217,15 +217,21 @@ export function assignStoryToSprintInPlan(
   return moveStoryInPlan(plan, storyId, fromSprintId, toSprintId, storyPoints);
 }
 
-export function addSprintToPlan(plan: SprintPlan): SprintPlan {
+export function addSprintToPlan(plan: SprintPlan, goal?: string): SprintPlan {
   const normalized = normalizeSprintPlan(plan);
   const last = normalized.sprints.at(-1);
   const startDate = last ? last.endDate : normalized.config.projectStartDate;
   const nextNumber = normalized.sprints.length + 1;
+  const trimmedGoal = goal?.trim();
+  const sprintGoal = !trimmedGoal
+    ? `Sprint ${nextNumber}: Nuevo sprint`
+    : /^Sprint\s+\d+\s*:/i.test(trimmedGoal)
+      ? trimmedGoal
+      : `Sprint ${nextNumber}: ${trimmedGoal}`;
   const newSprint: PlannedSprint = {
     id: getNextSprintId(normalized.sprints),
     number: nextNumber,
-    sprintGoal: `Sprint ${nextNumber}: Nuevo sprint`,
+    sprintGoal,
     storyIds: [],
     velocitySp: 0,
     startDate,
@@ -344,27 +350,34 @@ export function removeStoryFromSprintPlan(
   });
 }
 
-/** Aplica un plan actualizado en agent5 y pipeline.agent6Input. */
+/** Aplica un plan actualizado. En Dashboard solo toca agent6Input. */
 export function withUpdatedSprintPlan(workspace: UserWorkspace, plan: SprintPlan): UserWorkspace {
   const existing = workspace.pipeline.agent6Input;
-  let agent6Input = existing ? { ...existing, plan } : null;
+  if (existing) {
+    return {
+      ...workspace,
+      pipeline: {
+        ...workspace.pipeline,
+        agent6Input: { ...existing, plan },
+      },
+    };
+  }
 
-  if (!agent6Input) {
-    const source =
-      workspace.pipeline.agent5Input ??
-      (workspace.agent4.input && Object.keys(workspace.agent4.priorities).length > 0
-        ? {
-            epics: workspace.agent4.input.epics,
-            estimations: workspace.agent4.input.estimations,
-            priorities: workspace.agent4.priorities,
-            framework: workspace.agent4.framework,
-            sourceWishIds: workspace.agent4.input.sourceWishIds,
-            approvedAt: workspace.agent4.input.approvedAt,
-          }
-        : null);
-    if (source) {
-      agent6Input = { ...buildAgent6InputFromAgent4(source), plan };
-    }
+  let agent6Input = null;
+  const source =
+    workspace.pipeline.agent5Input ??
+    (workspace.agent4.input && Object.keys(workspace.agent4.priorities).length > 0
+      ? {
+          epics: workspace.agent4.input.epics,
+          estimations: workspace.agent4.input.estimations,
+          priorities: workspace.agent4.priorities,
+          framework: workspace.agent4.framework,
+          sourceWishIds: workspace.agent4.input.sourceWishIds,
+          approvedAt: workspace.agent4.input.approvedAt,
+        }
+      : null);
+  if (source) {
+    agent6Input = { ...buildAgent6InputFromAgent4(source), plan };
   }
 
   return {

@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
         if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await createUserStoryAcrossWorkspace(uid, {
+        const { storyId } = await createUserStoryAcrossWorkspace(uid, {
           epicId: payload.epicId,
           sprintId: payload.sprintId ?? null,
           title: payload.title,
@@ -249,15 +249,15 @@ export async function POST(request: NextRequest) {
           points: payload.points,
           category: payload.category,
         });
-        return NextResponse.json({ ok: true, workspace });
+        return NextResponse.json({ ok: true, storyId });
       }
       case 'deleteUserStory': {
         const payload = body.payload as { storyId?: string };
         if (!payload.storyId) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await deleteUserStoryAcrossWorkspace(uid, payload.storyId);
-        return NextResponse.json({ ok: true, workspace });
+        await deleteUserStoryAcrossWorkspace(uid, payload.storyId);
+        return NextResponse.json({ ok: true });
       }
       case 'updateUserStory': {
         const payload = body.payload as {
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
         if (!payload.storyId || !payload.updates) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await updateUserStoryAcrossWorkspace(
+        await updateUserStoryAcrossWorkspace(
           uid,
           payload.storyId,
           payload.updates,
@@ -282,18 +282,18 @@ export async function POST(request: NextRequest) {
           },
           payload.prioritizationUpdates
         );
-        return NextResponse.json({ ok: true, workspace });
+        return NextResponse.json({ ok: true });
       }
       case 'createEpic': {
         const payload = body.payload as { title?: string; description?: string };
         if (!payload.title?.trim() || !payload.description?.trim()) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await createEpicAcrossWorkspace(uid, {
+        const { epicId } = await createEpicAcrossWorkspace(uid, {
           title: payload.title,
           description: payload.description,
         });
-        return NextResponse.json({ ok: true, workspace });
+        return NextResponse.json({ ok: true, epicId });
       }
       case 'updateEpic': {
         const payload = body.payload as {
@@ -304,27 +304,27 @@ export async function POST(request: NextRequest) {
         if (!payload.epicId || (payload.title === undefined && payload.description === undefined)) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await updateEpicAcrossWorkspace(uid, payload.epicId, {
+        await updateEpicAcrossWorkspace(uid, payload.epicId, {
           title: payload.title,
           description: payload.description,
         });
-        return NextResponse.json({ ok: true, workspace });
+        return NextResponse.json({ ok: true });
       }
       case 'deleteEpic': {
         const payload = body.payload as { epicId?: string };
         if (!payload.epicId) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await deleteEpicAcrossWorkspace(uid, payload.epicId);
-        return NextResponse.json({ ok: true, workspace });
+        await deleteEpicAcrossWorkspace(uid, payload.epicId);
+        return NextResponse.json({ ok: true });
       }
       case 'updateSprintPlan': {
         const payload = body.payload as { plan?: SprintPlan };
         if (!payload.plan) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const workspace = await updateSprintPlanAcrossWorkspace(uid, payload.plan);
-        return NextResponse.json({ ok: true, workspace });
+        await updateSprintPlanAcrossWorkspace(uid, payload.plan);
+        return NextResponse.json({ ok: true });
       }
       case 'initializeExecution': {
         const workspace = await ensureExecutionInitialized(uid);

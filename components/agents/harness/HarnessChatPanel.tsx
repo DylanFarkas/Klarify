@@ -16,18 +16,15 @@ import type {
 import { notifySuccess, notifyError } from '@/lib/notifications/toast';
 import { LLM_STREAM_CONTENT_TYPE } from '@/lib/utils/llm-stream';
 import { ThoughtMarkdown } from '@/components/agents/shared/activity-log/AgentActivityLog/ThoughtMarkdown';
+import {
+  HarnessThoughtThread,
+  type HarnessTraceStep,
+} from '@/components/agents/harness/HarnessThoughtThread';
 
 interface PendingConfirm {
   name: string;
   args: Record<string, unknown>;
   label: string;
-}
-
-interface ToolActivity {
-  id: string;
-  name: string;
-  summary?: string;
-  status: 'running' | 'done' | 'error';
 }
 
 interface HarnessChatPanelProps {
@@ -51,7 +48,7 @@ const EXAMPLES = [
   },
   {
     label: 'Gestionar épicas y sprints',
-    example: '«Nueva épica…» o «Asigna esa historia al sprint…»',
+    example: '«Crea un sprint para…» o «Asigna esa historia al sprint…»',
     hint: 'Organización',
   },
   {
@@ -72,8 +69,8 @@ function formatTime(ts: number): string {
   }
 }
 
-function toolLabel(name: string): string {
-  return name.replaceAll('_', ' ');
+function isToolEchoThought(text: string): boolean {
+  return /^Ejecutando\s+\S+/i.test(text.trim());
 }
 
 /** Detecta respuestas afirmativas cortas para confirmar acciones pendientes. */
@@ -102,9 +99,12 @@ export function HarnessChatPanel({
   const [isSending, setIsSending] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [thought, setThought] = useState<string | null>(null);
-  const [activities, setActivities] = useState<ToolActivity[]>([]);
+  const [trace, setTrace] = useState<HarnessTraceStep[]>([]);
+  const [traceLive, setTraceLive] = useState(false);
+  const [traceStartedAt, setTraceStartedAt] = useState<number | null>(null);
+  const [traceEndedAt, setTraceEndedAt] = useState<number | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const traceIdRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null | undefined>(remainingMessages);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -121,7 +121,7 @@ export function HarnessChatPanel({
     const body = bodyRef.current;
     if (!body) return;
     body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' });
-  }, [messages, thought, activities, pendingConfirm]);
+  }, [messages, trace, traceLive, pendingConfirm]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -134,9 +134,11 @@ export function HarnessChatPanel({
     if (loadedForProjectRef.current && loadedForProjectRef.current !== activeProjectId) {
       loadedForProjectRef.current = null;
       setMessages([]);
-      setActivities([]);
+      setTrace([]);
+      setTraceLive(false);
+      setTraceStartedAt(null);
+      setTraceEndedAt(null);
       setPendingConfirm(null);
-      setThought(null);
       setError(null);
       setConfirmClear(false);
     }
@@ -188,28 +190,66 @@ export function HarnessChatPanel({
       let buffer = '';
       workspaceDirty.current = false;
 
+      const nextStepId = () => {
+        traceIdRef.current += 1;
+        return `trace-${traceIdRef.current}`;
+      };
+
+      const completeTrace = () => {
+        setTraceLive(false);
+        setTraceEndedAt(Date.now());
+      };
+
       const handleEvent = async (event: HarnessStreamEvent) => {
         switch (event.type) {
-          case 'thought':
-            setThought(event.text);
+          case 'thought': {
+            if (event.delta) {
+              if (!event.text) break;
+              setTrace((prev) => {
+                const withoutStatus = prev.filter((step) => step.kind !== 'status');
+                const last = withoutStatus[withoutStatus.length - 1];
+                if (last?.kind === 'reasoning') {
+                  return [
+                    ...withoutStatus.slice(0, -1),
+                    { ...last, text: last.text + event.text },
+                  ];
+                }
+                return [
+                  ...withoutStatus,
+                  { id: nextStepId(), kind: 'reasoning', text: event.text },
+                ];
+              });
+              break;
+            }
+            const text = event.text.trim();
+            if (!text || isToolEchoThought(text)) break;
+            setTrace((prev) => {
+              if (prev.some((step) => step.kind === 'status' && step.text === text)) {
+                return prev;
+              }
+              return [...prev, { id: nextStepId(), kind: 'status', text }];
+            });
             break;
+          }
           case 'tool_start':
-            setActivities((prev) => [
+            setTrace((prev) => [
               ...prev,
               {
-                id: `${event.name}-${Date.now()}`,
+                id: nextStepId(),
+                kind: 'tool',
                 name: event.name,
                 status: 'running',
               },
             ]);
             break;
           case 'tool_end':
-            setActivities((prev) => {
+            setTrace((prev) => {
               const next = [...prev];
               for (let i = next.length - 1; i >= 0; i -= 1) {
-                if (next[i].name === event.name && next[i].status === 'running') {
+                const step = next[i];
+                if (step.kind === 'tool' && step.name === event.name && step.status === 'running') {
                   next[i] = {
-                    ...next[i],
+                    ...step,
                     status: event.ok ? 'done' : 'error',
                     summary: event.summary,
                   };
@@ -225,9 +265,10 @@ export function HarnessChatPanel({
               args: event.args,
               label: event.label,
             });
+            completeTrace();
             break;
           case 'message':
-            setThought(null);
+            completeTrace();
             setMessages((prev) => [
               ...prev,
               {
@@ -244,9 +285,10 @@ export function HarnessChatPanel({
           case 'done':
             setMessages(event.payload.messages);
             setRemaining(event.payload.remaining);
-            setThought(null);
+            completeTrace();
             break;
           case 'error':
+            completeTrace();
             throw new Error(event.error);
           default:
             break;
@@ -285,8 +327,11 @@ export function HarnessChatPanel({
 
       setIsSending(true);
       setError(null);
-      setThought('Analizando petición…');
-      setActivities([]);
+      traceIdRef.current = 0;
+      setTrace([{ id: 'trace-0', kind: 'status', text: 'Analizando petición…' }]);
+      setTraceLive(true);
+      setTraceStartedAt(Date.now());
+      setTraceEndedAt(null);
       setConfirmClear(false);
       if (!confirmedAction) {
         setPendingConfirm(null);
@@ -330,9 +375,10 @@ export function HarnessChatPanel({
         await consumeStream(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error en Klark');
+        setTraceLive(false);
+        setTraceEndedAt((prev) => prev ?? Date.now());
       } finally {
         setIsSending(false);
-        setThought(null);
       }
     },
     [user, isSending, consumeStream]
@@ -352,9 +398,11 @@ export function HarnessChatPanel({
         throw new Error(data?.error ?? 'No se pudo limpiar el chat');
       }
       setMessages([]);
-      setActivities([]);
+      setTrace([]);
+      setTraceLive(false);
+      setTraceStartedAt(null);
+      setTraceEndedAt(null);
       setPendingConfirm(null);
-      setThought(null);
       setConfirmClear(false);
       notifySuccess('Chat limpiado');
     } catch (err) {
@@ -484,6 +532,14 @@ export function HarnessChatPanel({
         ? `${remaining} restantes`
         : null;
 
+  const lastAssistantIndex = messages.reduce(
+    (found, msg, index) => (msg.role === 'assistant' ? index : found),
+    -1
+  );
+  const showLiveThread = traceLive && trace.length > 0;
+  const showSettledThread = !traceLive && trace.length > 0 && lastAssistantIndex >= 0;
+  const showSettledStandalone = !traceLive && trace.length > 0 && lastAssistantIndex < 0;
+
   return (
     <section className="harness-chat harness-chat--drawer" aria-label="Klark">
       <header className="harness-chat__header">
@@ -530,7 +586,7 @@ export function HarnessChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((msg) => (
+          messages.map((msg, index) => (
             <div
               key={msg.id}
               className={`harness-chat__msg ${msg.role === 'user' ? 'harness-chat__msg--user' : ''}`}
@@ -544,6 +600,16 @@ export function HarnessChatPanel({
                 {msg.role === 'user' ? 'Tú' : 'K'}
               </div>
               <div className="min-w-0">
+                {showSettledThread && index === lastAssistantIndex ? (
+                  <div className="mb-1.5">
+                    <HarnessThoughtThread
+                      steps={trace}
+                      live={false}
+                      startedAt={traceStartedAt}
+                      endedAt={traceEndedAt}
+                    />
+                  </div>
+                ) : null}
                 <div
                   className={`harness-chat__bubble ${
                     msg.role === 'user'
@@ -567,43 +633,19 @@ export function HarnessChatPanel({
           ))
         )}
 
-        {activities.length > 0 ? (
-          <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
-            <p className="mb-2 text-[11px] font-medium text-subtle">Herramientas</p>
-            <ul className="space-y-1.5">
-              {activities.map((activity) => (
-                <li key={activity.id} className="flex items-start gap-2 text-xs text-muted">
-                  <span
-                    className={`mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                      activity.status === 'running'
-                        ? 'animate-pulse bg-subtle'
-                        : activity.status === 'done'
-                          ? 'bg-success'
-                          : 'bg-danger'
-                    }`}
-                  />
-                  <span>
-                    <span className="font-medium text-foreground">{toolLabel(activity.name)}</span>
-                    {activity.summary ? (
-                      <span className="text-muted"> — {activity.summary}</span>
-                    ) : activity.status === 'running' ? (
-                      <span className="text-muted"> — en curso…</span>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {thought ? (
-          <div className="flex items-center gap-2 text-xs text-muted">
-            <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70 [animation-delay:120ms]" />
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/70 [animation-delay:240ms]" />
-            </span>
-            {thought}
+        {showLiveThread || showSettledStandalone ? (
+          <div className="harness-chat__msg">
+            <div className="harness-chat__avatar harness-chat__avatar--assistant" aria-hidden>
+              K
+            </div>
+            <div className="min-w-0 pt-1">
+              <HarnessThoughtThread
+                steps={trace}
+                live={showLiveThread}
+                startedAt={traceStartedAt}
+                endedAt={traceEndedAt}
+              />
+            </div>
           </div>
         ) : null}
 

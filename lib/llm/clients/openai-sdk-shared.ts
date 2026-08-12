@@ -107,9 +107,10 @@ export async function openAiSdkToolTurn(
     systemInstruction: string;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     tools: LlmToolDefinition[];
+    onThought?: (text: string) => void;
   }
 ): Promise<LlmToolLoopTurn> {
-  const response = await client.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: credentials.model,
     messages: [
       { role: 'system', content: params.systemInstruction },
@@ -117,27 +118,64 @@ export async function openAiSdkToolTurn(
     ],
     tools: toOpenAiTools(params.tools),
     tool_choice: 'auto',
+    stream: true,
   });
 
-  const message = response.choices[0]?.message;
-  const text = message?.content?.trim() ?? '';
-  const toolCalls: LlmToolCall[] = (message?.tool_calls ?? [])
-    .filter((tc) => tc.type === 'function')
-    .map((tc) => {
+  let text = '';
+  const pending = new Map<number, { id: string; name: string; args: string }>();
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta as
+      | {
+          content?: string | null;
+          reasoning_content?: string | null;
+          tool_calls?: Array<{
+            index?: number;
+            id?: string;
+            function?: { name?: string; arguments?: string };
+          }>;
+        }
+      | undefined;
+
+    if (!delta) continue;
+
+    if (typeof delta.reasoning_content === 'string' && delta.reasoning_content) {
+      params.onThought?.(delta.reasoning_content);
+    }
+    if (typeof delta.content === 'string' && delta.content) {
+      text += delta.content;
+    }
+
+    for (const call of delta.tool_calls ?? []) {
+      const index = call.index ?? 0;
+      const current = pending.get(index) ?? { id: '', name: '', args: '' };
+      if (call.id) current.id = call.id;
+      if (call.function?.name) current.name += call.function.name;
+      if (typeof call.function?.arguments === 'string') {
+        current.args += call.function.arguments;
+      }
+      pending.set(index, current);
+    }
+  }
+
+  const toolCalls: LlmToolCall[] = [...pending.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, call], index) => {
       let args: Record<string, unknown> = {};
       try {
-        args = JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>;
+        args = JSON.parse(call.args || '{}') as Record<string, unknown>;
       } catch {
         args = {};
       }
       return {
-        id: tc.id,
-        name: tc.function.name,
+        id: call.id || `${call.name || 'tool'}-${index}`,
+        name: call.name,
         args,
       };
-    });
+    })
+    .filter((call) => call.name);
 
-  return { text, toolCalls };
+  return { text: text.trim(), toolCalls };
 }
 
 export type { OpenAI };

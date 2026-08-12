@@ -31,7 +31,7 @@ export interface HarnessToolResult {
 }
 
 export type HarnessStreamEvent =
-  | { type: 'thought'; text: string }
+  | { type: 'thought'; text: string; delta?: boolean }
   | { type: 'tool_start'; name: string; args: Record<string, unknown> }
   | {
       type: 'tool_end';
@@ -64,5 +64,7 @@ export const HARNESS_MAX_TOOL_ITERATIONS = 6;
 export const HARNESS_TERMINAL_TOOL_ERRORS = new Set([
   'STORY_NOT_FOUND',
   'EPIC_NOT_FOUND',
+  'SPRINT_NOT_FOUND',
+  'SPRINT_NOT_EMPTY',
   'NEEDS_CONFIRMATION',
 ]);

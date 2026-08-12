@@ -97,16 +97,22 @@ function extractText(parts: Part[] | undefined): string {
     .trim();
 }
 
+function geminiModelSupportsThoughts(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  return lower.includes('2.5') || lower.includes('thinking') || lower.includes('3.');
+}
+
 export async function geminiToolTurn(
   credentials: LlmCredentials,
   params: {
     systemInstruction: string;
     contents: Content[];
     tools: LlmToolDefinition[];
+    onThought?: (text: string) => void;
   }
 ): Promise<{ turn: LlmToolLoopTurn; modelContent: Content | null }> {
   const ai = createClient(credentials.apiKey);
-  const response = await ai.models.generateContent({
+  const responseStream = await ai.models.generateContentStream({
     model: credentials.model,
     contents: params.contents,
     config: {
@@ -117,19 +123,48 @@ export async function geminiToolTurn(
           mode: FunctionCallingConfigMode.AUTO,
         },
       },
+      ...(geminiModelSupportsThoughts(credentials.model)
+        ? {
+            thinkingConfig: {
+              includeThoughts: true,
+              thinkingBudget: 1024,
+            },
+          }
+        : {}),
     },
   });
 
-  const functionCalls = response.functionCalls ?? [];
-  const modelContent = response.candidates?.[0]?.content ?? null;
-  const text =
-    extractText(modelContent?.parts) || response.text?.trim() || '';
+  const parts: Part[] = [];
 
-  const toolCalls: LlmToolCall[] = functionCalls.map((call, index) => ({
-    id: call.id ?? `${call.name ?? 'tool'}-${index}`,
-    name: call.name ?? 'unknown',
-    args: (call.args ?? {}) as Record<string, unknown>,
-  }));
+  for await (const chunk of responseStream) {
+    const chunkParts = (chunk.candidates?.[0]?.content?.parts ?? []) as Array<
+      Part & { thought?: boolean }
+    >;
+    for (const part of chunkParts) {
+      if (part.thought === true) {
+        if (typeof part.text === 'string' && part.text) {
+          params.onThought?.(part.text);
+        }
+        continue;
+      }
+      parts.push(part);
+    }
+  }
+
+  const modelContent: Content | null = parts.length > 0 ? { role: 'model', parts } : null;
+  const text = extractText(parts);
+
+  const toolCalls: LlmToolCall[] = parts
+    .map((part, index) => {
+      const call = part.functionCall;
+      if (!call?.name) return null;
+      return {
+        id: call.id ?? `${call.name}-${index}`,
+        name: call.name,
+        args: (call.args ?? {}) as Record<string, unknown>,
+      };
+    })
+    .filter((call): call is LlmToolCall => call !== null);
 
   return { turn: { text, toolCalls }, modelContent };
 }

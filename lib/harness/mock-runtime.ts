@@ -75,6 +75,27 @@ function parseSimpleCommand(message: string): {
     return { name: 'delete_epic', args: { epicId: deleteEpicId[1].toUpperCase() } };
   }
 
+  const createSprint = trimmed.match(
+    /^crea(?:r)?\s+(?:un\s+)?sprint(?:\s+(?:para|de|:)\s+(.+))?$/i
+  );
+  if (createSprint) {
+    return {
+      name: 'create_sprint',
+      args: createSprint[1]?.trim() ? { goal: createSprint[1].trim() } : {},
+    };
+  }
+
+  const deleteSprint = trimmed.match(
+    /^elimina(?:r)?\s+(?:el\s+)?sprint[\s_-]*(\d+)$/i
+  );
+  if (deleteSprint) {
+    return { name: 'delete_sprint', args: { sprintId: `SPRINT-${deleteSprint[1]}` } };
+  }
+  const deleteSprintId = trimmed.match(/^elimina(?:r)?\s+(SPRINT[\s_-]*\d+)$/i);
+  if (deleteSprintId) {
+    return { name: 'delete_sprint', args: { sprintId: deleteSprintId[1].toUpperCase() } };
+  }
+
   return null;
 }
 

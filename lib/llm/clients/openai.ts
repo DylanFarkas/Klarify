@@ -36,6 +36,7 @@ export async function openaiToolTurn(
     systemInstruction: string;
     messages: OpenAI.Chat.ChatCompletionMessageParam[];
     tools: LlmToolDefinition[];
+    onThought?: (text: string) => void;
   }
 ): Promise<LlmToolLoopTurn> {
   return openAiSdkToolTurn(createOpenAiClient(credentials.apiKey), credentials, params);
