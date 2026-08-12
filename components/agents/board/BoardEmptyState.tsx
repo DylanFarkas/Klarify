@@ -23,13 +23,13 @@ export function BoardEmptyState({ reason }: BoardEmptyStateProps) {
           Pipeline incompleto
         </h3>
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
-          Completa la planificación de sprints para desbloquear el tablero de ejecución.
+          Completa la priorización y organiza sprints en el dashboard para desbloquear el tablero.
         </p>
         <Link
-          href="/agentes/5"
+          href="/agentes/dashboard"
           className="mt-6 inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
         >
-          Ir a planificación
+          Ir al dashboard
         </Link>
       </div>
     );

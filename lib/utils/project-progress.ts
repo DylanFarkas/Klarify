@@ -4,12 +4,12 @@
 
 import type { UserWorkspace } from '@/lib/types/workspace';
 
+/** Pipeline activo: Agente 5 (planificación IA) está desactivado; tras priorizar → dashboard. */
 const PIPELINE_STEPS = [
   { step: 1, label: 'Ingesta de contexto', check: (ws: UserWorkspace) => ws.agent1.status === 'approved' },
   { step: 2, label: 'Backlog inicial', check: (ws: UserWorkspace) => ws.agent2.status === 'approved' },
   { step: 3, label: 'Estimación', check: (ws: UserWorkspace) => ws.agent3.status === 'approved' },
   { step: 4, label: 'Priorización', check: (ws: UserWorkspace) => ws.agent4.status === 'approved' },
-  { step: 5, label: 'Plan de sprints', check: (ws: UserWorkspace) => ws.agent5.status === 'approved' },
   { step: 6, label: 'Dashboard', check: (ws: UserWorkspace) => Boolean(ws.pipeline.agent6Input) },
 ] as const;
 
@@ -48,7 +48,7 @@ const PIPELINE_ENTRY_PATHS: Record<number, string> = {
   2: '/agentes/2',
   3: '/agentes/3',
   4: '/agentes/4',
-  5: '/agentes/5',
+  5: '/agentes/dashboard',
   6: '/agentes/dashboard',
 };
 
@@ -61,7 +61,7 @@ export function getProjectEntryPath(project: {
     return '/agentes/dashboard';
   }
 
-  if (project.pipelineStep >= 6) {
+  if (project.pipelineStep >= 6 || project.lastAgent === '5') {
     return '/agentes/dashboard';
   }
 
@@ -84,8 +84,6 @@ function hasStarted(workspace: UserWorkspace, step: number): boolean {
       return workspace.agent3.status !== 'idle' || Object.keys(workspace.agent3.estimations).length > 0;
     case 4:
       return workspace.agent4.status !== 'idle' || Object.keys(workspace.agent4.priorities).length > 0;
-    case 5:
-      return workspace.agent5.status !== 'idle' || Boolean(workspace.agent5.plan);
     case 6:
       return Boolean(workspace.pipeline.agent6Input);
     default:

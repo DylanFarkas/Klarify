@@ -3,7 +3,7 @@ import type { UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
-import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { createEmptySprintPlan, normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
@@ -121,7 +121,14 @@ function resolveFramework(workspace: UserWorkspace): PrioritizationFramework | n
 
 function resolvePlan(workspace: UserWorkspace): SprintPlan | null {
 	const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
-	return plan ? normalizeSprintPlan(plan) : null;
+	if (plan) return normalizeSprintPlan(plan);
+
+	// Defensa: backlog priorizado sin plan materializado aún
+	const epics = resolveEpics(workspace);
+	if (workspace.agent4.status === 'approved' && epics.length > 0) {
+		return createEmptySprintPlan(epics);
+	}
+	return null;
 }
 
 function getPriorityBucket(
@@ -251,7 +258,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		workspace.agent2.status,
 		workspace.agent3.status,
 		workspace.agent4.status,
-		workspace.agent5.status,
+		workspace.pipeline.agent6Input ? 'approved' : 'idle',
 	].filter((status) => status === 'approved').length;
 
 	const completionPercentage = Math.round((completionCount / 5) * 100);
@@ -295,16 +302,16 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 							href: '/agentes/4',
 							description: 'Aun hay historias sin ordenar por valor y esfuerzo.',
 						}
-					: !plan
+					: !plan || plan.sprints.length === 0
 						? {
-								label: 'Planificar sprints',
-								href: '/agentes/5',
-								description: 'El backlog esta listo para convertirse en un plan de sprints.',
+								label: 'Crear sprints',
+								href: '/agentes/dashboard',
+								description: 'Organiza el backlog en sprints de forma manual.',
 							}
 						: {
 								label: 'Revisar el backlog',
-								href: '/agentes/2',
-								description: 'El ciclo principal esta completo; puedes volver a ajustar el backlog.',
+								href: '/agentes/dashboard',
+								description: 'Ajusta sprints, mueve HU o edita historias cuando lo necesites.',
 							};
 
 	const epicBreakdown = epics.map((epic) => {

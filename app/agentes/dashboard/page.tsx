@@ -4,6 +4,7 @@
 
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { DashboardContent } from '@/components/agents/dashboard/DashboardContent';
 import { DashboardLoadingState } from '@/components/agents/dashboard/DashboardLoadingState';
 import { buildDashboardMetrics } from '@/components/agents/dashboard/dashboardMetrics';
@@ -19,8 +20,24 @@ export default function DashboardPage() {
 		createUserStory,
 		deleteUserStory,
 		updateUserStory,
+		createEpic,
+		updateEpic,
+		deleteEpic,
 		updateSprintPlan,
+		bootstrapDashboardFromAgent4,
 	} = useWorkspace();
+	const bootstrapped = useRef(false);
+
+	useEffect(() => {
+		if (!workspace || bootstrapped.current) return;
+		if (workspace.pipeline.agent6Input) return;
+		if (workspace.agent4.status !== 'approved') return;
+
+		bootstrapped.current = true;
+		void bootstrapDashboardFromAgent4().catch(() => {
+			bootstrapped.current = false;
+		});
+	}, [workspace, bootstrapDashboardFromAgent4]);
 
 	if (isLoading || !workspace) {
 		return <DashboardLoadingState />;
@@ -42,6 +59,9 @@ export default function DashboardPage() {
 			onCreateStory={createUserStory}
 			onDeleteStory={deleteUserStory}
 			onEditStory={updateUserStory}
+			onCreateEpic={createEpic}
+			onUpdateEpic={updateEpic}
+			onDeleteEpic={deleteEpic}
 			onUpdateSprintPlan={updateSprintPlan}
 			workspace={workspace}
 		/>

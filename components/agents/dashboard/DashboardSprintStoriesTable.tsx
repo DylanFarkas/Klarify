@@ -62,6 +62,7 @@ interface DashboardSprintStoriesTableProps {
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
 	onUpdateSprintPlan?: (plan: SprintPlan) => void;
+	onManageEpic?: (epicId: string) => void;
 	/** When true, skips the outer section chrome (used inside DashboardSprintPlan). */
 	embedded?: boolean;
 	/** Controlled create-panel open state (used when embedded). */
@@ -96,6 +97,7 @@ export function DashboardSprintStoriesTable({
 	onDeleteStory,
 	onEditStory,
 	onUpdateSprintPlan,
+	onManageEpic,
 	embedded = false,
 	isCreating: controlledCreating,
 	onCreatingChange,
@@ -173,7 +175,7 @@ export function DashboardSprintStoriesTable({
 				await onEditStory(storyId, updates, estimationUpdates, options, prioritizationUpdates);
 				const onlyCriteria =
 					Object.keys(updates).length === 1 && updates.acceptanceCriteria !== undefined;
-				notifySuccess(onlyCriteria ? 'Criterios de aceptaciÃ³n actualizados' : 'HU actualizada');
+				notifySuccess(onlyCriteria ? 'Criterios de aceptación actualizados' : 'HU actualizada');
 			} catch (err) {
 				notifyError(errorMessage(err, 'No se pudo guardar la HU'));
 				throw err;
@@ -218,8 +220,8 @@ export function DashboardSprintStoriesTable({
 			const nextPlan = deleteEmptySprintAtIndex(current, sprintIndex);
 			if (!nextPlan) return;
 			const confirmed = await confirm({
-				title: 'Â¿Eliminar este sprint vacÃ­o?',
-				description: 'El sprint se quitarÃ¡ del plan. Esta acciÃ³n no se puede deshacer.',
+				title: '¿Eliminar este sprint vacío?',
+				description: 'El sprint se quitará del plan. Esta acción no se puede deshacer.',
 				confirmLabel: 'Eliminar',
 				variant: 'danger',
 			});
@@ -374,6 +376,7 @@ export function DashboardSprintStoriesTable({
 									? () => handleDeleteSprint(group.sprintIndex!)
 									: undefined
 							}
+							onManageEpic={onManageEpic}
 						/>
 					))}
 				</tbody>
@@ -382,10 +385,28 @@ export function DashboardSprintStoriesTable({
 	) : (
 		<div className="px-6 py-10">
 			<div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-8 text-center">
-				<p className="text-sm font-semibold text-foreground">Todavia no hay sprints para mostrar.</p>
-				<p className="mt-2 text-sm text-muted">
-					Cuando el Agente 5 genere el plan, esta tabla mostrara las HU organizadas por sprint.
+				<p className="text-sm font-semibold text-foreground">
+					{canManagePlan
+						? 'Crea tu primer sprint'
+						: 'Todavía no hay sprints para mostrar.'}
 				</p>
+				<p className="mt-2 text-sm text-muted">
+					{canManagePlan
+						? 'Todas las historias están en el backlog. Crea un sprint y arrastra las HU que quieras incluir.'
+						: 'Cuando haya un plan de sprints, esta tabla mostrará las HU organizadas.'}
+				</p>
+				{canManagePlan && safePlan ? (
+					<button
+						type="button"
+						onClick={() => handleAddSprint()}
+						className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+					>
+						<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+							<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+						</svg>
+						Crear sprint
+					</button>
+				) : null}
 			</div>
 		</div>
 	);
@@ -398,14 +419,17 @@ export function DashboardSprintStoriesTable({
 					onClick={() => handleAddSprint()}
 					className={[
 						'flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border',
-						'px-5 py-4 text-sm font-medium text-muted',
-						'cursor-pointer transition-colors hover:border-primary hover:bg-primary/5 hover:text-foreground',
+						'px-5 py-4 text-sm font-medium',
+						safePlan.sprints.length === 0
+							? 'border-primary/40 bg-primary/5 text-foreground hover:bg-primary/10'
+							: 'text-muted hover:border-primary hover:bg-primary/5 hover:text-foreground',
+						'cursor-pointer transition-colors',
 					].join(' ')}
 				>
 					<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
 						<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 					</svg>
-					Nuevo sprint
+					{safePlan.sprints.length === 0 ? 'Crear sprint' : 'Nuevo sprint'}
 				</button>
 			</div>
 		) : null;
@@ -608,10 +632,10 @@ function buildSprintGroups(
 			: rows.filter((r) => !r.sprintId);
 
 	if (plan || unresolvedUnassigned.length > 0) {
-		groups.push({
+		groups.unshift({
 			key: 'unassigned',
-			label: 'Sin asignar',
-			meta: 'Suelta historias aquÃ­ para desasignarlas',
+			label: 'Backlog',
+			meta: 'Suelta historias aquí o arrástralas a un sprint',
 			rows: plan ? unassignedRows : unresolvedUnassigned,
 			sprint: null,
 			sprintIndex: null,
@@ -686,6 +710,7 @@ function SprintGroupRows({
 	onStartEdit,
 	onEditSprint,
 	onDeleteSprint,
+	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
 	group: SprintRowsGroup;
@@ -696,6 +721,7 @@ function SprintGroupRows({
 	onStartEdit: (storyId: string) => void;
 	onEditSprint?: () => void;
 	onDeleteSprint?: () => void;
+	onManageEpic?: (epicId: string) => void;
 }) {
 	const dropId = group.isUnassigned ? 'sprint:unassigned' : `sprint:${group.key}`;
 	const { setNodeRef, isOver } = useDroppable({
@@ -780,8 +806,8 @@ function SprintGroupRows({
 					<td colSpan={7} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
 						{canManagePlan
 							? group.isUnassigned
-								? 'Suelta historias aquÃ­ para desasignarlas'
-								: 'Sin historias â€” arrastra aquÃ­ para asignar.'
+								? 'Suelta historias aquí para desasignarlas'
+								: 'Sin historias, arrastra aquí­ para asignar.'
 							: 'Sin historias asignadas.'}
 					</td>
 				</tr>
@@ -795,6 +821,7 @@ function SprintGroupRows({
 						onDelete={async () => onDeleteStory(row.story.id)}
 						onOpenDetail={() => onOpenDetail(row)}
 						onStartEdit={() => onStartEdit(row.story.id)}
+						onManageEpic={onManageEpic}
 					/>
 				))
 			)}
@@ -809,6 +836,7 @@ function StoryReadOnlyRow({
 	onDelete,
 	onOpenDetail,
 	onStartEdit,
+	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
 	row: DashboardSprintStoryRow;
@@ -816,6 +844,7 @@ function StoryReadOnlyRow({
 	onDelete: () => Promise<void>;
 	onOpenDetail: () => void;
 	onStartEdit: () => void;
+	onManageEpic?: (epicId: string) => void;
 }) {
 	const confirm = useConfirm();
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -869,9 +898,20 @@ function StoryReadOnlyRow({
 						<p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted @2xl:line-clamp-2">
 							{row.story.description}
 						</p>
-						<p className="mt-1 truncate text-xs text-muted @2xl:hidden" title={row.epicTitle}>
-							{row.epicTitle}
-						</p>
+						{onManageEpic ? (
+							<button
+								type="button"
+								onClick={() => onManageEpic(row.epicId)}
+								className="mt-1 block max-w-full cursor-pointer truncate text-left text-xs text-muted transition-colors hover:text-foreground @2xl:hidden"
+								title="Gestionar épica"
+							>
+								{row.epicTitle}
+							</button>
+						) : (
+							<p className="mt-1 truncate text-xs text-muted @2xl:hidden" title={row.epicTitle}>
+								{row.epicTitle}
+							</p>
+						)}
 						<div className="mt-1.5 @xl:hidden">
 							<ExecutionStatusBadge status={row.executionStatus} />
 						</div>
@@ -879,9 +919,20 @@ function StoryReadOnlyRow({
 				</div>
 			</td>
 			<td className="hidden min-w-0 px-3 py-3 align-top text-sm text-muted @2xl:table-cell @2xl:px-4 @2xl:py-4">
-				<span className="line-clamp-2" title={row.epicTitle}>
-					{row.epicTitle}
-				</span>
+				{onManageEpic ? (
+					<button
+						type="button"
+						onClick={() => onManageEpic(row.epicId)}
+						className="line-clamp-2 cursor-pointer text-left transition-colors hover:text-foreground"
+						title="Gestionar épica"
+					>
+						{row.epicTitle}
+					</button>
+				) : (
+					<span className="line-clamp-2" title={row.epicTitle}>
+						{row.epicTitle}
+					</span>
+				)}
 			</td>
 			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
 				<span className="inline-flex min-w-8 justify-center rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold text-foreground @lg:px-2">

@@ -99,7 +99,7 @@ export function DashboardSummaryStrip({
 						</>
 					) : (
 						<p className="text-[13px] text-muted">
-							Disponible al completar el plan de sprints.
+							Disponible al desbloquear el dashboard.
 						</p>
 					)}
 				</SummaryBlock>

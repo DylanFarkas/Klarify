@@ -469,7 +469,7 @@ export function HarnessChatPanel({
         </header>
         <div className="harness-chat__body justify-center">
           <p className="text-sm leading-relaxed text-muted">
-            Completa y aprueba el Agente 5 para editar épicas, historias, prioridades y sprints
+            Completa la priorización del backlog para editar épicas, historias, prioridades y sprints
             conversando con Klark.
           </p>
         </div>

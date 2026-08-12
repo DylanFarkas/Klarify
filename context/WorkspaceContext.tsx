@@ -33,6 +33,7 @@ import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5
 import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
 import { buildInitialExecutionState } from '@/lib/board/board-utils';
 import {
+  buildAgent6InputFromAgent4,
   normalizeSprintPlan,
   withUpdatedSprintPlan,
 } from '@/lib/utils/sprint-plan-mutations';
@@ -84,8 +85,13 @@ export interface UseWorkspaceResult {
   approveAgent3: (input: Agent4Input) => Promise<void>;
   approveAgent4: (input: Agent5Input) => Promise<void>;
   approveAgent5: (input: Agent6Input) => Promise<void>;
+  /** Materializa agent6Input si Agente 4 está aprobado y falta el plan (migración). */
+  bootstrapDashboardFromAgent4: () => Promise<void>;
   createUserStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
   deleteUserStory: (storyId: string) => Promise<void>;
+  createEpic: (input: { title: string; description: string }) => Promise<void>;
+  updateEpic: (epicId: string, updates: { title?: string; description?: string }) => Promise<void>;
+  deleteEpic: (epicId: string) => Promise<void>;
   updateUserStory: (
     storyId: string,
     updates: Partial<UserStory>,
@@ -791,6 +797,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         sourceWishIds: input.sourceWishIds,
         approvedAt: input.approvedAt,
       };
+      const agent6Input = buildAgent6InputFromAgent4(input);
       setWorkspace((prev) =>
         prev
           ? {
@@ -807,14 +814,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               pipeline: {
                 ...prev.pipeline,
                 agent5Input: input,
-                agent6Input: null,
+                agent6Input,
               },
+              execution: buildInitialExecutionState(agent6Input.epics),
             }
           : prev
       );
     },
     [runAction]
   );
+
+  const bootstrapDashboardFromAgent4 = useCallback(async () => {
+    if (!user) return;
+    const res = await authFetch('/api/workspace', user, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bootstrapDashboardFromAgent4' }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error ?? 'No se pudo inicializar el dashboard');
+    }
+    const data = (await res.json()) as { workspace?: UserWorkspace };
+    if (data.workspace) {
+      setWorkspace(data.workspace);
+    }
+  }, [user]);
 
   const approveAgent5 = useCallback(
     async (input: Agent6Input) => {
@@ -897,46 +922,68 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user, persistSprintPlan]
   );
 
-  const createUserStory = useCallback(
-    async (input: CreateDashboardUserStoryInput) => {
+  const applyWorkspaceAction = useCallback(
+    async (action: string, payload: unknown, fallbackError: string) => {
       if (!user) return;
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'createUserStory', payload: input }),
+        body: JSON.stringify({ action, payload }),
       });
-
+      const data = (await response.json().catch(() => null)) as
+        | { workspace?: UserWorkspace; error?: string }
+        | null;
       if (!response.ok) {
-        throw new Error('No se pudo crear la historia de usuario');
+        throw new Error(data?.error ?? fallbackError);
       }
-
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
+      if (data?.workspace) {
         setWorkspace(data.workspace);
       }
     },
     [user]
   );
 
+  const createUserStory = useCallback(
+    async (input: CreateDashboardUserStoryInput) => {
+      await applyWorkspaceAction('createUserStory', input, 'No se pudo crear la historia de usuario');
+    },
+    [applyWorkspaceAction]
+  );
+
   const deleteUserStory = useCallback(
     async (storyId: string) => {
-      if (!user) return;
-      const response = await authFetch('/api/workspace', user, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'deleteUserStory', payload: { storyId } }),
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo eliminar la historia de usuario');
-      }
-
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
-      }
+      await applyWorkspaceAction(
+        'deleteUserStory',
+        { storyId },
+        'No se pudo eliminar la historia de usuario'
+      );
     },
-    [user]
+    [applyWorkspaceAction]
+  );
+
+  const createEpic = useCallback(
+    async (input: { title: string; description: string }) => {
+      await applyWorkspaceAction('createEpic', input, 'No se pudo crear la épica');
+    },
+    [applyWorkspaceAction]
+  );
+
+  const updateEpic = useCallback(
+    async (epicId: string, updates: { title?: string; description?: string }) => {
+      await applyWorkspaceAction(
+        'updateEpic',
+        { epicId, ...updates },
+        'No se pudo actualizar la épica'
+      );
+    },
+    [applyWorkspaceAction]
+  );
+
+  const deleteEpic = useCallback(
+    async (epicId: string) => {
+      await applyWorkspaceAction('deleteEpic', { epicId }, 'No se pudo eliminar la épica');
+    },
+    [applyWorkspaceAction]
   );
 
   const initializeExecution = useCallback(async () => {
@@ -1102,8 +1149,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         approveAgent3,
         approveAgent4,
         approveAgent5,
+        bootstrapDashboardFromAgent4,
         createUserStory,
         deleteUserStory,
+        createEpic,
+        updateEpic,
+        deleteEpic,
         updateUserStory,
         updateSprintPlan,
         initializeExecution,

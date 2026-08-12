@@ -3,6 +3,7 @@
  *
  * Muestra los agentes del pipeline con estados (activo, completado, futuro).
  * Solo lectura: no permite navegar a pasos anteriores ni futuros.
+ * Omite pasos con `disabled: true` (p. ej. Agente 5 desactivado).
  */
 
 import { AGENT_STEPS } from '@/lib/constants/agent-1';
@@ -12,10 +13,13 @@ interface AgentStepperProps {
 }
 
 export function AgentStepper({ currentStep }: AgentStepperProps) {
+  const visibleSteps = AGENT_STEPS.filter((step) => !step.disabled);
+
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Progreso de agentes">
       <p className="mb-2 px-2.5 text-xs font-medium text-subtle">Pipeline</p>
-      {AGENT_STEPS.map((step) => {
+      {visibleSteps.map((step, index) => {
+        const displayNumber = index + 1;
         const isActive = step.number === currentStep;
         const isCompleted = step.number < currentStep;
         const isFuture = step.number > currentStep;
@@ -54,7 +58,7 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                step.number
+                displayNumber
               )}
             </div>
 

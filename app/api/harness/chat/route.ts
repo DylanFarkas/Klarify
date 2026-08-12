@@ -24,7 +24,7 @@ interface ChatBody {
 function assertPipelineReady(hasAgent6: boolean): void {
   if (!hasAgent6) {
     throw new Error(
-      'Klark está disponible cuando el pipeline está completo (Agente 5 aprobado).'
+      'Klark está disponible cuando el pipeline está completo (priorización aprobada).'
     );
   }
 }

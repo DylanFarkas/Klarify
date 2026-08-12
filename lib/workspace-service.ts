@@ -27,6 +27,7 @@ import {
   addStoryToSprintPlan,
   adjustSprintVelocityForStoryPoints,
   assignStoryToSprintInPlan,
+  buildAgent6InputFromAgent4,
   normalizeSprintPlan,
   removeStoryFromSprintPlan,
   withUpdatedSprintPlan,
@@ -1345,7 +1346,7 @@ export async function saveAgent4State(uid: string, state: Agent4State): Promise<
   });
 }
 
-/** Marca el Agente 4 como aprobado y escribe el input para el Agente 5. */
+/** Marca el Agente 4 como aprobado y abre el dashboard con plan de sprints vacío. */
 export async function approveAgent4(uid: string, agent5Input: Agent5Input): Promise<void> {
   const { workspace } = await getWorkspaceData(uid);
   const agent4Input: Agent4Input = {
@@ -1354,6 +1355,8 @@ export async function approveAgent4(uid: string, agent5Input: Agent5Input): Prom
     sourceWishIds: agent5Input.sourceWishIds,
     approvedAt: agent5Input.approvedAt,
   };
+  const agent6Input = buildAgent6InputFromAgent4(agent5Input);
+  const execution = buildInitialExecutionState(agent6Input.epics);
   const projectId = await activeProject(uid);
   await saveProjectWorkspace(uid, projectId, {
     agent4: sanitize({
@@ -1368,9 +1371,54 @@ export async function approveAgent4(uid: string, agent5Input: Agent5Input): Prom
     pipeline: {
       ...workspace.pipeline,
       agent5Input: sanitize(agent5Input),
-      agent6Input: null,
+      agent6Input: sanitize(agent6Input),
     },
+    execution: sanitize(execution),
   });
+}
+
+/**
+ * Migración suave: si el Agente 4 está aprobado pero falta agent6Input
+ * (proyectos creados antes de desactivar el Agente 5), lo materializa.
+ */
+export async function bootstrapDashboardFromAgent4(uid: string): Promise<UserWorkspace | null> {
+  const { workspace } = await getWorkspaceData(uid);
+  if (workspace.pipeline.agent6Input) return null;
+  if (workspace.agent4.status !== 'approved') return null;
+
+  const source: Agent5Input | null =
+    workspace.pipeline.agent5Input ??
+    (workspace.agent4.input && Object.keys(workspace.agent4.priorities).length > 0
+      ? {
+          epics: workspace.agent4.input.epics,
+          estimations: workspace.agent4.input.estimations,
+          priorities: workspace.agent4.priorities,
+          framework: workspace.agent4.framework,
+          sourceWishIds: workspace.agent4.input.sourceWishIds,
+          approvedAt: workspace.agent4.input.approvedAt,
+        }
+      : null);
+
+  if (!source?.epics.length) return null;
+
+  const agent6Input = buildAgent6InputFromAgent4(source);
+  if (workspace.agent5.plan) {
+    agent6Input.plan = normalizeSprintPlan(workspace.agent5.plan);
+  }
+  const execution =
+    workspace.execution ?? buildInitialExecutionState(agent6Input.epics);
+  const projectId = await activeProject(uid);
+  await saveProjectWorkspace(uid, projectId, {
+    pipeline: {
+      ...workspace.pipeline,
+      agent5Input: sanitize(source),
+      agent6Input: sanitize(agent6Input),
+    },
+    execution: sanitize(execution),
+  });
+
+  const { workspace: next } = await getWorkspaceData(uid);
+  return next;
 }
 
 /** Limpia el estado del Agente 1 (todos sus campos vuelven al estado inicial). */

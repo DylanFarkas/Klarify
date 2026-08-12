@@ -2,14 +2,49 @@
  * @fileoverview Mutaciones puras del plan de sprints — compartidas entre Agente 5 y dashboard.
  */
 
-import { SPRINT_ID_PREFIX } from '@/lib/constants/agent-5';
+import {
+  DEFAULT_SPRINT_CAPACITY_SP,
+  DEFAULT_SPRINT_DURATION_WEEKS,
+  SPRINT_ID_PREFIX,
+} from '@/lib/constants/agent-5';
+import type { Epic } from '@/lib/types/agent-2';
 import type {
   PlannedSprint,
   SprintDatePatch,
   SprintPlan,
 } from '@/lib/types/agent-5';
-import type { UserWorkspace } from '@/lib/types/workspace';
+import type { Agent5Input, Agent6Input, UserWorkspace } from '@/lib/types/workspace';
 import { applySprintDatePatch, computeEndDateForDuration } from '@/lib/utils/sprint-dates';
+
+/** Plan vacío: todas las HU en backlog, sin sprints (planificación manual tipo Jira). */
+export function createEmptySprintPlan(epics: Epic[]): SprintPlan {
+  const unassignedStoryIds = epics.flatMap((epic) => epic.userStories.map((story) => story.id));
+  const projectStartDate = new Date().toISOString().slice(0, 10);
+
+  return {
+    sprints: [],
+    dependencies: [],
+    config: {
+      sprintCapacitySp: DEFAULT_SPRINT_CAPACITY_SP,
+      sprintDurationWeeks: DEFAULT_SPRINT_DURATION_WEEKS,
+      projectStartDate,
+    },
+    unassignedStoryIds,
+  };
+}
+
+/** Construye Agent6Input desde el output del Agente 4 con plan vacío. */
+export function buildAgent6InputFromAgent4(input: Agent5Input): Agent6Input {
+  return {
+    epics: input.epics,
+    estimations: input.estimations,
+    priorities: input.priorities,
+    framework: input.framework,
+    plan: createEmptySprintPlan(input.epics),
+    sourceWishIds: input.sourceWishIds,
+    approvedAt: input.approvedAt,
+  };
+}
 
 const SPRINT_GOAL_PREFIX_RE = /^Sprint (\d+):\s*([\s\S]*)$/;
 
@@ -311,6 +346,27 @@ export function removeStoryFromSprintPlan(
 
 /** Aplica un plan actualizado en agent5 y pipeline.agent6Input. */
 export function withUpdatedSprintPlan(workspace: UserWorkspace, plan: SprintPlan): UserWorkspace {
+  const existing = workspace.pipeline.agent6Input;
+  let agent6Input = existing ? { ...existing, plan } : null;
+
+  if (!agent6Input) {
+    const source =
+      workspace.pipeline.agent5Input ??
+      (workspace.agent4.input && Object.keys(workspace.agent4.priorities).length > 0
+        ? {
+            epics: workspace.agent4.input.epics,
+            estimations: workspace.agent4.input.estimations,
+            priorities: workspace.agent4.priorities,
+            framework: workspace.agent4.framework,
+            sourceWishIds: workspace.agent4.input.sourceWishIds,
+            approvedAt: workspace.agent4.input.approvedAt,
+          }
+        : null);
+    if (source) {
+      agent6Input = { ...buildAgent6InputFromAgent4(source), plan };
+    }
+  }
+
   return {
     ...workspace,
     agent5: {
@@ -319,9 +375,7 @@ export function withUpdatedSprintPlan(workspace: UserWorkspace, plan: SprintPlan
     },
     pipeline: {
       ...workspace.pipeline,
-      agent6Input: workspace.pipeline.agent6Input
-        ? { ...workspace.pipeline.agent6Input, plan }
-        : null,
+      agent6Input,
     },
   };
 }

@@ -25,6 +25,7 @@ import {
   approveAgent3,
   approveAgent4,
   approveAgent5,
+  bootstrapDashboardFromAgent4,
   createUserStoryAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
@@ -66,6 +67,7 @@ interface PostBody {
     | 'approveAgent3'
     | 'approveAgent4'
     | 'approveAgent5'
+    | 'bootstrapDashboardFromAgent4'
     | 'createUserStory'
     | 'deleteUserStory'
     | 'updateUserStory'
@@ -221,6 +223,10 @@ export async function POST(request: NextRequest) {
       case 'approveAgent5':
         await approveAgent5(uid, body.payload as Agent6Input);
         return NextResponse.json({ ok: true });
+      case 'bootstrapDashboardFromAgent4': {
+        const workspace = await bootstrapDashboardFromAgent4(uid);
+        return NextResponse.json({ ok: true, workspace: workspace ?? undefined });
+      }
       case 'createUserStory': {
         const payload = body.payload as {
           epicId?: string;

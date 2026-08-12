@@ -1,4 +1,3 @@
-import { DashboardBacklogPanel } from './DashboardBacklogPanel';
 import { DashboardEmptyState } from './DashboardEmptyState';
 import { DashboardHero } from './DashboardHero';
 import { DashboardSummaryStrip } from './DashboardSummaryStrip';
@@ -30,6 +29,9 @@ interface DashboardContentProps {
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
 	onUpdateSprintPlan: (plan: SprintPlan) => void;
+	onCreateEpic: (input: { title: string; description: string }) => Promise<void>;
+	onUpdateEpic: (epicId: string, updates: { title?: string; description?: string }) => Promise<void>;
+	onDeleteEpic: (epicId: string) => Promise<void>;
 	workspace: UserWorkspace;
 }
 
@@ -44,6 +46,9 @@ export function DashboardContent({
 	onDeleteStory,
 	onEditStory,
 	onUpdateSprintPlan,
+	onCreateEpic,
+	onUpdateEpic,
+	onDeleteEpic,
 	workspace,
 }: DashboardContentProps) {
 	return (
@@ -63,8 +68,6 @@ export function DashboardContent({
 						executionBoardEnabled={executionBoardEnabled}
 					/>
 
-					<DashboardBacklogPanel metrics={metrics} />
-
 					<DashboardSprintPlan
 						epics={metrics.epics}
 						estimations={metrics.estimations}
@@ -75,6 +78,9 @@ export function DashboardContent({
 						onCreateStory={onCreateStory}
 						onDeleteStory={onDeleteStory}
 						onEditStory={onEditStory}
+						onCreateEpic={onCreateEpic}
+						onUpdateEpic={onUpdateEpic}
+						onDeleteEpic={onDeleteEpic}
 						onUpdateSprintPlan={onUpdateSprintPlan}
 					/>
 
