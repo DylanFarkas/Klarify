@@ -19,10 +19,10 @@ export type HarnessTraceStep =
 
 const TOOL_LABELS: Record<string, string> = {
   list_backlog: 'Consultar backlog',
-  get_story: 'Leer historia',
-  create_story: 'Crear historia',
-  update_story: 'Actualizar historia',
-  delete_story: 'Eliminar historia',
+  get_story: 'Leer ítem',
+  create_story: 'Crear ítem',
+  update_story: 'Actualizar ítem',
+  delete_story: 'Eliminar ítem',
   create_epic: 'Crear épica',
   update_epic: 'Actualizar épica',
   delete_epic: 'Eliminar épica',

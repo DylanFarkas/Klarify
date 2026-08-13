@@ -39,6 +39,7 @@ export function UserStoryList({
       .filter((c) => c.length > 0);
 
     onAdd({
+      type: 'story',
       title: trimmedTitle,
       description: trimmedDesc,
       acceptanceCriteria: criteria,

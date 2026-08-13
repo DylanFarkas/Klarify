@@ -38,13 +38,13 @@ interface HarnessChatPanelProps {
 const EXAMPLES = [
   {
     label: 'Consultar el backlog',
-    example: '«Muéstrame las épicas y sus historias»',
+    example: '«Muéstrame las épicas y sus ítems»',
     hint: 'Lectura',
   },
   {
-    label: 'Crear o editar historias',
-    example: '«Crea una HU para…» o «Actualiza el título de…»',
-    hint: 'Historias',
+    label: 'Crear o editar ítems',
+    example: '«Crea un bug de login…» o «Añade una task de CI…»',
+    hint: 'HU · Bug · Task',
   },
   {
     label: 'Gestionar épicas y sprints',
@@ -53,7 +53,7 @@ const EXAMPLES = [
   },
   {
     label: 'Ejecución',
-    example: '«Pasa HU-012 a in progress» o «Asigna esa historia a Ana»',
+    example: '«Pasa HU-012 a in progress» o «Asigna BUG-003 a Ana»',
     hint: 'Kanban',
   },
   {

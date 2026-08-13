@@ -19,6 +19,7 @@ export function DashboardExecutionPanel({
     sprintFilter: workspace.execution?.sprintFilter ?? 'all',
     epicId: 'all',
     assigneeId: 'all',
+    typeFilter: 'all',
     search: '',
   };
 

@@ -39,10 +39,12 @@ function parseSimpleCommand(message: string): {
   }
 
   const getStory = trimmed.match(
-    /^(?:ver|mostrar|get)\s+(?:la\s+)?(?:hu|historia|story)[\s_-]*(\d+)$/i
+    /^(?:ver|mostrar|get)\s+(?:la\s+)?(?:hu|historia|story|bug|task)[\s_-]*(\d+)$/i
   );
   if (getStory) {
-    return { name: 'get_story', args: { storyId: `HU-${getStory[1]}` } };
+    const kind = trimmed.match(/\b(bug|task)\b/i)?.[1]?.toUpperCase() ?? 'HU';
+    const prefix = kind === 'BUG' ? 'BUG' : kind === 'TASK' ? 'TASK' : 'HU';
+    return { name: 'get_story', args: { storyId: `${prefix}-${getStory[1]}` } };
   }
 
   const createEpic = trimmed.match(
@@ -55,13 +57,49 @@ function parseSimpleCommand(message: string): {
     };
   }
 
+  const createBug = trimmed.match(
+    /^crea(?:r)?\s+bug\s+["'](.+?)["']\s*[:\-]\s*(.+?)(?:\s*\|\s*(.+))?$/i
+  );
+  if (createBug) {
+    return {
+      name: 'create_story',
+      args: {
+        type: 'bug',
+        epicId: 'EPIC-001',
+        title: createBug[1],
+        description: createBug[2],
+        stepsToReproduce: [createBug[3]?.trim() || 'Reproducir el fallo descrito'],
+        severity: 'medium',
+      },
+    };
+  }
+
+  const createTask = trimmed.match(
+    /^crea(?:r)?\s+task\s+["'](.+?)["']\s*[:\-]\s*(.+)$/i
+  );
+  if (createTask) {
+    return {
+      name: 'create_story',
+      args: {
+        type: 'task',
+        epicId: 'EPIC-001',
+        title: createTask[1],
+        description: createTask[2],
+      },
+    };
+  }
+
   const deleteStory = trimmed.match(
-    /^elimina(?:r)?\s+(?:la\s+)?(?:hu|historia|story)[\s_-]*(\d+)$/i
+    /^elimina(?:r)?\s+(?:la\s+)?(?:hu|historia|story|bug|task)[\s_-]*(\d+)$/i
   );
   if (deleteStory) {
-    return { name: 'delete_story', args: { storyId: `HU-${deleteStory[1]}` } };
+    const kind = trimmed.match(/\b(bug|task)\b/i)?.[1]?.toUpperCase() ?? 'HU';
+    const prefix = kind === 'BUG' ? 'BUG' : kind === 'TASK' ? 'TASK' : 'HU';
+    return { name: 'delete_story', args: { storyId: `${prefix}-${deleteStory[1]}` } };
   }
-  const deleteStoryId = trimmed.match(/^elimina(?:r)?\s+((?:HU|STORY)[\s_-]*\d+)$/i);
+  const deleteStoryId = trimmed.match(
+    /^elimina(?:r)?\s+((?:HU|BUG|TASK|STORY)[\s_-]*\d+)$/i
+  );
   if (deleteStoryId) {
     return { name: 'delete_story', args: { storyId: deleteStoryId[1].toUpperCase() } };
   }
@@ -202,7 +240,7 @@ export async function runMockHarnessTurn(
 
   const assistantText =
     notes.join('\n\n') ||
-    'Modo mock activo. Prueba: "lista el backlog", "crear epica \\"Auth\\": login y sesión", o "eliminar HU-001".';
+    'Modo mock activo. Prueba: "lista el backlog", "crear bug \\"Login\\": falla al enviar | Abrir login", "crear task \\"CI\\": setup pipeline", o "eliminar HU-001".';
 
   onEvent({ type: 'message', role: 'assistant', text: assistantText });
 

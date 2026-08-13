@@ -240,25 +240,38 @@ export async function POST(request: NextRequest) {
         const payload = body.payload as {
           epicId?: string;
           sprintId?: string | null;
+          type?: import('@/lib/types/agent-2').WorkItemType;
           title?: string;
           description?: string;
           acceptanceCriteria?: string[];
           points?: number;
           category?: FrameworkCategory;
+          severity?: import('@/lib/types/agent-2').BugSeverity;
+          stepsToReproduce?: string[];
+          technicalNotes?: string;
         };
         if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        const { storyId } = await createUserStoryAcrossWorkspace(uid, {
-          epicId: payload.epicId,
-          sprintId: payload.sprintId ?? null,
-          title: payload.title,
-          description: payload.description,
-          acceptanceCriteria: payload.acceptanceCriteria ?? [],
-          points: payload.points,
-          category: payload.category,
-        });
-        return NextResponse.json({ ok: true, storyId });
+        try {
+          const { storyId } = await createUserStoryAcrossWorkspace(uid, {
+            epicId: payload.epicId,
+            sprintId: payload.sprintId ?? null,
+            type: payload.type,
+            title: payload.title,
+            description: payload.description,
+            acceptanceCriteria: payload.acceptanceCriteria ?? [],
+            points: payload.points,
+            category: payload.category,
+            severity: payload.severity,
+            stepsToReproduce: payload.stepsToReproduce,
+            technicalNotes: payload.technicalNotes,
+          });
+          return NextResponse.json({ ok: true, storyId });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'No se pudo crear el ítem';
+          return NextResponse.json({ error: message }, { status: 400 });
+        }
       }
       case 'deleteUserStory': {
         const payload = body.payload as { storyId?: string };
@@ -280,18 +293,23 @@ export async function POST(request: NextRequest) {
         if (!payload.storyId || !payload.updates) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
-        await updateUserStoryAcrossWorkspace(
-          uid,
-          payload.storyId,
-          payload.updates,
-          payload.estimationUpdates,
-          {
-            epicId: payload.epicId,
-            sprintId: payload.sprintId,
-          },
-          payload.prioritizationUpdates
-        );
-        return NextResponse.json({ ok: true });
+        try {
+          await updateUserStoryAcrossWorkspace(
+            uid,
+            payload.storyId,
+            payload.updates,
+            payload.estimationUpdates,
+            {
+              epicId: payload.epicId,
+              sprintId: payload.sprintId,
+            },
+            payload.prioritizationUpdates
+          );
+          return NextResponse.json({ ok: true });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'No se pudo actualizar el ítem';
+          return NextResponse.json({ error: message }, { status: 400 });
+        }
       }
       case 'createEpic': {
         const payload = body.payload as { title?: string; description?: string };

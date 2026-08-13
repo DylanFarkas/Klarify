@@ -58,11 +58,15 @@ export interface UpdateDashboardUserStoryOptions {
 export interface CreateDashboardUserStoryInput {
   epicId: string;
   sprintId?: string | null;
+  type?: import('@/lib/types/agent-2').WorkItemType;
   title: string;
   description: string;
   acceptanceCriteria: string[];
   points: number;
   category?: FrameworkCategory;
+  severity?: import('@/lib/types/agent-2').BugSeverity;
+  stepsToReproduce?: string[];
+  technicalNotes?: string;
 }
 
 export interface UseWorkspaceResult {
@@ -1009,9 +1013,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       const story: UserStory = {
         id: storyId,
+        type: input.type ?? 'story',
         title: input.title,
         description: input.description,
         acceptanceCriteria: input.acceptanceCriteria,
+        ...(input.type === 'bug'
+          ? {
+              severity: input.severity ?? 'medium',
+              stepsToReproduce: input.stepsToReproduce ?? [],
+            }
+          : {}),
+        ...(input.type === 'task' && input.technicalNotes
+          ? { technicalNotes: input.technicalNotes }
+          : {}),
         sourceWishIds: [],
         source: 'manual',
         isEdited: false,

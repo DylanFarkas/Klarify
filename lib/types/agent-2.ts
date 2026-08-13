@@ -17,12 +17,26 @@ export interface Agent2Input {
   wishes: Wish[];
 }
 
-/** Historia de Usuario estructurada (CA1) */
+/** Tipo de ítem de backlog (HU, bug o task técnica) */
+export type WorkItemType = 'story' | 'bug' | 'task';
+
+/** Severidad de un bug */
+export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+/** Ítem de backlog (historia, bug o task). El nombre UserStory se mantiene por compatibilidad. */
 export interface UserStory {
-  id: string;              // HU-001, HU-002...
+  id: string;              // HU-001 | BUG-001 | TASK-001
+  /** Discriminador semántico. Ausente en datos legacy → tratar como 'story'. */
+  type?: WorkItemType;
   title: string;           // CA1: Título
-  description: string;     // CA1: Descripción (formato "Como... quiero... para...")
-  acceptanceCriteria: string[];  // CA1: Criterios de aceptación
+  description: string;     // Story: "Como... quiero..."; bug/task: texto libre
+  acceptanceCriteria: string[];  // Obligatorio para story; opcional para bug/task
+  /** Solo bugs */
+  severity?: BugSeverity;
+  /** Solo bugs: pasos para reproducir */
+  stepsToReproduce?: string[];
+  /** Solo tasks: notas técnicas opcionales */
+  technicalNotes?: string;
   /** IDs de deseos que originaron esta HU (trazabilidad) */
   sourceWishIds: string[];
   source: 'auto' | 'manual';

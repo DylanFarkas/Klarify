@@ -14,6 +14,7 @@ import type { GithubExportRecord } from '@/lib/types/github-export';
 import { createEmptyWorkspace, type UserWorkspace } from '@/lib/types/workspace';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { normalizeEpics } from '@/lib/utils/work-item-validation';
 
 const EMPTY_AGENT3 = {
   input: null,
@@ -53,36 +54,53 @@ function generateProjectId(): string {
   return `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function normalizeAgentEpics<T extends { epics?: import('@/lib/types/agent-2').Epic[] } | null>(
+  value: T
+): T {
+  if (!value || !Array.isArray(value.epics)) return value;
+  return { ...value, epics: normalizeEpics(value.epics) };
+}
+
 function normalizeWorkspace(ws: Partial<UserWorkspace> | undefined): UserWorkspace {
   const empty = createEmptyWorkspace();
   if (!ws) return empty;
 
+  const agent2 = {
+    ...empty.agent2,
+    ...(ws.agent2 ?? {}),
+    epics: normalizeEpics(ws.agent2?.epics ?? empty.agent2.epics),
+  };
+
   return {
     agent1: { ...empty.agent1, ...(ws.agent1 ?? {}) },
-    agent2: { ...empty.agent2, ...(ws.agent2 ?? {}) },
+    agent2,
     agent3: {
       ...EMPTY_AGENT3,
       ...(ws.agent3 ?? {}),
+      input: normalizeAgentEpics(ws.agent3?.input ?? null),
       estimations: { ...EMPTY_AGENT3.estimations, ...(ws.agent3?.estimations ?? {}) },
     },
     agent4: {
       ...EMPTY_AGENT4,
       ...(ws.agent4 ?? {}),
+      input: normalizeAgentEpics(ws.agent4?.input ?? null),
       priorities: { ...EMPTY_AGENT4.priorities, ...(ws.agent4?.priorities ?? {}) },
     },
     agent5: {
       ...EMPTY_AGENT5,
       ...(ws.agent5 ?? {}),
+      input: normalizeAgentEpics(ws.agent5?.input ?? null),
       plan: ws.agent5?.plan ? normalizeSprintPlan(ws.agent5.plan) : null,
     },
     pipeline: {
       agent2Input: ws.pipeline?.agent2Input ?? null,
-      agent3Input: ws.pipeline?.agent3Input ?? null,
-      agent4Input: ws.pipeline?.agent4Input ?? null,
-      agent5Input: ws.pipeline?.agent5Input ?? null,
+      agent3Input: normalizeAgentEpics(ws.pipeline?.agent3Input ?? null),
+      agent4Input: normalizeAgentEpics(ws.pipeline?.agent4Input ?? null),
+      agent5Input: normalizeAgentEpics(ws.pipeline?.agent5Input ?? null),
       agent6Input: ws.pipeline?.agent6Input
         ? {
             ...ws.pipeline.agent6Input,
+            epics: normalizeEpics(ws.pipeline.agent6Input.epics ?? []),
             plan: ws.pipeline.agent6Input.plan
               ? normalizeSprintPlan(ws.pipeline.agent6Input.plan)
               : ws.pipeline.agent6Input.plan,

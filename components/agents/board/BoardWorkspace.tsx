@@ -33,6 +33,7 @@ export function BoardWorkspace() {
     sprintFilter: 'all',
     epicId: 'all',
     assigneeId: 'all',
+    typeFilter: 'all',
     search: '',
   });
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);

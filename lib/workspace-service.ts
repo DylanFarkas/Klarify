@@ -40,8 +40,15 @@ import {
   getLiveBacklog,
   isDashboardPhase,
   nextLiveEpicId,
-  nextLiveStoryId,
+  nextLiveWorkItemId,
 } from '@/lib/utils/live-backlog';
+import {
+  isBugSeverity,
+  isWorkItemType,
+  normalizeUserStory,
+  resolveWorkItemType,
+  validateWorkItemFields,
+} from '@/lib/utils/work-item-validation';
 import {
   withCreatedEpic,
   withCreatedUserStory,
@@ -114,12 +121,17 @@ const EMPTY_AGENT5: Agent5State = {
 export interface CreateUserStoryInput {
   epicId: string;
   sprintId?: string | null;
+  /** Default: story */
+  type?: import('@/lib/types/agent-2').WorkItemType;
   title: string;
   description: string;
   acceptanceCriteria: string[];
   points: number;
   /** Prioridad según el framework activo del Agente 4. */
   category?: FrameworkCategory;
+  severity?: import('@/lib/types/agent-2').BugSeverity;
+  stepsToReproduce?: string[];
+  technicalNotes?: string;
 }
 
 /**
@@ -411,11 +423,18 @@ export async function updateStoryExecution(
   patch: Partial<Pick<StoryExecution, 'status' | 'assigneeId' | 'columnOrder'>>
 ): Promise<UserWorkspace> {
   await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const execution = workspace.execution;
+  const { projectId, workspace: initial } = await loadProjectWorkspace(uid);
+  let workspace = initial;
+  let execution = workspace.execution;
+
   if (!execution?.initializedAt) {
-    return ensureExecutionInitialized(uid);
+    workspace = await ensureExecutionInitialized(uid);
+    execution = workspace.execution;
+    if (!execution?.initializedAt) {
+      throw new Error('No se pudo inicializar el tablero de ejecución.');
+    }
   }
+
   const current = execution.stories[storyId] ?? createDefaultStoryExecution(0);
   let updated = { ...current, ...patch, updatedAt: Date.now() };
 
@@ -554,10 +573,65 @@ export async function updateUserStoryAcrossWorkspace(
   prioritizationUpdates?: Partial<StoryPrioritization>
 ): Promise<UserWorkspace> {
   const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const live = getLiveBacklog(workspace);
+  const current = live.epics
+    .flatMap((epic) => epic.userStories)
+    .find((story) => story.id === storyId);
+  if (!current) {
+    throw new Error(`Historia no encontrada: ${storyId}`);
+  }
+
+  // MVP: no se permite cambiar el tipo ni el id tras crear.
+  const { type: _ignoredType, id: _ignoredId, ...safeUpdates } = updates;
+  const type = resolveWorkItemType(current);
+
+  const mergedForValidation = {
+    type,
+    title: safeUpdates.title ?? current.title,
+    description: safeUpdates.description ?? current.description,
+    acceptanceCriteria:
+      safeUpdates.acceptanceCriteria ?? current.acceptanceCriteria ?? [],
+    severity: safeUpdates.severity ?? current.severity,
+    stepsToReproduce:
+      safeUpdates.stepsToReproduce ?? current.stepsToReproduce ?? [],
+    technicalNotes: safeUpdates.technicalNotes ?? current.technicalNotes,
+  };
+  const validationError = validateWorkItemFields(mergedForValidation, {
+    partial: false,
+  });
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const normalizedPatch: Partial<UserStory> = { ...safeUpdates };
+  if (type === 'bug') {
+    if (safeUpdates.severity !== undefined) {
+      normalizedPatch.severity = isBugSeverity(safeUpdates.severity)
+        ? safeUpdates.severity
+        : 'medium';
+    }
+    if (safeUpdates.stepsToReproduce !== undefined) {
+      normalizedPatch.stepsToReproduce = safeUpdates.stepsToReproduce
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    delete normalizedPatch.technicalNotes;
+  } else if (type === 'task') {
+    if (safeUpdates.technicalNotes !== undefined) {
+      normalizedPatch.technicalNotes = safeUpdates.technicalNotes.trim();
+    }
+    delete normalizedPatch.severity;
+    delete normalizedPatch.stepsToReproduce;
+  } else {
+    delete normalizedPatch.severity;
+    delete normalizedPatch.stepsToReproduce;
+    delete normalizedPatch.technicalNotes;
+  }
+
   const updatedWorkspace = withUpdatedUserStory(
     workspace,
     storyId,
-    updates,
+    normalizedPatch,
     estimationUpdates,
     options,
     prioritizationUpdates
@@ -720,21 +794,64 @@ export async function createUserStoryAcrossWorkspace(
   if (!getLiveBacklog(workspace).epics.some((epic) => epic.id === input.epicId)) {
     throw new Error(`Épica no encontrada: ${input.epicId}`);
   }
-  await assertCanCreateStory(uid, workspace, input.epicId);
-  const storyId = nextLiveStoryId(workspace);
-  const story: UserStory = {
-    id: storyId,
+
+  const type = isWorkItemType(input.type) ? input.type : 'story';
+  const severity =
+    type === 'bug'
+      ? isBugSeverity(input.severity)
+        ? input.severity
+        : 'medium'
+      : undefined;
+  const stepsToReproduce =
+    type === 'bug'
+      ? (input.stepsToReproduce ?? []).map((s) => s.trim()).filter(Boolean)
+      : undefined;
+  const acceptanceCriteria = (input.acceptanceCriteria ?? [])
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const technicalNotes =
+    type === 'task' && typeof input.technicalNotes === 'string'
+      ? input.technicalNotes.trim()
+      : undefined;
+
+  const validationError = validateWorkItemFields({
+    type,
     title: input.title,
     description: input.description,
-    acceptanceCriteria: input.acceptanceCriteria,
+    acceptanceCriteria,
+    severity,
+    stepsToReproduce,
+    technicalNotes,
+  });
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  await assertCanCreateStory(uid, workspace, input.epicId);
+  const storyId = nextLiveWorkItemId(workspace, type);
+  const story = normalizeUserStory({
+    id: storyId,
+    type,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    acceptanceCriteria,
+    ...(type === 'bug'
+      ? { severity: severity ?? 'medium', stepsToReproduce: stepsToReproduce ?? [] }
+      : {}),
+    ...(type === 'task' && technicalNotes ? { technicalNotes } : {}),
     sourceWishIds: [],
     source: 'manual',
     isEdited: false,
     createdAt: Date.now(),
-  };
+  });
+
+  const defaultPoints = type === 'bug' ? 1 : input.points;
+  const points = Number.isFinite(input.points) ? input.points : defaultPoints;
+  const typeLabel =
+    type === 'bug' ? 'Bug' : type === 'task' ? 'Task' : 'Historia';
   const estimation: StoryEstimation = {
-    points: input.points,
-    justification: 'Estimacion creada manualmente desde el dashboard.',
+    points,
+    justification: `${typeLabel} creado(a) manualmente desde el dashboard.`,
     isModified: true,
   };
   const prioritization: StoryPrioritization | null = input.category

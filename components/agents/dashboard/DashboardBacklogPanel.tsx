@@ -9,6 +9,7 @@ import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
 import type { DashboardMetrics, DashboardSprintStoryRow } from './dashboardMetrics';
 
 interface DashboardBacklogPanelProps {
@@ -192,9 +193,12 @@ function DashboardEpicGroup({
 									].join(' ')}
 								>
 									<div className="min-w-0 flex-1">
-										<p className="text-[11px] tabular-nums text-subtle">
-											{story.id}
-										</p>
+										<div className="flex flex-wrap items-center gap-1.5">
+											<p className="text-[11px] tabular-nums text-subtle">
+												{story.id}
+											</p>
+											<WorkItemTypeBadge type={story.type} />
+										</div>
 										<p className="mt-0.5 text-[13px] font-medium text-foreground">
 											{story.title}
 										</p>

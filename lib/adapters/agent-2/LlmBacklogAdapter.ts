@@ -170,6 +170,7 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
 
         validStories.push({
           id: '',
+          type: 'story',
           title: rawStory.title.trim(),
           description: rawStory.description.trim(),
           acceptanceCriteria: cleanCriteria,

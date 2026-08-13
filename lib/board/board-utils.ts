@@ -2,7 +2,7 @@
  * @fileoverview Utilidades para construir datos del tablero Kanban.
  */
 
-import type { UserStory, Epic } from '@/lib/types/agent-2';
+import type { UserStory, Epic, WorkItemType } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { StoryPrioritization, PrioritizationFramework } from '@/lib/types/agent-4';
 import type { SprintPlan, StoryDependency } from '@/lib/types/agent-5';
@@ -13,6 +13,7 @@ import type {
   StoryExecution,
 } from '@/lib/types/execution';
 import type { Agent6Input, UserWorkspace } from '@/lib/types/workspace';
+import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
 
 export interface BoardStory {
   story: UserStory;
@@ -30,6 +31,7 @@ export interface BoardFilters {
   sprintFilter: string | 'all';
   epicId: string | 'all';
   assigneeId: string | 'all' | 'unassigned';
+  typeFilter: 'all' | WorkItemType;
   search: string;
 }
 
@@ -135,6 +137,13 @@ export function resolveBoardData(
       }
 
       if (filters.epicId !== 'all' && epic.id !== filters.epicId) continue;
+
+      if (
+        filters.typeFilter !== 'all' &&
+        resolveWorkItemType(story) !== filters.typeFilter
+      ) {
+        continue;
+      }
 
       if (filters.assigneeId === 'unassigned' && exec.assigneeId) continue;
       if (filters.assigneeId !== 'all' && filters.assigneeId !== 'unassigned' && exec.assigneeId !== filters.assigneeId) {

@@ -14,6 +14,7 @@ export const MOCK_BACKLOG: Epic[] = [
     userStories: [
       {
         id: 'HU-001',
+        type: 'story',
         title: 'Tablero Kanban con columnas personalizables',
         description: 'Como Product Owner, quiero un tablero Kanban con columnas personalizables para visualizar el estado de las tareas del equipo.',
         acceptanceCriteria: [

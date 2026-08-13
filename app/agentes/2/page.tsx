@@ -311,6 +311,7 @@ export default function Agent2Page() {
         const allStories = prev.epics.flatMap((e) => e.userStories);
         const newStory: UserStory = {
           ...story,
+          type: 'story',
           id: generateUserStoryId(allStories),
           source: 'manual',
           isEdited: false,

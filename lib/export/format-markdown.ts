@@ -95,6 +95,8 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
       lines.push(
         `#### ${row.storyId}: ${row.storyTitle}`,
         '',
+        `**Tipo:** ${row.storyType}`,
+        '',
         '**Descripción**',
         '',
         row.storyDescription,

@@ -13,9 +13,13 @@ export type ProjectExportFormat = 'json' | 'markdown' | 'xlsx';
 
 export interface ProjectExportStoryRow {
   storyId: string;
+  storyType: import('@/lib/types/agent-2').WorkItemType;
   storyTitle: string;
   storyDescription: string;
   acceptanceCriteria: string[];
+  severity: import('@/lib/types/agent-2').BugSeverity | null;
+  stepsToReproduce: string[];
+  technicalNotes: string | null;
   epicId: string;
   epicTitle: string;
   epicDescription: string;

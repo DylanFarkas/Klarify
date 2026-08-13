@@ -20,6 +20,7 @@ export default function DashboardPage() {
 		createUserStory,
 		deleteUserStory,
 		updateUserStory,
+		updateStoryExecution,
 		createEpic,
 		updateEpic,
 		deleteEpic,
@@ -61,6 +62,12 @@ export default function DashboardPage() {
 			onCreateStory={createUserStory}
 			onDeleteStory={deleteUserStory}
 			onEditStory={updateUserStory}
+			onUpdateStoryStatus={async (storyId, status) => {
+				await updateStoryExecution(storyId, { status });
+			}}
+			onUpdateStoryAssignee={async (storyId, assigneeId) => {
+				await updateStoryExecution(storyId, { assigneeId });
+			}}
 			onCreateEpic={createEpic}
 			onUpdateEpic={updateEpic}
 			onDeleteEpic={deleteEpic}

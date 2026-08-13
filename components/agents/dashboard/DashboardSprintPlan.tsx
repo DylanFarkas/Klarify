@@ -5,7 +5,7 @@ import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
-import type { ProjectMember } from '@/lib/types/execution';
+import type { ProjectMember, KanbanStatus } from '@/lib/types/execution';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
 import { DashboardEpicManager } from './DashboardEpicManager';
@@ -19,6 +19,7 @@ interface DashboardSprintPlanProps {
 	rows: DashboardSprintStoryRow[];
 	unassignedRows: DashboardSprintStoryRow[];
 	members: ProjectMember[];
+	executionBoardEnabled?: boolean;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -28,6 +29,8 @@ interface DashboardSprintPlanProps {
 		options?: UpdateDashboardUserStoryOptions,
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
+	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
 	onCreateEpic: (input: { title: string; description: string }) => Promise<void>;
 	onUpdateEpic: (epicId: string, updates: { title?: string; description?: string }) => Promise<void>;
 	onDeleteEpic: (epicId: string) => Promise<void>;
@@ -59,9 +62,12 @@ export function DashboardSprintPlan({
 	rows,
 	unassignedRows,
 	members,
+	executionBoardEnabled = false,
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
+	onUpdateStoryStatus,
+	onUpdateStoryAssignee,
 	onCreateEpic,
 	onUpdateEpic,
 	onDeleteEpic,
@@ -162,7 +168,7 @@ export function DashboardSprintPlan({
 						].join(' ')}
 					>
 						<PlusIcon />
-						Nueva HU
+						Nuevo Item
 					</button>
 				</div>
 			</div>
@@ -184,9 +190,14 @@ export function DashboardSprintPlan({
 				unassignedRows={filteredUnassignedRows}
 				members={members}
 				executionStatusByStoryId={executionStatusByStoryId}
+				canEditStatus={executionBoardEnabled}
 				onCreateStory={onCreateStory}
 				onDeleteStory={onDeleteStory}
 				onEditStory={onEditStory}
+				onUpdateStoryStatus={onUpdateStoryStatus}
+				onUpdateStoryAssignee={
+					executionBoardEnabled ? onUpdateStoryAssignee : undefined
+				}
 				onUpdateSprintPlan={onUpdateSprintPlan}
 				onStartSprint={onStartSprint}
 				onCompleteSprint={onCompleteSprint}

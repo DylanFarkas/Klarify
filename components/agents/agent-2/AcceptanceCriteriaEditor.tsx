@@ -11,12 +11,17 @@ interface AcceptanceCriteriaEditorProps {
   criteria: string[];
   onChange: (updated: string[]) => void;
   disabled: boolean;
+  /** Contador / encabezado, p. ej. "criterios" o "pasos" */
+  itemLabel?: string;
+  addButtonLabel?: string;
 }
 
 export function AcceptanceCriteriaEditor({
   criteria,
   onChange,
   disabled,
+  itemLabel = 'criterios',
+  addButtonLabel = 'Añadir criterio',
 }: AcceptanceCriteriaEditorProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newText, setNewText] = useState('');
@@ -99,7 +104,7 @@ export function AcceptanceCriteriaEditor({
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-[11px] text-subtle">
-        {criteria.length}/{MAX_ACCEPTANCE_CRITERIA} criterios
+        {criteria.length}/{MAX_ACCEPTANCE_CRITERIA} {itemLabel}
       </span>
 
       {criteria.map((criterion, index) => (
@@ -238,7 +243,7 @@ export function AcceptanceCriteriaEditor({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Añadir criterio
+            {addButtonLabel}
           </button>
         )
       ) : null}

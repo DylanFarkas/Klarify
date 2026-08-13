@@ -6,13 +6,14 @@
  * Antes del dashboard se usa el fallback del pipeline.
  */
 
-import type { Epic, UserStory } from '@/lib/types/agent-2';
+import type { Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import type { Agent6Input, UserWorkspace } from '@/lib/types/workspace';
-import { generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
+import { generateEpicId, generateWorkItemId } from '@/lib/utils/agent-2-ids';
 import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { normalizeEpics, resolveWorkItemType } from '@/lib/utils/work-item-validation';
 
 export interface LiveBacklog {
   epics: Epic[];
@@ -40,7 +41,7 @@ export function getLiveBacklog(workspace: UserWorkspace): LiveBacklog {
   const agent6 = workspace.pipeline.agent6Input;
   if (agent6) {
     return {
-      epics: agent6.epics ?? [],
+      epics: normalizeEpics(agent6.epics ?? []),
       estimations: agent6.estimations ?? {},
       priorities: agent6.priorities ?? {},
       framework: agent6.framework ?? null,
@@ -51,15 +52,16 @@ export function getLiveBacklog(workspace: UserWorkspace): LiveBacklog {
   }
 
   return {
-    epics:
+    epics: normalizeEpics(
       workspace.agent5.input?.epics ??
-      workspace.pipeline.agent5Input?.epics ??
-      workspace.agent4.input?.epics ??
-      workspace.pipeline.agent4Input?.epics ??
-      workspace.agent3.input?.epics ??
-      workspace.pipeline.agent3Input?.epics ??
-      workspace.agent2.epics ??
-      [],
+        workspace.pipeline.agent5Input?.epics ??
+        workspace.agent4.input?.epics ??
+        workspace.pipeline.agent4Input?.epics ??
+        workspace.agent3.input?.epics ??
+        workspace.pipeline.agent3Input?.epics ??
+        workspace.agent2.epics ??
+        []
+    ),
     estimations:
       workspace.agent5.input?.estimations ??
       workspace.pipeline.agent5Input?.estimations ??
@@ -93,7 +95,20 @@ export function listLiveStories(workspace: UserWorkspace): LiveStory[] {
 }
 
 export function nextLiveStoryId(workspace: UserWorkspace): string {
-  return generateUserStoryId(listLiveStories(workspace));
+  return nextLiveWorkItemId(workspace, 'story');
+}
+
+export function nextLiveWorkItemId(
+  workspace: UserWorkspace,
+  type: WorkItemType = 'story'
+): string {
+  return generateWorkItemId(type, listLiveStories(workspace));
+}
+
+export function resolveLiveWorkItemType(
+  story: Pick<UserStory, 'type'> | null | undefined
+): WorkItemType {
+  return resolveWorkItemType(story);
 }
 
 export function nextLiveEpicId(workspace: UserWorkspace): string {

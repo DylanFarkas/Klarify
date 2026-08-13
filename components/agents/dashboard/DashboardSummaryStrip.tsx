@@ -31,6 +31,7 @@ export function DashboardSummaryStrip({
 		sprintFilter,
 		epicId: 'all',
 		assigneeId: 'all',
+		typeFilter: 'all',
 		search: '',
 	};
 	const { stories } = resolveBoardData(workspace, filters);

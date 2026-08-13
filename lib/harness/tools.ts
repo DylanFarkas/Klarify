@@ -85,7 +85,7 @@ export function buildBacklogIndex(workspace: UserWorkspace): string {
       epic.userStories.length === 0
         ? '(sin historias)'
         : epic.userStories
-            .map((s) => `${s.id} «${truncate(s.title)}»`)
+            .map((s) => `${s.id}[${s.type ?? 'story'}] «${truncate(s.title)}»`)
             .join('; ');
     return `- ${epic.id} «${truncate(epic.title)}»: ${stories}`;
   });
@@ -124,7 +124,7 @@ export function buildBacklogIndex(workspace: UserWorkspace): string {
       : members.map((m) => `- ${m.id} «${truncate(m.displayName)}» (${m.role})`);
 
   return [
-    `Épicas: ${epics.length}. Historias: ${epics.reduce((n, e) => n + e.userStories.length, 0)}.`,
+    `Épicas: ${epics.length}. Ítems: ${epics.reduce((n, e) => n + e.userStories.length, 0)}.`,
     ...epicLines,
     `Sprints: ${plan?.sprints.length ?? 0}. Activo: ${active ? `${active.id} (Sprint ${active.number})` : 'ninguno'}.`,
     ...sprintLines,
@@ -168,11 +168,11 @@ function asBoolean(value: unknown): boolean {
   return value === true;
 }
 
-/** Extrae el número de un ID tipo HU-028, STORY-28, "hu 28", "28". */
+/** Extrae el número de un ID tipo HU-028, BUG-012, TASK-003, "hu 28", "28". */
 function extractEntityNumber(raw: string): number | null {
   const trimmed = raw.trim();
   const prefixed = trimmed.match(
-    /^(?:HU|STORY|US|USER[\s_-]?STORY|HISTORIA)[\s_-]*0*(\d+)$/i
+    /^(?:HU|BUG|TASK|STORY|US|USER[\s_-]?STORY|HISTORIA)[\s_-]*0*(\d+)$/i
   );
   if (prefixed) return Number(prefixed[1]);
   if (/^\d+$/.test(trimmed)) return Number(trimmed);
@@ -385,9 +385,13 @@ function summarizeBacklog(workspace: UserWorkspace) {
         const priorityCode = priorities[story.id]?.category ?? null;
         return {
           id: story.id,
+          type: story.type ?? 'story',
           title: story.title,
           description: story.description,
           acceptanceCriteria: story.acceptanceCriteria,
+          severity: story.severity ?? null,
+          stepsToReproduce: story.stepsToReproduce ?? null,
+          technicalNotes: story.technicalNotes ?? null,
           points: estimations[story.id]?.points ?? null,
           priority: priorityCode,
           priorityLabel: priorityCode ? (labels[priorityCode] ?? priorityCode) : null,
@@ -431,13 +435,13 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'get_story',
     description:
-      'Obtiene una historia por ID (HU-XXX, "28", etc.). Úsala para verificar existencia o leer detalle antes de mutar.',
+      'Obtiene un ítem por ID (HU-XXX, BUG-XXX, TASK-XXX, "28", etc.). Úsala para verificar existencia o leer detalle antes de mutar.',
     parameters: {
       type: 'object',
       properties: {
         storyId: {
           type: 'string',
-          description: 'ID de la historia. Preferir HU-XXX.',
+          description: 'ID del ítem. Preferir HU-XXX / BUG-XXX / TASK-XXX.',
         },
       },
       required: ['storyId'],
@@ -445,22 +449,46 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   },
   {
     name: 'create_story',
-    description: 'Crea una historia de usuario en una épica existente.',
+    description:
+      'Crea un ítem de backlog (historia, bug o task) en una épica existente. Usa type=story|bug|task (default story).',
     parameters: {
       type: 'object',
       properties: {
         epicId: { type: 'string', description: 'ID de la épica (p. ej. EPIC-001)' },
+        type: {
+          type: 'string',
+          description: 'story (HU), bug o task. Default: story.',
+          enum: ['story', 'bug', 'task'],
+        },
         title: { type: 'string' },
         description: {
           type: 'string',
-          description: 'Formato preferido: Como… quiero… para…',
+          description:
+            'Story: Como… quiero… para…. Bug/task: texto libre del fallo o trabajo técnico.',
         },
         acceptanceCriteria: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Criterios de aceptación',
+          description: 'Obligatorio para story (≥1). Opcional para bug/task.',
         },
-        points: { type: 'number', description: 'Story points (Fibonacci). Default 3.' },
+        severity: {
+          type: 'string',
+          description: 'Solo bug: low|medium|high|critical. Default medium.',
+          enum: ['low', 'medium', 'high', 'critical'],
+        },
+        stepsToReproduce: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Solo bug: pasos para reproducir (≥1 obligatorio).',
+        },
+        technicalNotes: {
+          type: 'string',
+          description: 'Solo task: notas técnicas opcionales.',
+        },
+        points: {
+          type: 'number',
+          description: 'Story points (Fibonacci). Default 3 (story/task) o 1 (bug).',
+        },
         category: {
           type: 'string',
           description:
@@ -472,13 +500,13 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
           nullable: true,
         },
       },
-      required: ['epicId', 'title', 'description', 'acceptanceCriteria'],
+      required: ['epicId', 'title', 'description'],
     },
   },
   {
     name: 'update_story',
     description:
-      'Actualiza una historia (título, descripción, CA, épica, puntos, prioridad o sprint). Para priorizar usa category con el código canónico (must/should/could/wont si MoSCoW).',
+      'Actualiza un ítem (HU/bug/task): título, descripción, CA, severity/steps/notes, épica, puntos, prioridad o sprint. No cambia el type.',
     parameters: {
       type: 'object',
       properties: {
@@ -486,6 +514,12 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         title: { type: 'string' },
         description: { type: 'string' },
         acceptanceCriteria: { type: 'array', items: { type: 'string' } },
+        severity: {
+          type: 'string',
+          enum: ['low', 'medium', 'high', 'critical'],
+        },
+        stepsToReproduce: { type: 'array', items: { type: 'string' } },
+        technicalNotes: { type: 'string' },
         epicId: { type: 'string', description: 'Mover a otra épica' },
         points: { type: 'number' },
         category: {
@@ -505,14 +539,14 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'delete_story',
     description:
-      'Elimina una historia. Requiere confirm=true tras confirmación explícita del usuario.',
+      'Elimina un ítem (HU/bug/task). Requiere confirm=true tras confirmación explícita del usuario.',
     parameters: {
       type: 'object',
       properties: {
         storyId: {
           type: 'string',
           description:
-            'ID de la historia. Preferir HU-XXX (p. ej. HU-028). También acepta "28", "HU-28" o alias.',
+            'ID del ítem. Preferir HU-XXX, BUG-XXX o TASK-XXX. También acepta "28", "HU-28" o alias.',
         },
         confirm: {
           type: 'boolean',
@@ -744,12 +778,34 @@ export async function executeHarnessTool(
         const title = asString(args.title);
         const description = asString(args.description);
         const acceptanceCriteria = asStringArray(args.acceptanceCriteria) ?? [];
+        const rawType = asString(args.type)?.toLowerCase();
+        const type =
+          rawType === 'bug' || rawType === 'task' || rawType === 'story'
+            ? rawType
+            : 'story';
+        const severityRaw = asString(args.severity)?.toLowerCase();
+        const severity =
+          severityRaw === 'low' ||
+          severityRaw === 'medium' ||
+          severityRaw === 'high' ||
+          severityRaw === 'critical'
+            ? severityRaw
+            : undefined;
+        const stepsToReproduce = asStringArray(args.stepsToReproduce);
+        const technicalNotes = asString(args.technicalNotes);
+
         if (!epicId || !title || !description) {
           return toolError('Faltan epicId, title o description.', 'INVALID_ARGS');
         }
-        if (acceptanceCriteria.length === 0) {
+        if (type === 'story' && acceptanceCriteria.length === 0) {
           return toolError(
-            'Se requiere al menos un criterio de aceptación.',
+            'Se requiere al menos un criterio de aceptación para una historia.',
+            'INVALID_ARGS'
+          );
+        }
+        if (type === 'bug' && (!stepsToReproduce || stepsToReproduce.length === 0)) {
+          return toolError(
+            'Se requiere al menos un paso para reproducir el bug.',
             'INVALID_ARGS'
           );
         }
@@ -770,22 +826,35 @@ export async function executeHarnessTool(
           sprintRaw === null || sprintRaw === ''
             ? null
             : asString(sprintRaw) ?? undefined;
+        const defaultPoints = type === 'bug' ? 1 : 3;
         const { workspace, storyId } = await createUserStoryAcrossWorkspace(ctx.uid, {
           epicId,
+          type,
           title,
           description,
           acceptanceCriteria,
-          points: asNumber(args.points) ?? 3,
+          severity,
+          stepsToReproduce,
+          technicalNotes,
+          points: asNumber(args.points) ?? defaultPoints,
           category,
           sprintId: sprintId === undefined ? undefined : sprintId,
         });
         const created = listLiveStories(workspace).find((s) => s.id === storyId);
+        const typeLabel =
+          type === 'bug' ? 'Bug' : type === 'task' ? 'Task' : 'Historia';
         return toolSuccess(
-          `Historia creada${created ? `: ${created.id}` : ''} — ${title}${
+          `${typeLabel} creado(a)${created ? `: ${created.id}` : ''} — ${title}${
             category ? ` [${category}]` : ''
           }`,
           {
-            data: { storyId: created?.id, epicId, title, category: category ?? null },
+            data: {
+              storyId: created?.id,
+              type,
+              epicId,
+              title,
+              category: category ?? null,
+            },
             mutated: true,
           }
         );
@@ -806,13 +875,29 @@ export async function executeHarnessTool(
           title?: string;
           description?: string;
           acceptanceCriteria?: string[];
+          severity?: 'low' | 'medium' | 'high' | 'critical';
+          stepsToReproduce?: string[];
+          technicalNotes?: string;
         } = {};
         const title = asString(args.title);
         const description = asString(args.description);
         const acceptanceCriteria = asStringArray(args.acceptanceCriteria);
+        const severityRaw = asString(args.severity)?.toLowerCase();
+        const stepsToReproduce = asStringArray(args.stepsToReproduce);
+        const technicalNotes = asString(args.technicalNotes);
         if (title) updates.title = title;
         if (description) updates.description = description;
         if (acceptanceCriteria) updates.acceptanceCriteria = acceptanceCriteria;
+        if (
+          severityRaw === 'low' ||
+          severityRaw === 'medium' ||
+          severityRaw === 'high' ||
+          severityRaw === 'critical'
+        ) {
+          updates.severity = severityRaw;
+        }
+        if (stepsToReproduce) updates.stepsToReproduce = stepsToReproduce;
+        if (technicalNotes !== undefined) updates.technicalNotes = technicalNotes;
 
         const hasSprint = Object.prototype.hasOwnProperty.call(args, 'sprintId');
         const sprintId = hasSprint
@@ -843,29 +928,34 @@ export async function executeHarnessTool(
           return toolError('No hay campos para actualizar.', 'INVALID_ARGS');
         }
 
-        await updateUserStoryAcrossWorkspace(
-          ctx.uid,
-          storyId,
-          updates,
-          points !== undefined
-            ? { points, justification: 'Actualizado por Klark.' }
-            : undefined,
-          {
-            epicId: asString(args.epicId),
-            sprintId,
-          },
-          category
-            ? {
-                category,
-                justification: 'Prioridad actualizada por Klark.',
-              }
-            : undefined
-        );
+        try {
+          await updateUserStoryAcrossWorkspace(
+            ctx.uid,
+            storyId,
+            updates,
+            points !== undefined
+              ? { points, justification: 'Actualizado por Klark.' }
+              : undefined,
+            {
+              epicId: asString(args.epicId),
+              sprintId,
+            },
+            category
+              ? {
+                  category,
+                  justification: 'Prioridad actualizada por Klark.',
+                }
+              : undefined
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'No se pudo actualizar.';
+          return toolError(message, 'INVALID_ARGS');
+        }
 
         return toolSuccess(
           category
-            ? `Historia ${storyId} actualizada. Prioridad: ${category}.`
-            : `Historia ${storyId} actualizada.`,
+            ? `Ítem ${storyId} actualizado. Prioridad: ${category}.`
+            : `Ítem ${storyId} actualizado.`,
           {
             data: { storyId, updates, points, category: category ?? null, sprintId },
             mutated: true,

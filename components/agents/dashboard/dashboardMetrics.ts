@@ -13,6 +13,8 @@ export type PriorityBucket = 'alta' | 'media' | 'baja';
 export interface DashboardMetrics {
 	epics: Epic[];
 	storyCount: number;
+	bugCount: number;
+	taskCount: number;
 	totalPoints: number;
 	wishesCount: number;
 	estimatedStoryCount: number;
@@ -202,6 +204,8 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 
 	const stories = epics.flatMap((epic) => epic.userStories);
 	const storyCount = stories.length;
+	const bugCount = stories.filter((story) => (story.type ?? 'story') === 'bug').length;
+	const taskCount = stories.filter((story) => (story.type ?? 'story') === 'task').length;
 	const wishesCount = workspace.agent1.wishes.length;
 	const totalPoints = stories.reduce((sum, story) => sum + (estimations[story.id]?.points ?? 0), 0);
 	const estimatedStoryCount = stories.filter((story) => Boolean(estimations[story.id])).length;
@@ -372,6 +376,8 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 	return {
 		epics,
 		storyCount,
+		bugCount,
+		taskCount,
 		totalPoints,
 		wishesCount,
 		estimatedStoryCount,

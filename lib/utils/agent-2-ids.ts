@@ -2,23 +2,55 @@
  * @fileoverview Generadores de IDs del Agente 2 (seguros para cliente).
  */
 
-import type { Epic, UserStory } from '@/lib/types/agent-2';
-import { EPIC_ID_PREFIX, USER_STORY_ID_PREFIX } from '@/lib/constants/agent-2';
+import type { Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
+import {
+  BUG_ID_PREFIX,
+  EPIC_ID_PREFIX,
+  TASK_ID_PREFIX,
+  USER_STORY_ID_PREFIX,
+} from '@/lib/constants/agent-2';
 
-export function generateEpicId(existing: Epic[] = []): string {
-  const maxNum = existing.reduce((max, epic) => {
-    const numStr = epic.id.replace(`${EPIC_ID_PREFIX}-`, '');
-    const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
-  }, 0);
-  return `${EPIC_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
+export function workItemIdPrefix(type: WorkItemType): string {
+  switch (type) {
+    case 'bug':
+      return BUG_ID_PREFIX;
+    case 'task':
+      return TASK_ID_PREFIX;
+    case 'story':
+    default:
+      return USER_STORY_ID_PREFIX;
+  }
 }
 
-export function generateUserStoryId(existing: UserStory[] = []): string {
-  const maxNum = existing.reduce((max, story) => {
-    const numStr = story.id.replace(`${USER_STORY_ID_PREFIX}-`, '');
+function nextIdForPrefix(prefix: string, existingIds: string[]): string {
+  const maxNum = existingIds.reduce((max, id) => {
+    if (!id.startsWith(`${prefix}-`)) return max;
+    const numStr = id.slice(prefix.length + 1);
     const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
+    return Number.isNaN(num) ? max : Math.max(max, num);
   }, 0);
-  return `${USER_STORY_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
+  return `${prefix}-${String(maxNum + 1).padStart(3, '0')}`;
+}
+
+export function generateEpicId(existing: Epic[] = []): string {
+  return nextIdForPrefix(
+    EPIC_ID_PREFIX,
+    existing.map((epic) => epic.id)
+  );
+}
+
+/** Genera el siguiente HU-XXX a partir de ítems existentes (solo cuenta prefijo HU). */
+export function generateUserStoryId(existing: UserStory[] = []): string {
+  return generateWorkItemId('story', existing);
+}
+
+/** Genera el siguiente ID según el tipo (HU / BUG / TASK), contando solo ese prefijo. */
+export function generateWorkItemId(
+  type: WorkItemType,
+  existing: UserStory[] = []
+): string {
+  return nextIdForPrefix(
+    workItemIdPrefix(type),
+    existing.map((item) => item.id)
+  );
 }

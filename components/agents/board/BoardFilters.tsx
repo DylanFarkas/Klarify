@@ -1,7 +1,8 @@
 'use client';
 
 import type { BoardFilters as BoardFiltersState } from '@/lib/board/board-utils';
-import type { Epic } from '@/lib/types/agent-2';
+import { WORK_ITEM_TYPE_LABELS } from '@/lib/constants/agent-2';
+import type { Epic, WorkItemType } from '@/lib/types/agent-2';
 import type { PlannedSprint } from '@/lib/types/agent-5';
 import { getSprintStatus } from '@/lib/types/agent-5';
 import type { ProjectMember } from '@/lib/types/execution';
@@ -33,7 +34,7 @@ export function BoardFilters({
           type="search"
           value={filters.search}
           onChange={(e) => onChange({ search: e.target.value })}
-          placeholder="Buscar historias..."
+          placeholder="Buscar ítems..."
           className={`w-full placeholder:text-subtle ${controlClass}`}
         />
       </div>
@@ -73,6 +74,24 @@ export function BoardFilters({
         {epics.map((e) => (
           <option key={e.id} value={e.id}>
             {e.title}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={filters.typeFilter}
+        onChange={(e) =>
+          onChange({
+            typeFilter: e.target.value as BoardFiltersState['typeFilter'],
+          })
+        }
+        className={`cursor-pointer ${controlClass}`}
+        aria-label="Filtrar por tipo"
+      >
+        <option value="all">Todos los tipos</option>
+        {(Object.keys(WORK_ITEM_TYPE_LABELS) as WorkItemType[]).map((type) => (
+          <option key={type} value={type}>
+            {WORK_ITEM_TYPE_LABELS[type]}
           </option>
         ))}
       </select>

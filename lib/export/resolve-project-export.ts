@@ -80,9 +80,13 @@ function buildStoryRows(
 
       return {
         storyId: story.id,
+        storyType: story.type ?? 'story',
         storyTitle: story.title,
         storyDescription: story.description,
         acceptanceCriteria: story.acceptanceCriteria,
+        severity: story.severity ?? null,
+        stepsToReproduce: story.stepsToReproduce ?? [],
+        technicalNotes: story.technicalNotes ?? null,
         epicId: epic.id,
         epicTitle: epic.title,
         epicDescription: epic.description,

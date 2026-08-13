@@ -19,6 +19,7 @@ import { StartSprintModal } from './StartSprintModal';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
+import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 import { getFrameworkShortLabels, getFrameworkCategories } from '@/lib/constants/agent-4';
@@ -50,7 +51,8 @@ import {
 	DashboardCreateStoryModal,
 	DashboardEditStoryModal,
 } from './DashboardStoryFormModal';
-import { ExecutionStatusBadge } from './ExecutionStatusBadge';
+import { ExecutionStatusBadge, ExecutionStatusSelect } from './ExecutionStatusBadge';
+import { AssigneeAvatarStatic, AssigneeSelect } from './AssigneeSelect';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 
@@ -63,6 +65,7 @@ interface DashboardSprintStoriesTableProps {
 	unassignedRows: DashboardSprintStoryRow[];
 	members?: ProjectMember[];
 	executionStatusByStoryId?: Record<string, KanbanStatus>;
+	canEditStatus?: boolean;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -72,6 +75,8 @@ interface DashboardSprintStoriesTableProps {
 		options?: UpdateDashboardUserStoryOptions,
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
+	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
 	onUpdateSprintPlan?: (plan: SprintPlan) => void;
 	onStartSprint?: (sprintId: string) => Promise<void>;
 	onCompleteSprint?: (
@@ -113,9 +118,12 @@ export function DashboardSprintStoriesTable({
 	unassignedRows,
 	members = [],
 	executionStatusByStoryId = {},
+	canEditStatus = false,
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
+	onUpdateStoryStatus,
+	onUpdateStoryAssignee,
 	onUpdateSprintPlan,
 	onStartSprint,
 	onCompleteSprint,
@@ -138,10 +146,10 @@ export function DashboardSprintStoriesTable({
 	const isCreating = controlledCreating ?? internalCreating;
 	const setIsCreating = onCreatingChange ?? setInternalCreating;
 
-	const memberNameById = useMemo(() => {
-		const map = new Map<string, string>();
+	const memberById = useMemo(() => {
+		const map = new Map<string, ProjectMember>();
 		for (const member of members) {
-			map.set(member.id, member.displayName);
+			map.set(member.id, member);
 		}
 		return map;
 	}, [members]);
@@ -242,6 +250,34 @@ export function DashboardSprintStoriesTable({
 			}
 		},
 		[onDeleteStory]
+	);
+
+	const handleUpdateStoryStatus = useCallback(
+		async (storyId: string, status: KanbanStatus) => {
+			if (!onUpdateStoryStatus) return;
+			try {
+				await onUpdateStoryStatus(storyId, status);
+				notifySuccess('Estado actualizado');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo actualizar el estado'));
+				throw err;
+			}
+		},
+		[onUpdateStoryStatus]
+	);
+
+	const handleUpdateStoryAssignee = useCallback(
+		async (storyId: string, assigneeId: string | null) => {
+			if (!onUpdateStoryAssignee) return;
+			try {
+				await onUpdateStoryAssignee(storyId, assigneeId);
+				notifySuccess(assigneeId ? 'Responsable asignado' : 'Responsable quitado');
+			} catch (err) {
+				notifyError(errorMessage(err, 'No se pudo actualizar el responsable'));
+				throw err;
+			}
+		},
+		[onUpdateStoryAssignee]
 	);
 
 	const handleMoveStory = useCallback(
@@ -445,8 +481,8 @@ export function DashboardSprintStoriesTable({
 						<th className="hidden w-[16%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
 						<th className="w-16 px-2 py-3 @lg:w-18 @lg:px-3">SP</th>
 						<th className="w-28 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
-						<th className="hidden w-22 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
-						<th className="hidden w-24 px-2 py-3 @2xl:table-cell @2xl:px-3">Asignado</th>
+						<th className="hidden w-36 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
+						<th className="hidden w-14 px-2 py-3 @2xl:table-cell @2xl:px-3">Asignado</th>
 						<th className="w-23 px-2 py-3 text-right @lg:w-27 @lg:px-3">Acciones</th>
 					</tr>
 				</thead>
@@ -460,10 +496,21 @@ export function DashboardSprintStoriesTable({
 								group={group}
 								canManagePlan={canManagePlan}
 								capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
-								memberNameById={memberNameById}
+								memberById={memberById}
+								members={members}
 								lifecycleBusy={lifecycleBusy}
 								onDeleteStory={handleDeleteStory}
 								onEditStory={handleEditStory}
+								onUpdateStoryStatus={
+									canEditStatus && onUpdateStoryStatus
+										? handleUpdateStoryStatus
+										: undefined
+								}
+								onUpdateStoryAssignee={
+									canEditStatus && onUpdateStoryAssignee
+										? handleUpdateStoryAssignee
+										: undefined
+								}
 								onOpenDetail={setDetailRow}
 								onStartEdit={setEditingStoryId}
 								onEditSprint={
@@ -702,10 +749,10 @@ export function DashboardSprintStoriesTable({
 						].join(' ')}
 					>
 						<PlusIcon />
-						Nueva HU
+						Nuevo ítem
 					</button>
 					<div className="rounded-2xl border border-border bg-surface px-4 py-3 text-right">
-						<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">HU planificadas</p>
+						<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Ítems planificados</p>
 						<p className="mt-1 text-2xl font-bold text-foreground">{rows.length}</p>
 					</div>
 				</div>
@@ -859,10 +906,13 @@ function SprintGroupRows({
 	group,
 	canManagePlan,
 	capacitySp,
-	memberNameById,
+	memberById,
+	members,
 	lifecycleBusy,
 	onDeleteStory,
 	onEditStory,
+	onUpdateStoryStatus,
+	onUpdateStoryAssignee,
 	onOpenDetail,
 	onStartEdit,
 	onEditSprint,
@@ -875,7 +925,8 @@ function SprintGroupRows({
 	group: SprintRowsGroup;
 	canManagePlan: boolean;
 	capacitySp: number;
-	memberNameById: Map<string, string>;
+	memberById: Map<string, ProjectMember>;
+	members: ProjectMember[];
 	lifecycleBusy: boolean;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -885,6 +936,8 @@ function SprintGroupRows({
 		options?: UpdateDashboardUserStoryOptions,
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
+	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
 	onOpenDetail: (row: DashboardSprintStoryRow) => void;
 	onStartEdit: (storyId: string) => void;
 	onEditSprint?: () => void;
@@ -1015,12 +1068,15 @@ function SprintGroupRows({
 						key={row.id}
 						framework={framework}
 						row={row}
-						assigneeName={
-							row.assigneeId ? memberNameById.get(row.assigneeId) ?? null : null
+						assignee={
+							row.assigneeId ? memberById.get(row.assigneeId) ?? null : null
 						}
+						members={members}
 						canDrag={canManagePlan && status !== 'completed'}
 						onDelete={async () => onDeleteStory(row.story.id)}
 						onEditStory={onEditStory}
+						onUpdateStoryStatus={onUpdateStoryStatus}
+						onUpdateStoryAssignee={onUpdateStoryAssignee}
 						onOpenDetail={() => onOpenDetail(row)}
 						onStartEdit={() => onStartEdit(row.story.id)}
 						onManageEpic={onManageEpic}
@@ -1034,17 +1090,21 @@ function SprintGroupRows({
 function StoryRow({
 	framework,
 	row,
-	assigneeName,
+	assignee,
+	members,
 	canDrag,
 	onDelete,
 	onEditStory,
+	onUpdateStoryStatus,
+	onUpdateStoryAssignee,
 	onOpenDetail,
 	onStartEdit,
 	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
 	row: DashboardSprintStoryRow;
-	assigneeName: string | null;
+	assignee: ProjectMember | null;
+	members: ProjectMember[];
 	canDrag: boolean;
 	onDelete: () => Promise<void>;
 	onEditStory: (
@@ -1054,13 +1114,17 @@ function StoryRow({
 		options?: UpdateDashboardUserStoryOptions,
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
+	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
 	onOpenDetail: () => void;
 	onStartEdit: () => void;
 	onManageEpic?: (epicId: string) => void;
 }) {
 	const confirm = useConfirm();
 	const [isDeleting, setIsDeleting] = useState(false);
-	const [isSavingField, setIsSavingField] = useState<'points' | 'priority' | null>(null);
+	const [isSavingField, setIsSavingField] = useState<
+		'points' | 'priority' | 'status' | 'assignee' | null
+	>(null);
 	const dragId = `story:${row.story.id}`;
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: dragId,
@@ -1136,6 +1200,51 @@ function StoryRow({
 		}
 	};
 
+	const handleStatusChange = async (nextStatus: KanbanStatus) => {
+		if (!onUpdateStoryStatus || isSavingField) return;
+		if (nextStatus === row.executionStatus) return;
+		setIsSavingField('status');
+		try {
+			await onUpdateStoryStatus(row.story.id, nextStatus);
+		} finally {
+			setIsSavingField(null);
+		}
+	};
+
+	const handleAssigneeChange = async (nextAssigneeId: string | null) => {
+		if (!onUpdateStoryAssignee || isSavingField) return;
+		if (nextAssigneeId === (assignee?.id ?? null)) return;
+		setIsSavingField('assignee');
+		try {
+			await onUpdateStoryAssignee(row.story.id, nextAssigneeId);
+		} finally {
+			setIsSavingField(null);
+		}
+	};
+
+	const statusControl = onUpdateStoryStatus ? (
+		<ExecutionStatusSelect
+			status={row.executionStatus}
+			onChange={handleStatusChange}
+			disabled={isSavingField !== null}
+			aria-label={`Estado de ${row.story.id}`}
+		/>
+	) : (
+		<ExecutionStatusBadge status={row.executionStatus} />
+	);
+
+	const assigneeControl = onUpdateStoryAssignee ? (
+		<AssigneeSelect
+			assignee={assignee}
+			members={members}
+			onChange={handleAssigneeChange}
+			disabled={isSavingField !== null}
+			aria-label={`Responsable de ${row.story.id}`}
+		/>
+	) : (
+		<AssigneeAvatarStatic assignee={assignee} />
+	);
+
 	return (
 		<tr
 			ref={canDrag ? setNodeRef : undefined}
@@ -1146,7 +1255,10 @@ function StoryRow({
 			].join(' ')}
 		>
 			<td className="hidden px-3 py-3 align-top @3xl:table-cell @3xl:px-4 @3xl:py-4">
-				<span className="font-mono text-xs font-bold text-muted">{row.story.id}</span>
+				<div className="flex flex-col items-start gap-1">
+					<span className="font-mono text-xs font-bold text-muted">{row.story.id}</span>
+					<WorkItemTypeBadge type={row.story.type} />
+				</div>
 			</td>
 			<td className="min-w-0 px-3 py-3 align-top @lg:px-4 @lg:py-4">
 				<div className="flex items-start gap-2">
@@ -1154,7 +1266,7 @@ function StoryRow({
 						<button
 							type="button"
 							className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-muted/50 transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
-							aria-label="Arrastrar historia"
+							aria-label="Arrastrar ítem"
 							{...listeners}
 							{...attributes}
 						>
@@ -1164,9 +1276,12 @@ function StoryRow({
 						</button>
 					) : null}
 					<div className="min-w-0 flex-1">
-						<span className="mb-0.5 block font-mono text-[11px] font-bold text-muted @3xl:hidden">
-							{row.story.id}
-						</span>
+						<div className="mb-0.5 flex flex-wrap items-center gap-1.5 @3xl:hidden">
+							<span className="font-mono text-[11px] font-bold text-muted">
+								{row.story.id}
+							</span>
+							<WorkItemTypeBadge type={row.story.type} />
+						</div>
 						<p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.story.title}>
 							{row.story.title}
 						</p>
@@ -1184,8 +1299,9 @@ function StoryRow({
 								{row.epicTitle}
 							</p>
 						)}
-						<div className="mt-1.5 @xl:hidden">
-							<ExecutionStatusBadge status={row.executionStatus} />
+						<div className="mt-1.5 flex flex-wrap items-center gap-2 @2xl:hidden">
+							<span className="@xl:hidden">{statusControl}</span>
+							{assigneeControl}
 						</div>
 					</div>
 				</div>
@@ -1234,17 +1350,11 @@ function StoryRow({
 					<span className="text-xs text-muted">N/D</span>
 				)}
 			</td>
-			<td className="hidden px-2 py-3 align-top @xl:table-cell @xl:px-3 @xl:py-4">
-				<ExecutionStatusBadge status={row.executionStatus} />
+			<td className="hidden overflow-hidden px-2 py-3 align-top @xl:table-cell @xl:px-3 @xl:py-4">
+				{statusControl}
 			</td>
-			<td className="hidden px-2 py-3 align-top text-xs text-muted @2xl:table-cell @2xl:px-3 @2xl:py-4">
-				{assigneeName ? (
-					<span className="line-clamp-1 font-medium text-foreground" title={assigneeName}>
-						{assigneeName}
-					</span>
-				) : (
-					<span className="text-subtle">—</span>
-				)}
+			<td className="hidden px-2 py-3 align-top @2xl:table-cell @2xl:px-3 @2xl:py-4">
+				{assigneeControl}
 			</td>
 			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
 				<div className="flex justify-end gap-0.5 @lg:gap-1.5">

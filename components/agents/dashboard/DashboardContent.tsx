@@ -12,6 +12,7 @@ import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } f
 import type { SprintPlan } from '@/lib/types/agent-5';
 import { DashboardSprintPlan } from './DashboardSprintPlan';
 import type { UserWorkspace } from '@/lib/types/workspace';
+import type { KanbanStatus } from '@/lib/types/execution';
 
 interface DashboardContentProps {
 	hasContent: boolean;
@@ -29,6 +30,8 @@ interface DashboardContentProps {
 		options?: UpdateDashboardUserStoryOptions,
 		prioritizationUpdates?: Partial<StoryPrioritization>
 	) => Promise<void>;
+	onUpdateStoryStatus: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onUpdateStoryAssignee: (storyId: string, assigneeId: string | null) => Promise<void>;
 	onUpdateSprintPlan: (plan: SprintPlan) => void;
 	onStartSprint: (sprintId: string) => Promise<void>;
 	onCompleteSprint: (
@@ -51,6 +54,8 @@ export function DashboardContent({
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
+	onUpdateStoryStatus,
+	onUpdateStoryAssignee,
 	onUpdateSprintPlan,
 	onStartSprint,
 	onCompleteSprint,
@@ -84,9 +89,12 @@ export function DashboardContent({
 						rows={metrics.sprintStoryRows}
 						unassignedRows={metrics.unassignedStoryRows}
 						members={workspace.execution?.members ?? []}
+						executionBoardEnabled={executionBoardEnabled}
 						onCreateStory={onCreateStory}
 						onDeleteStory={onDeleteStory}
 						onEditStory={onEditStory}
+						onUpdateStoryStatus={onUpdateStoryStatus}
+						onUpdateStoryAssignee={onUpdateStoryAssignee}
 						onCreateEpic={onCreateEpic}
 						onUpdateEpic={onUpdateEpic}
 						onDeleteEpic={onDeleteEpic}

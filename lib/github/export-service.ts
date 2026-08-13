@@ -61,7 +61,15 @@ export type GithubExportProgressCallback = (
 
 const EXPORT_LABEL = 'klarify-export';
 const STORY_LABEL = 'klarify:story';
+const BUG_LABEL = 'klarify:bug';
+const TASK_LABEL = 'klarify:task';
 const EPIC_LABEL_PREFIX = 'klarify:epic:';
+
+function workItemTypeLabel(type: string | undefined): string {
+  if (type === 'bug') return BUG_LABEL;
+  if (type === 'task') return TASK_LABEL;
+  return STORY_LABEL;
+}
 
 export class GithubExportError extends Error {
   readonly code: string;
@@ -194,6 +202,8 @@ export async function exportProjectToGithub(params: {
   reportProgress(onProgress, 'labels', 'Preparando etiquetas…');
   await ensureLabel(accessToken, owner, repo, EXPORT_LABEL, '0e8a16');
   await ensureLabel(accessToken, owner, repo, STORY_LABEL, '1d76db');
+  await ensureLabel(accessToken, owner, repo, BUG_LABEL, 'd73a4a');
+  await ensureLabel(accessToken, owner, repo, TASK_LABEL, '0e8a16');
 
   const repoChanged = existingExport != null && existingExport.repoFullName !== repoFullName;
   if (repoChanged) {
@@ -309,10 +319,18 @@ export async function exportProjectToGithub(params: {
 
     const storyLabel = `klarify:${story.id}`;
     await ensureLabel(accessToken, owner, repo, storyLabel, 'fbca04');
+    const typeLabel = workItemTypeLabel(story.type);
+    await ensureLabel(
+      accessToken,
+      owner,
+      repo,
+      typeLabel,
+      typeLabel === BUG_LABEL ? 'd73a4a' : typeLabel === TASK_LABEL ? '0e8a16' : '1d76db'
+    );
 
     const body = buildStoryIssueBody(exportable, backlog.stories);
     const title = `${story.id}: ${story.title}`;
-    const labels = [EXPORT_LABEL, STORY_LABEL, storyLabel, `${EPIC_LABEL_PREFIX}${epic.id}`];
+    const labels = [EXPORT_LABEL, typeLabel, storyLabel, `${EPIC_LABEL_PREFIX}${epic.id}`];
     const milestoneNumber = sprint ? milestoneMappings[sprint.id]?.number : undefined;
 
     const existing = storyMappings[story.id];

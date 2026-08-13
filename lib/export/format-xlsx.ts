@@ -368,6 +368,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
 } {
   const columns: ColumnDef[] = [
     { key: 'id', label: 'ID', width: 11, align: 'center' },
+    { key: 'tipo', label: 'Tipo', width: 10, align: 'center' },
     { key: 'titulo', label: 'Historia', width: 28, wrap: true },
     { key: 'descripcion', label: 'Descripción', width: 40, wrap: true },
     { key: 'criterios', label: 'Criterios de aceptación', width: 42, wrap: true },
@@ -395,6 +396,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
 
     return [
       row.storyId,
+      row.storyType,
       row.storyTitle,
       row.storyDescription,
       row.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n'),

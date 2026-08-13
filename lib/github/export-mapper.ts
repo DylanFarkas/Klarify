@@ -87,6 +87,7 @@ export function buildEpicIssueBody(epic: Epic): string {
 
 export function buildStoryIssueBody(exportable: ExportableStory, allStories: ExportableStory[]): string {
   const { story, epic, points, priorityLabel, sprint, dependencies } = exportable;
+  const type = story.type ?? 'story';
 
   const acceptanceLines =
     story.acceptanceCriteria.length > 0
@@ -106,9 +107,30 @@ export function buildStoryIssueBody(exportable: ExportableStory, allStories: Exp
     ? `Sprint ${sprint.number}: ${sprint.sprintGoal} (${sprint.startDate} → ${sprint.endDate})`
     : 'Sin sprint asignado';
 
+  const bugBlocks: string[] = [];
+  if (type === 'bug') {
+    bugBlocks.push(
+      '',
+      '## Severidad',
+      story.severity ?? 'medium',
+      '',
+      '## Pasos para reproducir',
+      ...(story.stepsToReproduce && story.stepsToReproduce.length > 0
+        ? story.stepsToReproduce.map((step, i) => `${i + 1}. ${step}`)
+        : ['1. Sin pasos definidos'])
+    );
+  }
+
+  const taskBlocks: string[] = [];
+  if (type === 'task' && story.technicalNotes) {
+    taskBlocks.push('', '## Notas técnicas', story.technicalNotes);
+  }
+
   const lines = [
     '## Descripción',
     story.description,
+    ...bugBlocks,
+    ...taskBlocks,
     '',
     '## Criterios de aceptación',
     ...acceptanceLines,
@@ -118,6 +140,7 @@ export function buildStoryIssueBody(exportable: ExportableStory, allStories: Exp
     '',
     '## Metadatos',
     `- **ID:** ${story.id}`,
+    `- **Tipo:** ${type}`,
     `- **Épica:** ${epic.id} — ${epic.title}`,
     `- **Story Points:** ${points}`,
     `- **Prioridad:** ${priorityLabel}`,

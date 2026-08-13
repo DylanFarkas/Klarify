@@ -8,6 +8,7 @@ import type { ProjectMember } from '@/lib/types/execution';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import { getFrameworkShortLabels, getFrameworkColors } from '@/lib/constants/agent-4';
 import { DependencyBadge } from '@/components/agents/agent-5/DependencyBadge';
+import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
 import type { StoryDependency } from '@/lib/types/agent-5';
 
 interface KanbanCardProps {
@@ -70,7 +71,7 @@ export function KanbanCard({
           className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded-md text-subtle hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
           aria-label="Arrastrar historia"
         >
-          <svg className="block h-[18px] w-[10px]" fill="currentColor" viewBox="0 0 10 18" aria-hidden>
+          <svg className="block h-4.5 w-2.5" fill="currentColor" viewBox="0 0 10 18" aria-hidden>
             <circle cx="2.5" cy="2.5" r="1.5" />
             <circle cx="7.5" cy="2.5" r="1.5" />
             <circle cx="2.5" cy="9" r="1.5" />
@@ -87,6 +88,7 @@ export function KanbanCard({
         >
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-[10px] font-medium text-subtle">{item.story.id}</span>
+            <WorkItemTypeBadge type={item.story.type} />
             {item.sprintNumber !== null && (
               <span className="text-[10px] text-subtle">S{item.sprintNumber}</span>
             )}
@@ -130,7 +132,7 @@ export function KanbanCard({
             {memberInitials(assignee.displayName)}
           </span>
         ) : (
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-[9px] text-subtle">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-muted text-[9px] font-bold text-muted">
             ?
           </span>
         )}
