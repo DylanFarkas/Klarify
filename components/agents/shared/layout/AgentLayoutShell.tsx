@@ -6,6 +6,7 @@ import { AgentSidebarSettings } from './AgentSidebarSettings';
 import { NewSessionButton } from './NewSessionButton';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { WorkspaceGridBackground } from './WorkspaceGridBackground';
+import { WorkspaceSidebarNav } from './WorkspaceSidebarNav';
 
 interface AgentLayoutShellProps {
   children: React.ReactNode;
@@ -31,7 +32,11 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
-            <AgentStepper currentStep={currentStep} />
+            {currentStep >= 6 ? (
+              <WorkspaceSidebarNav />
+            ) : (
+              <AgentStepper currentStep={currentStep} />
+            )}
 
             <div className="mt-1">
               <ProjectSwitcher />
@@ -73,12 +78,14 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
                 <span className="text-primary">K</span>larify
               </Link>
               <p className="truncate text-[12px] text-muted">
-                Paso {currentStep} · {agentTitle}
+                {currentStep >= 6 ? agentTitle : `Paso ${currentStep} · ${agentTitle}`}
               </p>
             </div>
-            <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-1 text-[11px] font-medium tabular-nums text-muted">
-              {currentStep}/6
-            </span>
+            {currentStep >= 6 ? null : (
+              <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-1 text-[11px] font-medium tabular-nums text-muted">
+                {currentStep}/6
+              </span>
+            )}
           </div>
           <AgentSidebarSettings className="mt-2.5" />
           <NewSessionButton className="mt-1" />

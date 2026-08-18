@@ -1,8 +1,8 @@
 /**
  * @fileoverview AgentStepper — Indicador visual de progreso entre agentes.
  *
- * Muestra los agentes del pipeline con estados (activo, completado, futuro).
- * Solo lectura: no permite navegar a pasos anteriores ni futuros.
+ * Se muestra solo mientras el pipeline está en curso (pasos 1–4).
+ * Al llegar al dashboard, el sidebar pasa a WorkspaceSidebarNav.
  * Omite pasos con `disabled: true` (p. ej. Agente 5 desactivado).
  */
 
