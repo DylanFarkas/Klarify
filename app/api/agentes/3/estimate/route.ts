@@ -13,7 +13,9 @@ import { assertAiRegenerationAllowed } from '@/lib/plans/regeneration-guard';
 import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { AGENT_ACTIVITY, PREP_ACTION_MIN_VISIBLE_MS } from '@/lib/constants/agent-activity';
 import type { Agent3Input } from '@/lib/types/workspace';
+import type { EstimationMode } from '@/lib/types/agent-3';
 import { validateAgent3Input, estimateBacklogStream } from '@/lib/services/agent-3-service';
+import { isEstimationMode } from '@/lib/utils/estimation';
 import {
   AgentStreamEmitter,
   createNdjsonStream,
@@ -34,7 +36,10 @@ export type { Agent3EstimationResponse, Agent3SuggestionItem, LocalEpic };
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as Agent3Input & { isRegeneration?: boolean };
+    const body = (await request.json()) as Agent3Input & {
+      isRegeneration?: boolean;
+      estimationMode?: EstimationMode;
+    };
 
     await assertAiRegenerationAllowed(uid, 'agent3', body.isRegeneration);
     const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
@@ -71,10 +76,16 @@ export async function POST(request: NextRequest) {
 
             // Acción 2: Generar estimaciones reales o mockeadas
             // Al limpiar la función local, esto conecta directamente con el pipeline de Gemini
+            const mode: EstimationMode = isEstimationMode(body.estimationMode)
+              ? body.estimationMode
+              : 'story_points';
             return emitter.runAction(
               'ACTION_ESTIMATE_STORIES',
-              'Calculando Story Points (Fibonacci)...',
-              () => estimateBacklogStream(uid, body.epics, emitter.bindThought(), aiConfig)
+              mode === 'time'
+                ? 'Estimando esfuerzo en tiempo calendario...'
+                : 'Calculando Story Points (Fibonacci)...',
+              () =>
+                estimateBacklogStream(uid, body.epics, mode, emitter.bindThought(), aiConfig)
             );
           }
         );

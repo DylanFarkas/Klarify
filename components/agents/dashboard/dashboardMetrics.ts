@@ -1,10 +1,11 @@
 import type { Epic } from '@/lib/types/agent-2';
 import type { UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import { createEmptySprintPlan } from '@/lib/utils/sprint-plan-mutations';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import { getEffortValue, isStoryEstimated } from '@/lib/utils/estimation';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
@@ -16,6 +17,7 @@ export interface DashboardMetrics {
 	bugCount: number;
 	taskCount: number;
 	totalPoints: number;
+	estimationMode: EstimationMode;
 	wishesCount: number;
 	estimatedStoryCount: number;
 	prioritizedStoryCount: number;
@@ -197,9 +199,11 @@ export function getStatusTone(status: string): 'success' | 'default' | 'warning'
 
 export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetrics {
 	const epics = resolveEpics(workspace);
-	const estimations = resolveEstimations(workspace);
-	const priorities = resolvePriorities(workspace);
-	const framework = resolveFramework(workspace);
+	const live = getLiveBacklog(workspace);
+	const estimations = live.estimations;
+	const estimationMode = live.estimationMode;
+	const priorities = live.priorities;
+	const framework = live.framework;
 	const plan = resolvePlan(workspace);
 
 	const stories = epics.flatMap((epic) => epic.userStories);
@@ -207,8 +211,13 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 	const bugCount = stories.filter((story) => (story.type ?? 'story') === 'bug').length;
 	const taskCount = stories.filter((story) => (story.type ?? 'story') === 'task').length;
 	const wishesCount = workspace.agent1.wishes.length;
-	const totalPoints = stories.reduce((sum, story) => sum + (estimations[story.id]?.points ?? 0), 0);
-	const estimatedStoryCount = stories.filter((story) => Boolean(estimations[story.id])).length;
+	const totalPoints = stories.reduce(
+		(sum, story) => sum + getEffortValue(estimations[story.id], estimationMode),
+		0
+	);
+	const estimatedStoryCount = stories.filter((story) =>
+		isStoryEstimated(estimations[story.id], estimationMode)
+	).length;
 	const prioritizedStoryCount = stories.filter((story) => Boolean(priorities[story.id])).length;
 	const totalAcceptanceCriteria = stories.reduce(
 		(sum, story) => sum + story.acceptanceCriteria.length,
@@ -227,7 +236,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 
 		const bucket = getPriorityBucket(framework, prioritization.category);
 		priorityBuckets[bucket].count += 1;
-		priorityBuckets[bucket].points += estimations[story.id]?.points ?? 0;
+		priorityBuckets[bucket].points += getEffortValue(estimations[story.id], estimationMode);
 	});
 
 	const completionCount = [
@@ -294,7 +303,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 	const epicBreakdown = epics.map((epic) => {
 		const storyEntries = epic.userStories.map((story) => ({
 			priority: priorities[story.id],
-			points: estimations[story.id]?.points ?? 0,
+			points: getEffortValue(estimations[story.id], estimationMode),
 			done: (workspace.execution?.stories[story.id]?.status ?? 'todo') === 'done',
 		}));
 
@@ -379,6 +388,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		bugCount,
 		taskCount,
 		totalPoints,
+		estimationMode,
 		wishesCount,
 		estimatedStoryCount,
 		prioritizedStoryCount,

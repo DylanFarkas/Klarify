@@ -45,6 +45,8 @@ import {
   withUpdatedEpic,
   withUpdatedUserStory,
 } from '@/lib/utils/user-story-mutations';
+import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import { buildManualEstimation } from '@/lib/utils/estimation';
 
 const SAVE_DEBOUNCE_MS = 500;
 const BULK_REORDER_DEBOUNCE_MS = 400;
@@ -62,7 +64,8 @@ export interface CreateDashboardUserStoryInput {
   title: string;
   description: string;
   acceptanceCriteria: string[];
-  points: number;
+  points?: number;
+  durationLabel?: string;
   category?: FrameworkCategory;
   severity?: import('@/lib/types/agent-2').BugSeverity;
   stepsToReproduce?: string[];
@@ -800,6 +803,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 ...prev.agent3,
                 input: agent3Input,
                 estimations: input.estimations,
+                estimationMode: input.estimationMode ?? prev.agent3.estimationMode ?? 'story_points',
                 status: 'approved',
                 error: null,
               },
@@ -818,6 +822,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const agent4Input: Agent4Input = {
         epics: input.epics,
         estimations: input.estimations,
+        estimationMode: input.estimationMode ?? 'story_points',
         sourceWishIds: input.sourceWishIds,
         approvedAt: input.approvedAt,
       };
@@ -872,6 +877,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const agent5Input: Agent5Input = {
         epics: input.epics,
         estimations: input.estimations,
+        estimationMode: input.estimationMode ?? 'story_points',
         priorities: input.priorities,
         framework: input.framework,
         sourceWishIds: input.sourceWishIds,
@@ -1031,17 +1037,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         isEdited: false,
         createdAt: Date.now(),
       };
-      setWorkspace((prev) =>
-        prev
-          ? withCreatedUserStory(prev, {
+      setWorkspace((prev) => {
+        if (!prev) return prev;
+        const mode = getLiveBacklog(prev).estimationMode;
+        return withCreatedUserStory(prev, {
               story,
               epicId: input.epicId,
               sprintId: input.sprintId,
-              estimation: {
+              estimation: buildManualEstimation({
+                mode,
                 points: input.points,
+                durationLabel: input.durationLabel,
+                workItemType: input.type ?? 'story',
                 justification: 'Estimacion creada manualmente desde el dashboard.',
-                isModified: true,
-              },
+              }),
               prioritization: input.category
                 ? {
                     category: input.category,
@@ -1049,9 +1058,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     isModified: true,
                   }
                 : null,
-            })
-          : prev
-      );
+            });
+      });
     },
     [postWorkspaceAction, user]
   );

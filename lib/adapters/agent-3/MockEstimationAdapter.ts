@@ -1,13 +1,13 @@
 /**
  * @fileoverview Mock Adapter para el Agente 3.
- * Simula el comportamiento de un LLM emitiendo delays artificiales y heurísticas.
  */
 
 import type { IEstimationAdapter } from './IEstimationAdapter';
-import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
+import type { EstimationMode, LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
 import { ESTIMATION_DELAY_MS } from '@/lib/constants/agent-3';
 import { MOCK_ESTIMATION_THOUGHTS, mockEstimateStories } from '@/lib/mock/agent-3-mock';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import type { AiGenerationConfig } from '@/lib/plans/types';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -29,17 +29,19 @@ async function emitMockThoughts(
 export class MockEstimationAdapter implements IEstimationAdapter {
   async estimateBacklog(
     epics: LocalEpic[],
-    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
+    estimationMode: EstimationMode,
+    _aiConfig?: AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]> {
-    return mockEstimateStories(epics);
+    return mockEstimateStories(epics, estimationMode);
   }
 
   async estimateBacklogStream(
     epics: LocalEpic[],
+    estimationMode: EstimationMode,
     onThought: LLMThoughtCallback,
-    _aiConfig?: import('@/lib/plans/types').AiGenerationConfig
+    _aiConfig?: AiGenerationConfig
   ): Promise<Agent3SuggestionItem[]> {
     await emitMockThoughts(MOCK_ESTIMATION_THOUGHTS, onThought, ESTIMATION_DELAY_MS);
-    return mockEstimateStories(epics);
+    return mockEstimateStories(epics, estimationMode);
   }
 }

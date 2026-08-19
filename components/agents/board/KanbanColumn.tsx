@@ -4,6 +4,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { BoardStory } from '@/lib/board/board-utils';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 import { KanbanCard } from './KanbanCard';
 import type { ProjectMember } from '@/lib/types/execution';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
@@ -43,6 +44,11 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column:${status}` });
 
+  const projectEstimationMode =
+    (storyIds[0] ? storiesById[storyIds[0]]?.estimationMode : undefined) ??
+    Object.values(storiesById)[0]?.estimationMode ??
+    'story_points';
+
   return (
     <div
       className={[
@@ -63,7 +69,9 @@ export function KanbanColumn({
           </div>
           <span className="tabular-nums text-[11px] text-subtle">{stats.count}</span>
         </div>
-        <p className="mt-0.5 pl-3.5 text-[11px] text-subtle">{stats.points} SP</p>
+        <p className="mt-0.5 pl-3.5 text-[11px] text-subtle">
+          {formatEffortTotal(stats.points, projectEstimationMode)}
+        </p>
       </header>
 
       <div

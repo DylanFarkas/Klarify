@@ -51,6 +51,7 @@ export function buildAgent6InputFromAgent4(input: Agent5Input): Agent6Input {
   return {
     epics: input.epics,
     estimations: input.estimations,
+    estimationMode: input.estimationMode ?? 'story_points',
     priorities: input.priorities,
     framework: input.framework,
     plan: createEmptySprintPlan(input.epics),

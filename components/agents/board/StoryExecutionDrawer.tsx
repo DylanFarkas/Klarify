@@ -133,7 +133,8 @@ export function StoryExecutionDrawer({
         <UserStoryDetailContent
           story={item.story}
           epicTitle={item.epicTitle}
-          estimation={item.points > 0 ? { points: item.points, justification: '', isModified: false } : undefined}
+          estimation={item.estimation}
+          estimationMode={item.estimationMode}
           prioritization={item.priority ?? undefined}
           framework={framework}
         />

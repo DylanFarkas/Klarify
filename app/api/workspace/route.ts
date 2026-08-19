@@ -245,12 +245,13 @@ export async function POST(request: NextRequest) {
           description?: string;
           acceptanceCriteria?: string[];
           points?: number;
+          durationLabel?: string;
           category?: FrameworkCategory;
           severity?: import('@/lib/types/agent-2').BugSeverity;
           stepsToReproduce?: string[];
           technicalNotes?: string;
         };
-        if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
+        if (!payload.epicId || !payload.title || !payload.description) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
         try {
@@ -262,6 +263,7 @@ export async function POST(request: NextRequest) {
             description: payload.description,
             acceptanceCriteria: payload.acceptanceCriteria ?? [],
             points: payload.points,
+            durationLabel: payload.durationLabel,
             category: payload.category,
             severity: payload.severity,
             stepsToReproduce: payload.stepsToReproduce,

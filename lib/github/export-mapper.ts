@@ -5,6 +5,12 @@
 import type { Agent6Input } from '@/lib/types/workspace';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { PlannedSprint, StoryDependency } from '@/lib/types/agent-5';
+import type { EstimationMode } from '@/lib/types/agent-3';
+import {
+  formatEffortTotal,
+  formatEstimation,
+  githubHoursFromEstimation,
+} from '@/lib/utils/estimation';
 import {
   getFrameworkLabels,
   getFrameworkShortLabels,
@@ -15,6 +21,8 @@ export interface ExportableStory {
   story: UserStory;
   epic: Epic;
   points: number;
+  effortLabel: string;
+  estimationMode: EstimationMode;
   priorityLabel: string;
   priorityCategory: string;
   sprint: PlannedSprint | null;
@@ -26,6 +34,7 @@ export interface ExportableBacklog {
   stories: ExportableStory[];
   sprints: PlannedSprint[];
   framework: PrioritizationFramework;
+  estimationMode: EstimationMode;
   priorityOptionNames: string[];
 }
 
@@ -33,6 +42,7 @@ export function buildExportableBacklog(input: Agent6Input): ExportableBacklog {
   const labels = getFrameworkLabels(input.framework);
   const shortLabels = getFrameworkShortLabels(input.framework);
   const priorityOptionNames = Object.values(shortLabels);
+  const estimationMode: EstimationMode = input.estimationMode ?? 'story_points';
 
   const sprintByStoryId = new Map<string, PlannedSprint>();
   for (const sprint of input.plan.sprints) {
@@ -51,10 +61,13 @@ export function buildExportableBacklog(input: Agent6Input): ExportableBacklog {
   const stories: ExportableStory[] = input.epics.flatMap((epic) =>
     epic.userStories.map((story) => {
       const category = input.priorities[story.id]?.category ?? 'could';
+      const estimation = input.estimations[story.id];
       return {
         story,
         epic,
-        points: input.estimations[story.id]?.points ?? 0,
+        points: githubHoursFromEstimation(estimation, estimationMode),
+        effortLabel: formatEstimation(estimation, estimationMode),
+        estimationMode,
         priorityLabel: labels[category] ?? category,
         priorityCategory: category,
         sprint: sprintByStoryId.get(story.id) ?? null,
@@ -68,6 +81,7 @@ export function buildExportableBacklog(input: Agent6Input): ExportableBacklog {
     stories,
     sprints: input.plan.sprints,
     framework: input.framework,
+    estimationMode,
     priorityOptionNames,
   };
 }
@@ -86,7 +100,7 @@ export function buildEpicIssueBody(epic: Epic): string {
 }
 
 export function buildStoryIssueBody(exportable: ExportableStory, allStories: ExportableStory[]): string {
-  const { story, epic, points, priorityLabel, sprint, dependencies } = exportable;
+  const { story, epic, points, effortLabel, estimationMode, priorityLabel, sprint, dependencies } = exportable;
   const type = story.type ?? 'story';
 
   const acceptanceLines =
@@ -142,7 +156,9 @@ export function buildStoryIssueBody(exportable: ExportableStory, allStories: Exp
     `- **ID:** ${story.id}`,
     `- **Tipo:** ${type}`,
     `- **Épica:** ${epic.id} — ${epic.title}`,
-    `- **Story Points:** ${points}`,
+    `- **${estimationMode === 'time' ? 'Tiempo' : 'Story Points'}:** ${
+      estimationMode === 'time' ? effortLabel : points
+    }`,
     `- **Prioridad:** ${priorityLabel}`,
     `- **Sprint:** ${sprintLine}`,
     '',
@@ -157,8 +173,8 @@ export function buildSprintMilestoneTitle(sprint: PlannedSprint): string {
   return `Sprint ${sprint.number}: ${sprint.sprintGoal}`;
 }
 
-export function buildSprintMilestoneDescription(sprint: PlannedSprint): string {
-  return `Objetivo: ${sprint.sprintGoal}\nVelocidad: ${sprint.velocitySp} SP\nPeríodo: ${sprint.startDate} → ${sprint.endDate}`;
+export function buildSprintMilestoneDescription(sprint: PlannedSprint, estimationMode: EstimationMode = 'story_points'): string {
+  return `Objetivo: ${sprint.sprintGoal}\nVelocidad: ${formatEffortTotal(sprint.velocitySp, estimationMode)}\nPeríodo: ${sprint.startDate} → ${sprint.endDate}`;
 }
 
 export function buildSprintFieldValue(sprint: PlannedSprint): string {

@@ -26,7 +26,13 @@ import { getFrameworkShortLabels, getFrameworkCategories } from '@/lib/constants
 import { SPRINT_COLORS } from '@/lib/constants/agent-5';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
+import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
+import {
+	formatEffortTotal,
+	formatEstimation,
+	getEffortValue,
+} from '@/lib/utils/estimation';
 import type {
 	FrameworkCategory,
 	PrioritizationFramework,
@@ -85,6 +91,7 @@ interface DashboardSprintStoriesTableProps {
 		rollover?: 'backlog' | 'next_planned'
 	) => Promise<void>;
 	onManageEpic?: (epicId: string) => void;
+	estimationMode?: EstimationMode;
 	/** When true, skips the outer section chrome (used inside DashboardSprintPlan). */
 	embedded?: boolean;
 	/** Controlled create-panel open state (used when embedded). */
@@ -129,6 +136,7 @@ export function DashboardSprintStoriesTable({
 	onStartSprint,
 	onCompleteSprint,
 	onManageEpic,
+	estimationMode = 'story_points',
 	embedded = false,
 	isCreating: controlledCreating,
 	onCreatingChange,
@@ -180,10 +188,10 @@ export function DashboardSprintStoriesTable({
 
 	const sprintOptions = useMemo(() => getSprintOptions(safePlan, rows), [safePlan, rows]);
 	const groups = useMemo(() => {
-		const all = buildSprintGroups(safePlan, rows, unassignedRows);
+		const all = buildSprintGroups(safePlan, rows, unassignedRows, estimationMode);
 		if (!hideEmptyGroups) return all;
 		return all.filter((group) => group.rows.length > 0);
-	}, [safePlan, rows, unassignedRows, hideEmptyGroups]);
+	}, [safePlan, rows, unassignedRows, hideEmptyGroups, estimationMode]);
 	const hasContent =
 		groups.some((g) => g.rows.length > 0) ||
 		(!hideEmptyGroups && Boolean(safePlan?.sprints.length));
@@ -285,9 +293,9 @@ export function DashboardSprintStoriesTable({
 		(storyId: string, fromSprintId: string | null, toSprintId: string | null) => {
 			const current = planRef.current;
 			if (!current || !onUpdateSprintPlan) return;
-			const storyPoints = estimations[storyId]?.points ?? 0;
+			const storyEffort = getEffortValue(estimations[storyId], estimationMode);
 			try {
-				persistPlan(moveStoryInPlan(current, storyId, fromSprintId, toSprintId, storyPoints));
+				persistPlan(moveStoryInPlan(current, storyId, fromSprintId, toSprintId, storyEffort));
 			} catch (err) {
 				notifyError(
 					err instanceof SprintLifecycleError
@@ -296,7 +304,7 @@ export function DashboardSprintStoriesTable({
 				);
 			}
 		},
-		[estimations, onUpdateSprintPlan, persistPlan]
+		[estimations, estimationMode, onUpdateSprintPlan, persistPlan]
 	);
 
 	const handleAddSprint = useCallback(() => {
@@ -508,7 +516,15 @@ export function DashboardSprintStoriesTable({
 						<th className="hidden w-24 px-3 py-3 @3xl:table-cell @3xl:px-4">ID</th>
 						<th className="min-w-0 px-3 py-3 @lg:px-4">HU</th>
 						<th className="hidden w-[16%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
-						<th className="w-16 px-2 py-3 @lg:w-18 @lg:px-3">SP</th>
+						<th
+							className={
+								estimationMode === 'time'
+									? 'w-20 px-2 py-3 @lg:w-24 @lg:px-3'
+									: 'w-16 px-2 py-3 @lg:w-22 @lg:px-3'
+							}
+						>
+							{estimationMode === 'time' ? 'Tiempo' : 'SP'}
+						</th>
 						<th className="w-28 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
 						<th className="hidden w-36 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
 						<th className="hidden w-14 px-2 py-3 @2xl:table-cell @2xl:px-3">Asignado</th>
@@ -525,6 +541,7 @@ export function DashboardSprintStoriesTable({
 								group={group}
 								canManagePlan={canManagePlan}
 								capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
+								estimationMode={estimationMode}
 								memberById={memberById}
 								members={members}
 								lifecycleBusy={lifecycleBusy}
@@ -699,6 +716,7 @@ export function DashboardSprintStoriesTable({
 				epics={epics}
 				framework={framework}
 				sprintOptions={sprintOptions}
+				estimationMode={estimationMode}
 				onCreate={async (input) => {
 					await handleCreateStory(input);
 					setIsCreating(false);
@@ -714,6 +732,7 @@ export function DashboardSprintStoriesTable({
 					framework={framework}
 					sprintOptions={editSprintOptions}
 					sprintAssignmentLocked={editingSprintLocked}
+					estimationMode={estimationMode}
 					onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
 						const savePromise = handleEditStory(
 							editingRow.story.id,
@@ -745,6 +764,7 @@ export function DashboardSprintStoriesTable({
 							story={detailRow.story}
 							epicTitle={detailRow.epicTitle}
 							estimation={detailRow.estimation}
+							estimationMode={estimationMode}
 							prioritization={detailRow.prioritization}
 							framework={framework ?? undefined}
 						/>
@@ -814,7 +834,8 @@ interface SprintOption {
 function buildSprintGroups(
 	plan: SprintPlan | null,
 	rows: DashboardSprintStoryRow[],
-	unassignedRows: DashboardSprintStoryRow[]
+	unassignedRows: DashboardSprintStoryRow[],
+	estimationMode: EstimationMode
 ): SprintRowsGroup[] {
 	const rowsBySprint = new Map<string, DashboardSprintStoryRow[]>();
 	rows.forEach((row) => {
@@ -854,7 +875,10 @@ function buildSprintGroups(
 				sprintIndex: null,
 				colorClass: 'border-l-border',
 				isUnassigned: group.key === 'unassigned',
-				velocitySp: group.rows.reduce((sum, r) => sum + (r.estimation?.points ?? 0), 0),
+				velocitySp: group.rows.reduce(
+					(sum, r) => sum + getEffortValue(r.estimation, estimationMode),
+					0
+				),
 			});
 		});
 	}
@@ -875,7 +899,7 @@ function buildSprintGroups(
 			colorClass: 'border-l-border',
 			isUnassigned: true,
 			velocitySp: (plan ? unassignedRows : unresolvedUnassigned).reduce(
-				(sum, r) => sum + (r.estimation?.points ?? 0),
+				(sum, r) => sum + getEffortValue(r.estimation, estimationMode),
 				0
 			),
 		});
@@ -944,6 +968,7 @@ function SprintGroupRows({
 	group,
 	canManagePlan,
 	capacitySp,
+	estimationMode,
 	memberById,
 	members,
 	lifecycleBusy,
@@ -963,6 +988,7 @@ function SprintGroupRows({
 	group: SprintRowsGroup;
 	canManagePlan: boolean;
 	capacitySp: number;
+	estimationMode: EstimationMode;
 	memberById: Map<string, ProjectMember>;
 	members: ProjectMember[];
 	lifecycleBusy: boolean;
@@ -993,8 +1019,9 @@ function SprintGroupRows({
 		disabled: dropDisabled,
 	});
 
-	const capacityPct = Math.round((group.velocitySp / capacitySp) * 100);
-	const isOverCapacity = group.velocitySp > capacitySp;
+	const showCapacity = estimationMode === 'story_points' && !group.isUnassigned;
+	const capacityPct = showCapacity ? Math.round((group.velocitySp / capacitySp) * 100) : 0;
+	const isOverCapacity = showCapacity && group.velocitySp > capacitySp;
 	const status = group.sprint ? getSprintStatus(group.sprint) : null;
 
 	return (
@@ -1029,7 +1056,7 @@ function SprintGroupRows({
 							)}
 						</div>
 
-						{!group.isUnassigned && (
+						{showCapacity && (
 							<div
 								className="h-2 w-14 shrink-0 overflow-hidden rounded-full bg-surface-muted @md:w-20 @xl:w-24"
 								title={`${group.velocitySp}/${capacitySp} SP`}
@@ -1042,7 +1069,7 @@ function SprintGroupRows({
 						)}
 
 						<span className="shrink-0 rounded-full border border-border bg-surface px-2 py-1 text-[11px] font-bold text-foreground @lg:px-2.5 @lg:text-xs">
-							{group.rows.length} HU · {group.velocitySp} SP
+							{group.rows.length} HU · {formatEffortTotal(group.velocitySp, estimationMode)}
 						</span>
 
 						{onStartSprint ? (
@@ -1100,6 +1127,7 @@ function SprintGroupRows({
 					<StoryRow
 						key={row.id}
 						framework={framework}
+						estimationMode={estimationMode}
 						row={row}
 						assignee={
 							row.assigneeId ? memberById.get(row.assigneeId) ?? null : null
@@ -1123,6 +1151,7 @@ function SprintGroupRows({
 
 function StoryRow({
 	framework,
+	estimationMode,
 	row,
 	assignee,
 	members,
@@ -1137,6 +1166,7 @@ function StoryRow({
 	onManageEpic,
 }: {
 	framework: PrioritizationFramework | null;
+	estimationMode: EstimationMode;
 	row: DashboardSprintStoryRow;
 	assignee: ProjectMember | null;
 	members: ProjectMember[];
@@ -1194,6 +1224,24 @@ function StoryRow({
 			label: labels[category] ?? category,
 		}));
 	}, [framework]);
+
+	const handleDurationChange = async (label: string, minutes: number) => {
+		if (minutes === (row.estimation?.durationMinutes ?? 0) || isSavingField) return;
+		setIsSavingField('points');
+		try {
+			await onEditStory(row.story.id, {}, {
+				points: 0,
+				durationMinutes: minutes,
+				durationLabel: label,
+				justification:
+					row.estimation?.justification ||
+					'Estimacion ajustada manualmente desde el dashboard.',
+				isModified: true,
+			});
+		} finally {
+			setIsSavingField(null);
+		}
+	};
 
 	const handlePointsChange = async (nextValue: string) => {
 		const nextPoints = Number(nextValue);
@@ -1362,17 +1410,28 @@ function StoryRow({
 					</span>
 				)}
 			</td>
-			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
-				<DropdownSelect
-					value={currentPoints > 0 ? String(currentPoints) : ''}
-					onChange={handlePointsChange}
-					options={pointsOptions}
-					placeholder="—"
-					disabled={fieldsDisabled}
-					size="compact"
-					className="w-14 @lg:w-16"
-					aria-label={`Story points de ${row.story.id}`}
-				/>
+			<td className="overflow-hidden px-2 py-3 align-top @lg:px-3 @lg:py-4">
+				{estimationMode === 'time' ? (
+					<TimeDurationInput
+						id={`dash-duration-${row.story.id}`}
+						value={row.estimation?.durationLabel ?? ''}
+						disabled={fieldsDisabled}
+						onCommit={handleDurationChange}
+						size="compact"
+						className="min-w-0"
+					/>
+				) : (
+					<DropdownSelect
+						value={currentPoints > 0 ? String(currentPoints) : ''}
+						onChange={handlePointsChange}
+						options={pointsOptions}
+						placeholder="—"
+						disabled={fieldsDisabled}
+						size="compact"
+						className="w-14 @lg:w-16"
+						aria-label={`Story points de ${row.story.id}`}
+					/>
+				)}
 			</td>
 			<td className="min-w-0 px-2 py-3 align-top @xl:px-3 @xl:py-4">
 				{framework ? (

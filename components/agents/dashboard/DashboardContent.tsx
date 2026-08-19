@@ -90,6 +90,7 @@ export function DashboardContent({
 						unassignedRows={metrics.unassignedStoryRows}
 						members={workspace.execution?.members ?? []}
 						executionBoardEnabled={executionBoardEnabled}
+						estimationMode={metrics.estimationMode}
 						onCreateStory={onCreateStory}
 						onDeleteStory={onDeleteStory}
 						onEditStory={onEditStory}

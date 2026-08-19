@@ -6,6 +6,7 @@ import type { Cell, CellObject, SheetData, Value } from 'write-excel-file/browse
 import { MEMBER_ROLE_LABELS } from '@/lib/export/resolve-project-export';
 import type { ProjectExportPayload, ProjectExportResult } from '@/lib/export/types';
 import { slugifyExportFilename } from '@/lib/export/filename';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -214,7 +215,11 @@ function buildSummarySheet(payload: ProjectExportPayload): {
     ['Framework de priorización', payload.frameworkLabel ?? '—'],
     ['Épicas', payload.summary.epicCount, true],
     ['Historias de usuario', payload.summary.storyCount, true],
-    ['Story points totales', payload.summary.totalStoryPoints, true],
+    [
+      payload.estimationMode === 'time' ? 'Tiempo total' : 'Story points totales',
+      payload.summary.totalEffortLabel,
+      true,
+    ],
     ['Historias estimadas', payload.summary.estimatedStoryCount],
     ['Historias priorizadas', payload.summary.prioritizedStoryCount],
     ['Sprints planificados', payload.summary.sprintCount, true],
@@ -288,13 +293,19 @@ function buildEpicsSheet(payload: ProjectExportPayload): {
     { key: 'titulo', label: 'Épica', width: 28 },
     { key: 'descripcion', label: 'Descripción', width: 52, wrap: true },
     { key: 'historias', label: 'Historias', width: 12, align: 'center' },
-    { key: 'sp', label: 'Story points', width: 14, align: 'center' },
+    { key: 'sp', label: payload.estimationMode === 'time' ? 'Tiempo' : 'Story points', width: 14, align: 'center' },
   ];
 
   const rawRows = payload.epics.map((epic) => {
     const epicStories = payload.stories.filter((row) => row.epicId === epic.id);
-    const points = epicStories.reduce((sum, row) => sum + (row.storyPoints ?? 0), 0);
-    return [epic.id, epic.title, epic.description, epicStories.length, points];
+    const effort = epicStories.reduce((sum, row) => sum + row.effortValue, 0);
+    return [
+      epic.id,
+      epic.title,
+      epic.description,
+      epicStories.length,
+      formatEffortTotal(effort, payload.estimationMode),
+    ];
   });
 
   const table = buildTableSheet(columns, rawRows);
@@ -318,7 +329,7 @@ function buildSprintsSheet(payload: ProjectExportPayload): {
     { key: 'objetivo', label: 'Objetivo', width: 40, wrap: true },
     { key: 'inicio', label: 'Inicio', width: 12, align: 'center' },
     { key: 'fin', label: 'Fin', width: 12, align: 'center' },
-    { key: 'velocidad', label: 'Velocidad (SP)', width: 14, align: 'center' },
+    { key: 'velocidad', label: payload.estimationMode === 'time' ? 'Velocidad' : 'Velocidad (SP)', width: 14, align: 'center' },
     { key: 'count', label: 'Historias', width: 12, align: 'center' },
     { key: 'ids', label: 'IDs de historias', width: 36, wrap: true },
   ];
@@ -329,7 +340,7 @@ function buildSprintsSheet(payload: ProjectExportPayload): {
     sprint.sprintGoal,
     sprint.startDate,
     sprint.endDate,
-    sprint.velocitySp,
+    formatEffortTotal(sprint.velocitySp, payload.estimationMode),
     sprint.storyIds.length,
     sprint.storyIds.join(' · '),
   ]);
@@ -374,7 +385,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
     { key: 'criterios', label: 'Criterios de aceptación', width: 42, wrap: true },
     { key: 'epic_id', label: 'Épica ID', width: 12, align: 'center' },
     { key: 'epic', label: 'Épica', width: 22 },
-    { key: 'sp', label: 'SP', width: 8, align: 'center' },
+    { key: 'sp', label: payload.estimationMode === 'time' ? 'Tiempo' : 'SP', width: 12, align: 'center' },
     { key: 'est_just', label: 'Justificación estimación', width: 28, wrap: true },
     { key: 'prio_cat', label: 'Prioridad', width: 14, align: 'center' },
     { key: 'prio_label', label: 'Etiqueta', width: 14, align: 'center' },
@@ -402,7 +413,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
       row.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n'),
       row.epicId,
       row.epicTitle,
-      emptyValue(row.storyPoints),
+      emptyValue(row.effortLabel),
       emptyValue(row.estimationJustification),
       emptyValue(row.priorityCategory),
       emptyValue(row.priorityLabel),
@@ -429,7 +440,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
       if (key === 'kanban' && value) {
         return kanbanStyle(String(value));
       }
-      if (key === 'sp' && typeof value === 'number') {
+      if (key === 'sp' && value) {
         return {
           textColor: COLORS.primary,
           backgroundColor: COLORS.primarySoft,
@@ -445,7 +456,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
       ...titleRow(
         'Historias de usuario',
         columns.length,
-        `${payload.stories.length} historias · ${payload.summary.totalStoryPoints} story points`
+        `${payload.stories.length} historias · ${payload.summary.totalEffortLabel}`
       ),
       ...table.data,
     ],

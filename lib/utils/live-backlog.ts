@@ -7,7 +7,8 @@
  */
 
 import type { Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
+import { isEstimationMode } from '@/lib/utils/estimation';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import type { Agent6Input, UserWorkspace } from '@/lib/types/workspace';
@@ -18,11 +19,35 @@ import { normalizeEpics, resolveWorkItemType } from '@/lib/utils/work-item-valid
 export interface LiveBacklog {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode: EstimationMode;
   priorities: Record<string, StoryPrioritization>;
   framework: PrioritizationFramework | null;
   plan: SprintPlan | null;
   sourceWishIds: string[];
   isDashboard: boolean;
+}
+
+function resolveLiveEstimationMode(
+  workspace: UserWorkspace,
+  preferred?: EstimationMode | null
+): EstimationMode {
+  if (isEstimationMode(preferred)) return preferred;
+  if (isEstimationMode(workspace.pipeline.agent5Input?.estimationMode)) {
+    return workspace.pipeline.agent5Input.estimationMode;
+  }
+  if (isEstimationMode(workspace.agent5.input?.estimationMode)) {
+    return workspace.agent5.input.estimationMode;
+  }
+  if (isEstimationMode(workspace.pipeline.agent4Input?.estimationMode)) {
+    return workspace.pipeline.agent4Input.estimationMode;
+  }
+  if (isEstimationMode(workspace.agent4.input?.estimationMode)) {
+    return workspace.agent4.input.estimationMode;
+  }
+  if (isEstimationMode(workspace.agent3.estimationMode)) {
+    return workspace.agent3.estimationMode;
+  }
+  return 'story_points';
 }
 
 export interface LiveStory extends UserStory {
@@ -43,6 +68,7 @@ export function getLiveBacklog(workspace: UserWorkspace): LiveBacklog {
     return {
       epics: normalizeEpics(agent6.epics ?? []),
       estimations: agent6.estimations ?? {},
+      estimationMode: resolveLiveEstimationMode(workspace, agent6.estimationMode),
       priorities: agent6.priorities ?? {},
       framework: agent6.framework ?? null,
       plan: agent6.plan ? normalizeSprintPlan(agent6.plan) : null,
@@ -67,6 +93,7 @@ export function getLiveBacklog(workspace: UserWorkspace): LiveBacklog {
       workspace.pipeline.agent5Input?.estimations ??
       workspace.agent3.estimations ??
       {},
+    estimationMode: resolveLiveEstimationMode(workspace),
     priorities:
       workspace.agent5.input?.priorities ??
       workspace.pipeline.agent5Input?.priorities ??

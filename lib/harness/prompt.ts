@@ -3,6 +3,8 @@
  */
 
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
+import type { EstimationMode } from '@/lib/types/agent-3';
+import { TIME_DURATION_EXAMPLES } from '@/lib/constants/agent-3';
 import { buildPriorityToolHint, describeFrameworkCategories } from '@/lib/harness/priority';
 import { AI_PROVIDER_LABELS } from '@/lib/llm/catalog';
 import type { LlmCredentials } from '@/lib/llm/types';
@@ -24,7 +26,8 @@ export function identityFromCredentials(credentials: LlmCredentials): HarnessPro
 export function buildHarnessSystemPrompt(
   framework: PrioritizationFramework,
   backlogIndex?: string,
-  identity?: HarnessPromptIdentity
+  identity?: HarnessPromptIdentity,
+  estimationMode: EstimationMode = 'story_points'
 ): string {
   const { frameworkLabel, allowedCategories, categoryLabels } =
     describeFrameworkCategories(framework);
@@ -62,6 +65,17 @@ ${backlogIndex.trim()}
 
 ## Contexto del proyecto (autoritativo)
 - Framework de priorización activo: ${frameworkLabel} (código interno: ${framework}).
+- Modo de estimación (FIJO, no se puede cambiar): ${
+    estimationMode === 'time'
+      ? `tiempo calendario (${TIME_DURATION_EXAMPLES}; 1d = 24h). Usa duration, nunca points.`
+      : 'Story Points Fibonacci (1, 2, 3, 5, 8, 13, 21). Usa points, nunca duration.'
+  }.
+- No existe ninguna tool para cambiar el modo. Dashboard y Klark solo editan valores dentro del modo activo.
+${
+  estimationMode === 'time'
+    ? `- create_story/update_story: pasa duration como string de una sola unidad (${TIME_DURATION_EXAMPLES}). Rechaza combinaciones (1d 4h). Defaults: 1h (story/task), 30m (bug).`
+    : '- create_story/update_story: pasa points Fibonacci. Defaults: 3 (story/task), 1 (bug).'
+}
 - Categorías válidas (usa el CÓDIGO canónico al llamar tools, nunca etiquetas largas):
 ${categoryLines}
 - ${buildPriorityToolHint(framework)}
@@ -96,7 +110,8 @@ ${indexBlock}
 7. delete_sprint NUNCA borra un sprint con historias asignadas. Si devuelve SPRINT_NOT_EMPTY, informa las HU y ofrece reasignarlas o dejarlas sin sprint; no reintentes el delete.
 8. Solo un sprint puede estar active. Si start_sprint falla porque ya hay uno activo, sugiere cerrarlo primero con complete_sprint.
 9. Al cerrar (complete_sprint): usa rollover=backlog por defecto; next_planned solo si el usuario pide mover incompletas al siguiente sprint.
-9b. Un sprint [completed] es histórico: no saques ni metas historias, ni edites, cambies estado/responsable, puntos, prioridad o borres esas HU. Si una tool devuelve SPRINT_CLOSED, informa y no reintentes. Tampoco las cuentes como «todas las HU» al replanificar.
+9b. Un sprint [completed] es histórico: no saques ni metas historias, ni edites, cambies estado/responsable, estimación, prioridad o borres esas HU. Si una tool devuelve SPRINT_CLOSED, informa y no reintentes. Tampoco las cuentes como «todas las HU» al replanificar.
+9c. El modo de estimación del proyecto es inmutable. No intentes pasar de Story Points a tiempo ni al revés.
 10. Estados Kanban válidos: todo, in_progress, code_review, done.
 11. Responde en español, breve y accionable. Tras mutar, confirma el ID canónico + valor aplicado.
 12. Si una tool falla con INVALID_ARGS o INVALID_CATEGORY, corrige args y reintenta una vez. Si falla con STORY_NOT_FOUND / EPIC_NOT_FOUND / SPRINT_NOT_FOUND / SPRINT_NOT_EMPTY / SPRINT_CLOSED, no reintentes delete/update/assign: informa al usuario. No preguntes por el framework.

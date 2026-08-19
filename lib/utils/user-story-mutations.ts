@@ -8,6 +8,7 @@ import type { StoryPrioritization } from '@/lib/types/agent-4';
 import type { UserWorkspace } from '@/lib/types/workspace';
 import { createDefaultStoryExecution } from '@/lib/board/board-utils';
 import { getLiveBacklog, isDashboardPhase, patchLiveAgent6 } from '@/lib/utils/live-backlog';
+import { getEffortValue } from '@/lib/utils/estimation';
 import {
   addStoryToSprintPlan,
   adjustSprintVelocityForStoryPoints,
@@ -201,8 +202,13 @@ export function withUpdatedUserStory(
   const live = getLiveBacklog(workspace);
   const currentEpicId = findStoryEpicId(live.epics, storyId);
   const shouldMoveEpic = options?.epicId !== undefined && options.epicId !== currentEpicId;
-  const oldPoints = live.estimations[storyId]?.points ?? 0;
-  const newPoints = estimationUpdates?.points ?? oldPoints;
+  const mode = live.estimationMode;
+  const nextEstimation = estimationUpdates
+    ? { ...(live.estimations[storyId] ?? { points: 0, justification: '', isModified: false }), ...estimationUpdates }
+    : live.estimations[storyId];
+  const oldEffort = getEffortValue(live.estimations[storyId], mode);
+  const newEffort = getEffortValue(nextEstimation, mode);
+  const effortChanged = estimationUpdates !== undefined && oldEffort !== newEffort;
 
   const applyStoryUpdate = (sourceEpics: Epic[] | null | undefined) =>
     applyStoryUpdateToEpics(sourceEpics, storyId, updates, shouldMoveEpic, options?.epicId);
@@ -212,9 +218,9 @@ export function withUpdatedUserStory(
     let updatedPlan = agent6.plan ?? null;
     if (updatedPlan) {
       if (options?.sprintId !== undefined) {
-        updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newPoints);
-      } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
-        updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldPoints, newPoints);
+        updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newEffort);
+      } else if (effortChanged) {
+        updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldEffort, newEffort);
       }
     }
 
@@ -229,9 +235,9 @@ export function withUpdatedUserStory(
   let updatedPlan = workspace.agent5.plan;
   if (updatedPlan) {
     if (options?.sprintId !== undefined) {
-      updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newPoints);
-    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
-      updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldPoints, newPoints);
+      updatedPlan = assignStoryToSprintInPlan(updatedPlan, storyId, options.sprintId, newEffort);
+    } else if (effortChanged) {
+      updatedPlan = adjustSprintVelocityForStoryPoints(updatedPlan, storyId, oldEffort, newEffort);
     }
   }
 
@@ -242,14 +248,14 @@ export function withUpdatedUserStory(
         updatedPipelinePlan,
         storyId,
         options.sprintId,
-        newPoints
+        newEffort
       );
-    } else if (estimationUpdates?.points !== undefined && oldPoints !== newPoints) {
+    } else if (effortChanged) {
       updatedPipelinePlan = adjustSprintVelocityForStoryPoints(
         updatedPipelinePlan,
         storyId,
-        oldPoints,
-        newPoints
+        oldEffort,
+        newEffort
       );
     }
   }
@@ -378,11 +384,13 @@ export function withCreatedUserStory(
 ): UserWorkspace {
   const { story, epicId, sprintId, estimation, prioritization } = input;
   const storyId = story.id;
+  const mode = getLiveBacklog(workspace).estimationMode;
+  const effort = getEffortValue(estimation, mode);
 
   if (isDashboardPhase(workspace) && workspace.pipeline.agent6Input) {
     const agent6 = workspace.pipeline.agent6Input;
     const updatedPlan = agent6.plan
-      ? addStoryToSprintPlan(agent6.plan, storyId, sprintId, estimation.points)
+      ? addStoryToSprintPlan(agent6.plan, storyId, sprintId, effort)
       : agent6.plan;
     let next = patchLiveAgent6(workspace, {
       epics: addStoryToEpics(agent6.epics, epicId, story) ?? [],
@@ -408,14 +416,14 @@ export function withCreatedUserStory(
   }
 
   const updatedAgent5Plan = workspace.agent5.plan
-    ? addStoryToSprintPlan(workspace.agent5.plan, storyId, sprintId, estimation.points)
+    ? addStoryToSprintPlan(workspace.agent5.plan, storyId, sprintId, effort)
     : null;
   const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
     ? addStoryToSprintPlan(
         workspace.pipeline.agent6Input.plan,
         storyId,
         sprintId,
-        estimation.points
+        effort
       )
     : null;
 
@@ -541,12 +549,12 @@ export function withCreatedUserStory(
 
 export function withDeletedUserStory(workspace: UserWorkspace, storyId: string): UserWorkspace {
   const live = getLiveBacklog(workspace);
-  const storyPoints = live.estimations[storyId]?.points ?? 0;
+  const storyEffort = getEffortValue(live.estimations[storyId], live.estimationMode);
 
   if (isDashboardPhase(workspace) && workspace.pipeline.agent6Input) {
     const agent6 = workspace.pipeline.agent6Input;
     const updatedPlan = agent6.plan
-      ? removeStoryFromSprintPlan(agent6.plan, storyId, storyPoints)
+      ? removeStoryFromSprintPlan(agent6.plan, storyId, storyEffort)
       : agent6.plan;
     const next = patchLiveAgent6(workspace, {
       epics: deleteStoryFromEpics(agent6.epics, storyId) ?? [],
@@ -558,10 +566,10 @@ export function withDeletedUserStory(workspace: UserWorkspace, storyId: string):
   }
 
   const updatedAgent5Plan = workspace.agent5.plan
-    ? removeStoryFromSprintPlan(workspace.agent5.plan, storyId, storyPoints)
+    ? removeStoryFromSprintPlan(workspace.agent5.plan, storyId, storyEffort)
     : null;
   const updatedPipelinePlan = workspace.pipeline.agent6Input?.plan
-    ? removeStoryFromSprintPlan(workspace.pipeline.agent6Input.plan, storyId, storyPoints)
+    ? removeStoryFromSprintPlan(workspace.pipeline.agent6Input.plan, storyId, storyEffort)
     : null;
 
   return {

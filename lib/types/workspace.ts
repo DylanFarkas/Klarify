@@ -8,7 +8,7 @@
 
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic } from '@/lib/types/agent-2';
-import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
+import type { Agent3State, EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type {
   Agent4State,
   StoryPrioritization,
@@ -28,6 +28,8 @@ export interface Agent3Input {
 export interface Agent4Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  /** Ausente en proyectos legacy → story_points. */
+  estimationMode?: EstimationMode;
   sourceWishIds: string[];
   approvedAt: number;
 }
@@ -36,6 +38,7 @@ export interface Agent4Input {
 export interface Agent5Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode?: EstimationMode;
   priorities: Record<string, StoryPrioritization>;
   framework: PrioritizationFramework;
   sourceWishIds: string[];
@@ -46,6 +49,7 @@ export interface Agent5Input {
 export interface Agent6Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode?: EstimationMode;
   priorities: Record<string, StoryPrioritization>;
   framework: PrioritizationFramework;
   plan: SprintPlan;
@@ -104,6 +108,7 @@ export interface WorkspaceResponse {
 const EMPTY_AGENT3: Agent3State = {
   input: null,
   estimations: {},
+  estimationMode: null,
   status: 'idle',
   error: null,
 };

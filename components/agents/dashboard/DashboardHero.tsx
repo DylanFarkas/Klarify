@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 interface DashboardHeroProps {
 	projectName: string;
@@ -17,7 +18,7 @@ export function DashboardHero({
 	const metaParts = [
 		`${metrics.epics.length} épica${metrics.epics.length === 1 ? '' : 's'}`,
 		`${metrics.storyCount} HU${metrics.storyCount === 1 ? '' : 's'}`,
-		`${metrics.totalPoints} SP`,
+		`${formatEffortTotal(metrics.totalPoints, metrics.estimationMode)}`,
 		`${metrics.wishesCount} deseo${metrics.wishesCount === 1 ? '' : 's'}`,
 		`pipeline ${metrics.completionCount}/5`,
 	];

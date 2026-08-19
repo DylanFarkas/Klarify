@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const agent4Input: Agent4Input = {
       epics: body.epics,
       estimations: body.estimations,
+      estimationMode: body.estimationMode ?? 'story_points',
       sourceWishIds: [],
       approvedAt: Date.now(),
     };

@@ -27,6 +27,7 @@ import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrat
 import { getFrameworkLabels } from '@/lib/constants/agent-4';
 import type { Agent4Input, UserWorkspace } from '@/lib/types/workspace';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import { formatEffortTotal, getEffortValue } from '@/lib/utils/estimation';
 
 const INITIAL_STATE: Agent4State = {
   input: null,
@@ -57,6 +58,7 @@ function resolveAgent4Input(workspace: UserWorkspace): Agent4Input | null {
     return {
       epics: agent3.input.epics,
       estimations: agent3.estimations,
+      estimationMode: agent3.estimationMode ?? 'story_points',
       sourceWishIds: agent3.input.sourceWishIds,
       approvedAt: agent3.input.approvedAt,
     };
@@ -161,6 +163,7 @@ export default function Agent4Page() {
       await approveAgent4({
         epics: state.input.epics,
         estimations: state.input.estimations,
+        estimationMode: state.input.estimationMode ?? 'story_points',
         priorities: state.priorities,
         framework: state.framework,
         sourceWishIds: state.input.sourceWishIds,
@@ -190,8 +193,9 @@ export default function Agent4Page() {
   const epicCount = state.input?.epics.length ?? 0;
   const storyCount = allStories.length;
 
-  const totalPoints = allStories.reduce(
-    (sum, s) => sum + (state.input?.estimations[s.id]?.points ?? 0),
+  const estimationMode = state.input?.estimationMode ?? 'story_points';
+  const totalEffort = allStories.reduce(
+    (sum, s) => sum + getEffortValue(state.input?.estimations[s.id], estimationMode),
     0
   );
 
@@ -269,8 +273,8 @@ export default function Agent4Page() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
-                value={totalPoints}
-                label="Story Points"
+                value={formatEffortTotal(totalEffort, estimationMode)}
+                label={estimationMode === 'time' ? 'Tiempo total' : 'Story Points'}
               />
               {hasPriorities ? (
                 <AgentStat

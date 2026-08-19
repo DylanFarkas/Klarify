@@ -7,6 +7,7 @@ import { findActiveSprint } from '@/lib/utils/sprint-plan-mutations';
 import { getSprintStatus } from '@/lib/types/agent-5';
 import type { UserWorkspace } from '@/lib/types/workspace';
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 interface DashboardSummaryStripProps {
 	metrics: DashboardMetrics;
@@ -81,7 +82,7 @@ export function DashboardSummaryStrip({
 							<p className="mt-1 text-[11px] text-subtle">
 								{doneCount}/{stories.length} hechas
 								{' · '}
-								{doneSp}/{committedSp} SP
+								{formatEffortTotal(doneSp, metrics.estimationMode)}/{formatEffortTotal(committedSp, metrics.estimationMode)}
 							</p>
 							<div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
 								<div

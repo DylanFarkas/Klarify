@@ -1,5 +1,6 @@
 import { DashboardPriorityBucketCard } from './DashboardPriorityBucketCard';
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 export function DashboardPriorityBuckets({ metrics }: { metrics: DashboardMetrics }) {
 	return (
@@ -7,19 +8,19 @@ export function DashboardPriorityBuckets({ metrics }: { metrics: DashboardMetric
 			<DashboardPriorityBucketCard
 				title="Alta"
 				count={metrics.priorityBuckets.alta.count}
-				points={metrics.priorityBuckets.alta.points}
+				effortLabel={formatEffortTotal(metrics.priorityBuckets.alta.points, metrics.estimationMode)}
 				description="Historias que concentran el valor o la urgencia principal del backlog."
 			/>
 			<DashboardPriorityBucketCard
 				title="Media"
 				count={metrics.priorityBuckets.media.count}
-				points={metrics.priorityBuckets.media.points}
+				effortLabel={formatEffortTotal(metrics.priorityBuckets.media.points, metrics.estimationMode)}
 				description="Historias importantes que normalmente entran despues del nucleo critico."
 			/>
 			<DashboardPriorityBucketCard
 				title="Baja"
 				count={metrics.priorityBuckets.baja.count}
-				points={metrics.priorityBuckets.baja.points}
+				effortLabel={formatEffortTotal(metrics.priorityBuckets.baja.points, metrics.estimationMode)}
 				description="Historias de menor impacto inmediato o que pueden esperar otra iteracion."
 			/>
 		</section>

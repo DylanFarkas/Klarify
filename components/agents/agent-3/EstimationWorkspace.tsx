@@ -9,6 +9,7 @@ import type { UserStory } from '@/lib/types/agent-2';
 import type {
   Agent3EstimationResponse,
   Agent3Status,
+  EstimationMode,
   StoryEstimation,
 } from '@/lib/types/agent-3';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
@@ -16,16 +17,25 @@ import { AgentActivityModal } from '@/components/agents/shared/activity-log/Agen
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
+import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
-import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
+import { FIBONACCI_SCALE, TIME_DURATION_EXAMPLES } from '@/lib/constants/agent-3';
+import {
+  formatDuration,
+  formatEffortTotal,
+  isEstimationModeLocked,
+  isStoryEstimated,
+} from '@/lib/utils/estimation';
 
 interface EstimationWorkspaceProps {
   input: Agent3Input;
   estimations: Record<string, StoryEstimation>;
   onEstimationsChange: (estimations: Record<string, StoryEstimation>) => void;
+  estimationMode: EstimationMode | null;
+  onEstimationModeChange: (mode: EstimationMode) => void;
   status: Agent3Status;
   onStatusChange: (status: Agent3Status) => void;
   onApprove: () => void;
@@ -117,13 +127,47 @@ function FibonacciPicker({ value, onChange, disabled }: FibonacciPickerProps) {
   );
 }
 
+interface ModeOptionCardProps {
+  selected: boolean;
+  disabled: boolean;
+  title: string;
+  description: string;
+  onSelect: () => void;
+}
+
+function ModeOptionCard({ selected, disabled, title, description, onSelect }: ModeOptionCardProps) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={[
+        'w-full rounded-xl border px-4 py-3.5 text-left transition-colors',
+        selected
+          ? 'border-foreground bg-foreground text-background'
+          : 'border-border bg-background text-foreground hover:border-border-strong hover:bg-surface-hover',
+        'disabled:cursor-not-allowed disabled:opacity-40',
+        disabled ? '' : 'cursor-pointer',
+      ].join(' ')}
+    >
+      <p className="text-[14px] font-medium">{title}</p>
+      <p className={['mt-1 text-[12px] leading-relaxed', selected ? 'text-background/75' : 'text-muted'].join(' ')}>
+        {description}
+      </p>
+    </button>
+  );
+}
+
 interface StoryRowProps {
   story: UserStory;
   epicTitle: string;
   estimation: StoryEstimation | undefined;
+  estimationMode: EstimationMode;
   isAnalyzing: boolean;
   isApproved: boolean;
   onPointChange: (points: number) => void;
+  onDurationChange: (label: string, minutes: number) => void;
   index: number;
 }
 
@@ -131,14 +175,16 @@ function StoryRow({
   story,
   epicTitle,
   estimation,
+  estimationMode,
   isAnalyzing,
   isApproved,
   onPointChange,
+  onDurationChange,
   index,
 }: StoryRowProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const points = estimation?.points ?? 0;
-  const hasPoint = points > 0;
+  const hasEstimate = isStoryEstimated(estimation, estimationMode);
   const disabled = !estimation || isApproved || isAnalyzing;
   const displayNumber = String(index + 1).padStart(2, '0');
 
@@ -186,19 +232,40 @@ function StoryRow({
         </div>
 
         <div className="lg:w-50 shrink-0">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-medium text-subtle">Story Points</p>
-            {hasPoint ? (
-              <span className="text-[12px] tabular-nums text-foreground">
-                {points} SP · {getPointLabel(points)}
-              </span>
-            ) : null}
-          </div>
-          <FibonacciPicker
-            value={hasPoint ? points : 0}
-            onChange={onPointChange}
-            disabled={disabled}
-          />
+          {estimationMode === 'time' ? (
+            <>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium text-subtle">Tiempo</p>
+                {hasEstimate ? (
+                  <span className="text-[12px] tabular-nums text-foreground">
+                    {estimation?.durationLabel ?? formatDuration(estimation?.durationMinutes ?? 0)}
+                  </span>
+                ) : null}
+              </div>
+              <TimeDurationInput
+                id={`duration-${story.id}`}
+                value={estimation?.durationLabel ?? ''}
+                disabled={disabled}
+                onCommit={onDurationChange}
+              />
+            </>
+          ) : (
+            <>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium text-subtle">Story Points</p>
+                {hasEstimate ? (
+                  <span className="text-[12px] tabular-nums text-foreground">
+                    {points} SP · {getPointLabel(points)}
+                  </span>
+                ) : null}
+              </div>
+              <FibonacciPicker
+                value={hasEstimate ? points : 0}
+                onChange={onPointChange}
+                disabled={disabled}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -209,7 +276,12 @@ function StoryRow({
         subtitle={story.id}
         eyebrow="Historia de usuario"
       >
-        <UserStoryDetailContent story={story} epicTitle={epicTitle} estimation={estimation} />
+        <UserStoryDetailContent
+          story={story}
+          epicTitle={epicTitle}
+          estimation={estimation}
+          estimationMode={estimationMode}
+        />
       </DetailModal>
     </article>
   );
@@ -219,6 +291,8 @@ export function EstimationWorkspace({
   input,
   estimations,
   onEstimationsChange,
+  estimationMode,
+  onEstimationModeChange,
   status,
   onStatusChange,
   onApprove,
@@ -233,26 +307,33 @@ export function EstimationWorkspace({
 
   const isAnalyzing = status === 'estimating';
   const activityModalOpen = isAnalyzing && showModelReasoning;
+  const modeLocked = isEstimationModeLocked({ estimations, status });
+  const activeMode: EstimationMode = estimationMode ?? 'story_points';
 
   const allStories = useMemo(
     () => input.epics.flatMap((e) => e.userStories),
     [input.epics]
   );
   const totalStories = allStories.length;
-  const totalPoints = useMemo(
-    () => allStories.reduce((sum, s) => sum + (estimations[s.id]?.points ?? 0), 0),
-    [allStories, estimations]
+  const totalEffort = useMemo(
+    () =>
+      allStories.reduce((sum, s) => {
+        const est = estimations[s.id];
+        if (activeMode === 'time') return sum + (est?.durationMinutes ?? 0);
+        return sum + (est?.points ?? 0);
+      }, 0),
+    [allStories, estimations, activeMode]
   );
   const estimatedCount = useMemo(
-    () => allStories.filter((s) => (estimations[s.id]?.points ?? 0) > 0).length,
-    [allStories, estimations]
+    () => allStories.filter((s) => isStoryEstimated(estimations[s.id], activeMode)).length,
+    [allStories, estimations, activeMode]
   );
   const hasEstimations = Object.keys(estimations).length > 0;
   const progressPct =
     totalStories > 0 ? Math.round((estimatedCount / totalStories) * 100) : 0;
 
   const handleAnalyzeWithAgent = useCallback(async () => {
-    if (!input || !user) return;
+    if (!input || !user || !estimationMode) return;
 
     onStatusChange('estimating');
     reset();
@@ -263,6 +344,7 @@ export function EstimationWorkspace({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           epics: input.epics,
+          estimationMode,
           ...(hasEstimations ? { isRegeneration: true } : {}),
         }),
       });
@@ -276,11 +358,21 @@ export function EstimationWorkspace({
 
       const aiResult: Record<string, StoryEstimation> = {};
       data.suggestions.forEach((sug) => {
-        aiResult[sug.storyId] = {
-          points: sug.suggestedPoints,
-          justification: sug.justification,
-          isModified: false,
-        };
+        if (estimationMode === 'time') {
+          aiResult[sug.storyId] = {
+            points: 0,
+            durationMinutes: sug.durationMinutes ?? 0,
+            durationLabel: sug.suggestedDuration,
+            justification: sug.justification,
+            isModified: false,
+          };
+        } else {
+          aiResult[sug.storyId] = {
+            points: sug.suggestedPoints ?? 0,
+            justification: sug.justification,
+            isModified: false,
+          };
+        }
       });
 
       onEstimationsChange(aiResult);
@@ -291,7 +383,16 @@ export function EstimationWorkspace({
       onStatusChange('idle');
       notifyError(errorMessage(error, 'Error al procesar la estimación.'));
     }
-  }, [input, user, consumeStream, reset, onEstimationsChange, onStatusChange, hasEstimations]);
+  }, [
+    input,
+    user,
+    estimationMode,
+    consumeStream,
+    reset,
+    onEstimationsChange,
+    onStatusChange,
+    hasEstimations,
+  ]);
 
   const handlePointChange = (storyId: string, newPoints: number) => {
     onEstimationsChange({
@@ -299,12 +400,37 @@ export function EstimationWorkspace({
       [storyId]: {
         ...estimations[storyId],
         points: newPoints,
+        durationMinutes: undefined,
+        durationLabel: undefined,
+        isModified: true,
+      },
+    });
+  };
+
+  const handleDurationChange = (storyId: string, label: string, minutes: number) => {
+    onEstimationsChange({
+      ...estimations,
+      [storyId]: {
+        ...estimations[storyId],
+        points: 0,
+        durationMinutes: minutes,
+        durationLabel: label,
         isModified: true,
       },
     });
   };
 
   if (input.epics.length === 0) return null;
+
+  const totalLabel = formatEffortTotal(totalEffort, activeMode);
+  const analyzingTitle =
+    estimationMode === 'time'
+      ? hasEstimations
+        ? 'Regenerando estimación...'
+        : 'Estimando tiempo...'
+      : hasEstimations
+        ? 'Regenerando estimación...'
+        : 'Estimando Story Points...';
 
   return (
     <section
@@ -315,11 +441,15 @@ export function EstimationWorkspace({
         <AgentActivityModal
           open={activityModalOpen}
           isActive={isAnalyzing}
-          title={hasEstimations ? 'Regenerando estimación...' : 'Estimando Story Points...'}
+          title={analyzingTitle}
           description={
             hasEstimations
-              ? 'El Scrum Master IA vuelve a calcular los Story Points de cada historia. Los valores anteriores serán reemplazados.'
-              : 'El Scrum Master IA analiza la complejidad técnica de cada historia de usuario del backlog.'
+              ? estimationMode === 'time'
+                ? 'El Scrum Master IA vuelve a calcular el tiempo de cada historia. Los valores anteriores serán reemplazados.'
+                : 'El Scrum Master IA vuelve a calcular los Story Points de cada historia. Los valores anteriores serán reemplazados.'
+              : estimationMode === 'time'
+                ? 'El Scrum Master IA estima el tiempo calendario de cada historia de usuario del backlog.'
+                : 'El Scrum Master IA analiza la complejidad técnica de cada historia de usuario del backlog.'
           }
           meta={
             input
@@ -344,6 +474,12 @@ export function EstimationWorkspace({
           <p className="mt-1 text-[12px] text-muted">
             {input.epics.length} épica{input.epics.length !== 1 ? 's' : ''} · {totalStories}{' '}
             historia{totalStories !== 1 ? 's' : ''}
+            {estimationMode ? (
+              <>
+                {' '}
+                · {estimationMode === 'time' ? 'Tiempo' : 'Story Points'}
+              </>
+            ) : null}
           </p>
         </div>
 
@@ -365,9 +501,11 @@ export function EstimationWorkspace({
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold tabular-nums leading-none text-foreground">
-                {totalPoints}
+                {totalLabel}
               </p>
-              <p className="mt-0.5 text-[11px] text-subtle">SP total</p>
+              <p className="mt-0.5 text-[11px] text-subtle">
+                {activeMode === 'time' ? 'Total' : 'SP total'}
+              </p>
             </div>
           </div>
         ) : null}
@@ -379,23 +517,47 @@ export function EstimationWorkspace({
             <AnalyzeIcon className="h-6 w-6 text-muted" />
           </div>
           <h4 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">
-            Listo para estimar
+            Elige cómo estimar
           </h4>
           <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
-            El Scrum Master IA analizará cada historia y sugerirá Story Points según la escala
-            Fibonacci, con justificación técnica para cada valor.
+            Esta elección queda fija para el proyecto. Después no podrás cambiarla en el
+            dashboard ni en Klark.
           </p>
+
+          <div className="mt-6 grid w-full max-w-lg gap-2.5 sm:grid-cols-2">
+            <ModeOptionCard
+              selected={estimationMode === 'story_points'}
+              disabled={modeLocked || isApproving}
+              title="Story Points"
+              description={`Escala Fibonacci ${FIBONACCI_SCALE.join(' · ')}`}
+              onSelect={() => onEstimationModeChange('story_points')}
+            />
+            <ModeOptionCard
+              selected={estimationMode === 'time'}
+              disabled={modeLocked || isApproving}
+              title="Tiempo"
+              description={`Duración calendario: ${TIME_DURATION_EXAMPLES}`}
+              onSelect={() => onEstimationModeChange('time')}
+            />
+          </div>
+
           <button
             type="button"
             onClick={handleAnalyzeWithAgent}
-            disabled={isAnalyzing || isApproving}
+            disabled={isAnalyzing || isApproving || !estimationMode}
             className="mt-6 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <AnalyzeIcon className="h-4 w-4" />
-            Sugerir Story Points con IA
+            {estimationMode === 'time'
+              ? 'Sugerir tiempos con IA'
+              : 'Sugerir Story Points con IA'}
           </button>
           <p className="mt-3 text-[12px] text-subtle">
-            Escala Fibonacci: {FIBONACCI_SCALE.join(' · ')}
+            {estimationMode === 'time'
+              ? `1d = 24h calendario · ${TIME_DURATION_EXAMPLES}`
+              : estimationMode === 'story_points'
+                ? `Escala Fibonacci: ${FIBONACCI_SCALE.join(' · ')}`
+                : 'Selecciona un modo para continuar'}
           </p>
         </div>
       ) : null}
@@ -406,7 +568,9 @@ export function EstimationWorkspace({
           <p className="mt-5 text-sm font-medium text-foreground">
             {hasEstimations
               ? 'Regenerando estimaciones…'
-              : 'Analizando complejidad del backlog…'}
+              : activeMode === 'time'
+                ? 'Estimando tiempo del backlog…'
+                : 'Analizando complejidad del backlog…'}
           </p>
           <p className="mt-1 text-[12px] text-muted">
             Evaluando {totalStories} historia{totalStories !== 1 ? 's' : ''} en{' '}
@@ -422,13 +586,14 @@ export function EstimationWorkspace({
         <div>
           {input.epics.map((epic, epicIdx) => {
             const epicStories = epic.userStories || [];
-            const epicEstimated = epicStories.filter(
-              (s) => (estimations[s.id]?.points ?? 0) > 0
+            const epicEstimated = epicStories.filter((s) =>
+              isStoryEstimated(estimations[s.id], activeMode)
             ).length;
-            const epicPoints = epicStories.reduce(
-              (sum, s) => sum + (estimations[s.id]?.points ?? 0),
-              0
-            );
+            const epicEffort = epicStories.reduce((sum, s) => {
+              const est = estimations[s.id];
+              if (activeMode === 'time') return sum + (est?.durationMinutes ?? 0);
+              return sum + (est?.points ?? 0);
+            }, 0);
 
             return (
               <div
@@ -452,8 +617,7 @@ export function EstimationWorkspace({
                   </div>
                   {hasEstimations && epicStories.length > 0 ? (
                     <span className="text-[13px] tabular-nums text-foreground">
-                      {epicPoints}{' '}
-                      <span className="text-subtle">SP</span>
+                      {formatEffortTotal(epicEffort, activeMode)}
                     </span>
                   ) : null}
                 </div>
@@ -466,9 +630,13 @@ export function EstimationWorkspace({
                         story={story}
                         epicTitle={epic.title}
                         estimation={estimations[story.id]}
+                        estimationMode={activeMode}
                         isAnalyzing={isAnalyzing}
                         isApproved={isApproved}
                         onPointChange={(pts) => handlePointChange(story.id, pts)}
+                        onDurationChange={(label, minutes) =>
+                          handleDurationChange(story.id, label, minutes)
+                        }
                         index={storyIdx}
                       />
                     ))}
@@ -490,7 +658,7 @@ export function EstimationWorkspace({
             <p className="hidden text-sm text-subtle sm:block">
               <span className="font-medium text-foreground">{estimatedCount}</span>/{totalStories}{' '}
               historias ·{' '}
-              <span className="font-medium text-foreground">{totalPoints}</span> SP
+              <span className="font-medium text-foreground">{totalLabel}</span>
               {!isApprovable ? (
                 <span className="text-muted">
                   {' '}
@@ -507,6 +675,7 @@ export function EstimationWorkspace({
                   disabled={
                     isAnalyzing ||
                     isApproving ||
+                    !estimationMode ||
                     (hasEstimations && !canRegenerate('agent3'))
                   }
                   className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"

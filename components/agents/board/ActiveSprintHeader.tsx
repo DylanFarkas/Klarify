@@ -1,4 +1,5 @@
 import type { BoardStory } from '@/lib/board/board-utils';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 import type { PlannedSprint } from '@/lib/types/agent-5';
 
 interface ActiveSprintHeaderProps {
@@ -25,6 +26,7 @@ export function ActiveSprintHeader({
   const doneSp = stories
     .filter((s) => s.execution.status === 'done')
     .reduce((sum, s) => sum + s.points, 0);
+  const mode = stories[0]?.estimationMode ?? 'story_points';
   const remaining = daysRemaining(sprint.endDate);
   const goalShort =
     sprint.sprintGoal.replace(/^Sprint\s+\d+\s*:\s*/i, '').trim() || sprint.sprintGoal;
@@ -66,8 +68,8 @@ export function ActiveSprintHeader({
             {doneCount}/{stories.length} hechas
           </p>
           <p className="mt-1 text-[11px] text-subtle">
-            {doneSp}/{committedSp} SP
-            {typeof capacitySp === 'number' ? ` · cap. ${capacitySp}` : ''}
+            {formatEffortTotal(doneSp, mode)}/{formatEffortTotal(committedSp, mode)}
+            {mode === 'story_points' && typeof capacitySp === 'number' ? ` · cap. ${capacitySp}` : ''}
           </p>
         </div>
       </div>

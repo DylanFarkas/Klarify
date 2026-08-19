@@ -46,6 +46,11 @@ import {
   nextLiveWorkItemId,
 } from '@/lib/utils/live-backlog';
 import {
+  buildManualEstimation,
+  getEffortValue,
+  normalizeEstimationPatchForMode,
+} from '@/lib/utils/estimation';
+import {
   isBugSeverity,
   isWorkItemType,
   normalizeUserStory,
@@ -102,6 +107,7 @@ const EMPTY_AGENT2: Agent2State = {
 const EMPTY_AGENT3: Agent3State = {
   input: null,
   estimations: {},
+  estimationMode: null,
   status: 'idle',
   error: null,
 };
@@ -129,7 +135,8 @@ export interface CreateUserStoryInput {
   title: string;
   description: string;
   acceptanceCriteria: string[];
-  points: number;
+  points?: number;
+  durationLabel?: string;
   /** Prioridad según el framework activo del Agente 4. */
   category?: FrameworkCategory;
   severity?: import('@/lib/types/agent-2').BugSeverity;
@@ -648,11 +655,14 @@ export async function updateUserStoryAcrossWorkspace(
     delete normalizedPatch.technicalNotes;
   }
 
+  const mode = live.estimationMode;
+  const normalizedEstimation = normalizeEstimationPatchForMode(mode, estimationUpdates);
+
   const updatedWorkspace = withUpdatedUserStory(
     workspace,
     storyId,
     normalizedPatch,
-    estimationUpdates,
+    normalizedEstimation,
     options,
     prioritizationUpdates
   );
@@ -789,10 +799,10 @@ export async function completeSprintAcrossWorkspace(
     throw new Error(`Sprint no encontrado: ${sprintId}`);
   }
 
-  const { estimations } = getLiveBacklog(workspace);
+  const { estimations, estimationMode } = getLiveBacklog(workspace);
   const storyPointsById: Record<string, number> = {};
   for (const storyId of sprint.storyIds) {
-    storyPointsById[storyId] = estimations[storyId]?.points ?? 0;
+    storyPointsById[storyId] = getEffortValue(estimations[storyId], estimationMode);
   }
 
   const incompleteStoryIds = sprint.storyIds.filter((storyId) => {
@@ -815,7 +825,8 @@ export async function createUserStoryAcrossWorkspace(
   input: CreateUserStoryInput
 ): Promise<{ workspace: UserWorkspace; storyId: string }> {
   const { projectId, workspace } = await loadProjectWorkspace(uid);
-  if (!getLiveBacklog(workspace).epics.some((epic) => epic.id === input.epicId)) {
+  const live = getLiveBacklog(workspace);
+  if (!live.epics.some((epic) => epic.id === input.epicId)) {
     throw new Error(`Épica no encontrada: ${input.epicId}`);
   }
 
@@ -869,15 +880,15 @@ export async function createUserStoryAcrossWorkspace(
     createdAt: Date.now(),
   });
 
-  const defaultPoints = type === 'bug' ? 1 : input.points;
-  const points = Number.isFinite(input.points) ? input.points : defaultPoints;
   const typeLabel =
     type === 'bug' ? 'Bug' : type === 'task' ? 'Task' : 'Historia';
-  const estimation: StoryEstimation = {
-    points,
+  const estimation = buildManualEstimation({
+    mode: live.estimationMode,
+    points: input.points,
+    durationLabel: input.durationLabel,
+    workItemType: type,
     justification: `${typeLabel} creado(a) manualmente desde el dashboard.`,
-    isModified: true,
-  };
+  });
   const prioritization: StoryPrioritization | null = input.category
     ? {
         category: input.category,
@@ -1023,6 +1034,7 @@ export async function approveAgent3(uid: string, agent4Input: Agent4Input): Prom
       ...workspace.agent3,
       input: agent3Input,
       estimations: agent4Input.estimations,
+      estimationMode: agent4Input.estimationMode ?? workspace.agent3.estimationMode ?? 'story_points',
       status: 'approved',
       error: null,
     }),
@@ -1047,6 +1059,7 @@ export async function approveAgent4(uid: string, agent5Input: Agent5Input): Prom
   const agent4Input: Agent4Input = {
     epics: agent5Input.epics,
     estimations: agent5Input.estimations,
+    estimationMode: agent5Input.estimationMode ?? workspace.agent3.estimationMode ?? 'story_points',
     sourceWishIds: agent5Input.sourceWishIds,
     approvedAt: agent5Input.approvedAt,
   };
@@ -1087,6 +1100,10 @@ export async function bootstrapDashboardFromAgent4(uid: string): Promise<UserWor
       ? {
           epics: workspace.agent4.input.epics,
           estimations: workspace.agent4.input.estimations,
+          estimationMode:
+            workspace.agent4.input.estimationMode ??
+            workspace.agent3.estimationMode ??
+            'story_points',
           priorities: workspace.agent4.priorities,
           framework: workspace.agent4.framework,
           sourceWishIds: workspace.agent4.input.sourceWishIds,
@@ -1157,6 +1174,7 @@ export async function approveAgent5(uid: string, agent6Input: Agent6Input): Prom
   const agent5Input: Agent5Input = {
     epics: agent6Input.epics,
     estimations: agent6Input.estimations,
+    estimationMode: agent6Input.estimationMode ?? 'story_points',
     priorities: agent6Input.priorities,
     framework: agent6Input.framework,
     sourceWishIds: agent6Input.sourceWishIds,

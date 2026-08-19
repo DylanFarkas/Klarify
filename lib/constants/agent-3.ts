@@ -1,5 +1,5 @@
 /**
- * @fileoverview Constantes del Agente 3 — Estimación en Story Points.
+ * @fileoverview Constantes del Agente 3 — Estimación.
  */
 
 /** Escala Fibonacci permitida para Story Points */
@@ -7,6 +7,21 @@ export const FIBONACCI_SCALE = [1, 2, 3, 5, 8, 13, 21] as const;
 
 /** Etiqueta legible de la escala Fibonacci (prompts LLM, validación) */
 export const FIBONACCI_SCALE_LABEL = FIBONACCI_SCALE.join(', ');
+
+/** Minutos en un día calendario (1d = 24h). */
+export const MINUTES_PER_CALENDAR_DAY = 24 * 60;
+
+/** Minutos en una hora. */
+export const MINUTES_PER_HOUR = 60;
+
+/** Ejemplos de duración para UI y prompts. */
+export const TIME_DURATION_EXAMPLES = '2d, 3h, 50m, 2.5h';
+
+/** Duración por defecto al crear una historia o task en modo tiempo. */
+export const DEFAULT_TIME_DURATION_STORY = '1h';
+
+/** Duración por defecto al crear un bug en modo tiempo. */
+export const DEFAULT_TIME_DURATION_BUG = '30m';
 
 /** Longitud máxima de la justificación técnica por historia */
 export const MAX_JUSTIFICATION_LENGTH = 140;

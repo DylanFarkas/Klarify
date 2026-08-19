@@ -30,6 +30,13 @@ import {
 } from '@/lib/workspace-service';
 import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
 import {
+  defaultDurationLabel,
+  DurationParseError,
+  formatEstimation,
+  formatEffortTotal,
+  isStoryEstimated,
+} from '@/lib/utils/estimation';
+import {
   assertStoryNotInCompletedSprint,
   findActiveSprint,
   SprintLifecycleError,
@@ -355,6 +362,7 @@ function findSprintIdForStory(workspace: UserWorkspace, storyId: string): string
 function summarizeBacklog(workspace: UserWorkspace) {
   const live = getLiveBacklog(workspace);
   const estimations = live.estimations;
+  const estimationMode = live.estimationMode;
   const priorities = live.priorities;
   const framework = resolveWorkspaceFramework(workspace);
   const frameworkMeta = describeFrameworkCategories(framework);
@@ -364,6 +372,7 @@ function summarizeBacklog(workspace: UserWorkspace) {
   return {
     framework: frameworkMeta.framework,
     frameworkLabel: frameworkMeta.frameworkLabel,
+    estimationMode,
     allowedPriorityCategories: frameworkMeta.allowedCategories,
     priorityCategoryLabels: labels,
     epicCount: live.epics.length,
@@ -376,6 +385,7 @@ function summarizeBacklog(workspace: UserWorkspace) {
         status: getSprintStatus(sprint),
         storyIds: sprint.storyIds,
         velocitySp: sprint.velocitySp,
+        velocityLabel: formatEffortTotal(sprint.velocitySp, estimationMode),
         startDate: sprint.startDate,
         endDate: sprint.endDate,
       })) ?? [],
@@ -387,6 +397,7 @@ function summarizeBacklog(workspace: UserWorkspace) {
       description: epic.description,
       stories: epic.userStories.map((story) => {
         const priorityCode = priorities[story.id]?.category ?? null;
+        const estimation = estimations[story.id];
         return {
           id: story.id,
           type: story.type ?? 'story',
@@ -396,7 +407,12 @@ function summarizeBacklog(workspace: UserWorkspace) {
           severity: story.severity ?? null,
           stepsToReproduce: story.stepsToReproduce ?? null,
           technicalNotes: story.technicalNotes ?? null,
-          points: estimations[story.id]?.points ?? null,
+          points: estimationMode === 'story_points' ? estimation?.points ?? null : null,
+          duration:
+            estimationMode === 'time' && isStoryEstimated(estimation, 'time')
+              ? formatEstimation(estimation, 'time')
+              : null,
+          effortLabel: formatEstimation(estimation, estimationMode),
           priority: priorityCode,
           priorityLabel: priorityCode ? (labels[priorityCode] ?? priorityCode) : null,
           sprintId: findSprintIdForStory(workspace, story.id),
@@ -429,7 +445,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'list_backlog',
     description:
-      'Lista el backlog actual: épicas, historias, puntos, prioridad y asignación a sprints.',
+      'Lista el backlog actual: épicas, historias, esfuerzo (Story Points o tiempo), prioridad y asignación a sprints.',
     parameters: {
       type: 'object',
       properties: {},
@@ -491,7 +507,13 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         },
         points: {
           type: 'number',
-          description: 'Story points (Fibonacci). Default 3 (story/task) o 1 (bug).',
+          description:
+            'Solo si el proyecto estima en Story Points (Fibonacci 1,2,3,5,8,13,21). Default 3 (story/task) o 1 (bug). No usar en modo tiempo.',
+        },
+        duration: {
+          type: 'string',
+          description:
+            'Solo si el proyecto estima en tiempo. Unidad única: 2d, 3h, 50m, 2.5h. 1d = 24h calendario. Default 1h (story/task) o 30m (bug).',
         },
         category: {
           type: 'string',
@@ -511,7 +533,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'update_story',
     description:
-      'Actualiza un ítem (HU/bug/task): título, descripción, CA, severity/steps/notes, épica, puntos, prioridad o sprint. No cambia el type. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
+      'Actualiza un ítem (HU/bug/task): título, descripción, CA, severity/steps/notes, épica, estimación (points o duration según el modo del proyecto), prioridad o sprint. No cambia el type. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
     parameters: {
       type: 'object',
       properties: {
@@ -526,7 +548,14 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         stepsToReproduce: { type: 'array', items: { type: 'string' } },
         technicalNotes: { type: 'string' },
         epicId: { type: 'string', description: 'Mover a otra épica' },
-        points: { type: 'number' },
+        points: {
+          type: 'number',
+          description: 'Solo en modo Story Points (Fibonacci). No usar en modo tiempo.',
+        },
+        duration: {
+          type: 'string',
+          description: 'Solo en modo tiempo: 2d, 3h, 50m, 2.5h. 1d = 24h calendario.',
+        },
         category: {
           type: 'string',
           description:
@@ -835,6 +864,21 @@ export async function executeHarnessTool(
             ? null
             : asString(sprintRaw) ?? undefined;
         const defaultPoints = type === 'bug' ? 1 : 3;
+        const { workspace: currentWs } = await getWorkspaceData(ctx.uid);
+        const mode = getLiveBacklog(currentWs).estimationMode;
+        const durationArg = asString(args.duration);
+        if (mode === 'time' && asNumber(args.points) !== undefined) {
+          return toolError(
+            'Este proyecto estima en tiempo. Usa duration (2d, 3h, 50m, 2.5h), no points.',
+            'INVALID_ARGS'
+          );
+        }
+        if (mode === 'story_points' && durationArg) {
+          return toolError(
+            'Este proyecto estima en Story Points Fibonacci. Usa points, no duration.',
+            'INVALID_ARGS'
+          );
+        }
         const { workspace, storyId } = await createUserStoryAcrossWorkspace(ctx.uid, {
           epicId,
           type,
@@ -844,7 +888,9 @@ export async function executeHarnessTool(
           severity,
           stepsToReproduce,
           technicalNotes,
-          points: asNumber(args.points) ?? defaultPoints,
+          points: mode === 'story_points' ? asNumber(args.points) ?? defaultPoints : undefined,
+          durationLabel:
+            mode === 'time' ? durationArg || defaultDurationLabel(type) : undefined,
           category,
           sprintId: sprintId === undefined ? undefined : sprintId,
         });
@@ -915,6 +961,8 @@ export async function executeHarnessTool(
           : undefined;
 
         const points = asNumber(args.points);
+        const durationArg = asString(args.duration);
+        const mode = getLiveBacklog(currentForId).estimationMode;
         const rawCategory = asString(args.category);
         let category: FrameworkCategory | undefined;
 
@@ -926,10 +974,24 @@ export async function executeHarnessTool(
           category = resolved.category;
         }
 
+        if (mode === 'time' && points !== undefined) {
+          return toolError(
+            'Este proyecto estima en tiempo. Usa duration (2d, 3h, 50m, 2.5h), no points.',
+            'INVALID_ARGS'
+          );
+        }
+        if (mode === 'story_points' && durationArg) {
+          return toolError(
+            'Este proyecto estima en Story Points Fibonacci. Usa points, no duration.',
+            'INVALID_ARGS'
+          );
+        }
+
         if (
           Object.keys(updates).length === 0 &&
           !asString(args.epicId) &&
           points === undefined &&
+          !durationArg &&
           !category &&
           !hasSprint
         ) {
@@ -943,7 +1005,9 @@ export async function executeHarnessTool(
             updates,
             points !== undefined
               ? { points, justification: 'Actualizado por Klark.' }
-              : undefined,
+              : durationArg
+                ? { durationLabel: durationArg, justification: 'Actualizado por Klark.' }
+                : undefined,
             {
               epicId: asString(args.epicId),
               sprintId,
@@ -968,7 +1032,7 @@ export async function executeHarnessTool(
             ? `Ítem ${storyId} actualizado. Prioridad: ${category}.`
             : `Ítem ${storyId} actualizado.`,
           {
-            data: { storyId, updates, points, category: category ?? null, sprintId },
+            data: { storyId, updates, points, duration: durationArg ?? null, category: category ?? null, sprintId },
             mutated: true,
           }
         );
@@ -1310,7 +1374,18 @@ export async function executeHarnessTool(
     if (error instanceof SprintLifecycleError) {
       return toolError(error.message, error.code);
     }
+    if (error instanceof DurationParseError) {
+      return toolError(error.message, 'INVALID_ARGS');
+    }
     const message = error instanceof Error ? error.message : 'Error al ejecutar la tool';
+    if (
+      message.includes('estima en tiempo') ||
+      message.includes('estima en Story Points') ||
+      message.includes('Fibonacci') ||
+      message.includes('duración')
+    ) {
+      return toolError(message, 'INVALID_ARGS');
+    }
     return toolError(message, 'TOOL_EXCEPTION');
   }
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
 import type { ProjectMember, KanbanStatus } from '@/lib/types/execution';
@@ -19,6 +19,7 @@ interface DashboardSprintPlanProps {
 	rows: DashboardSprintStoryRow[];
 	unassignedRows: DashboardSprintStoryRow[];
 	members: ProjectMember[];
+	estimationMode?: EstimationMode;
 	executionBoardEnabled?: boolean;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
@@ -63,6 +64,7 @@ export function DashboardSprintPlan({
 	unassignedRows,
 	members,
 	executionBoardEnabled = false,
+	estimationMode = 'story_points',
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
@@ -202,6 +204,7 @@ export function DashboardSprintPlan({
 				onStartSprint={onStartSprint}
 				onCompleteSprint={onCompleteSprint}
 				onManageEpic={openEpicManager}
+				estimationMode={estimationMode}
 				embedded
 				isCreating={isCreating}
 				onCreatingChange={setIsCreating}

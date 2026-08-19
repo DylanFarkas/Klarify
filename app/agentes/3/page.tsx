@@ -13,17 +13,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import type { Agent3State, Agent3Status, StoryEstimation } from '@/lib/types/agent-3';
+import type { Agent3State, Agent3Status, EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import { EmptyPrioritizationState } from '@/components/agents/agent-3/EmptyPrioritizationState';
 import { EstimationWorkspace } from '@/components/agents/agent-3/EstimationWorkspace';
 import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import { formatEffortTotal, isEstimationMode, isStoryEstimated } from '@/lib/utils/estimation';
 
 const INITIAL_STATE: Agent3State = {
   input: null,
   estimations: {},
+  estimationMode: null,
   status: 'idle',
   error: null,
 };
@@ -48,6 +50,14 @@ export default function Agent3Page() {
     const a3 = workspace.agent3;
     const pipelineInput = workspace.pipeline.agent3Input;
     const pipelineEstimations = workspace.pipeline.agent4Input?.estimations ?? {};
+    const pipelineMode = workspace.pipeline.agent4Input?.estimationMode;
+    const estimationMode: EstimationMode | null = isEstimationMode(a3.estimationMode)
+      ? a3.estimationMode
+      : isEstimationMode(pipelineMode)
+        ? pipelineMode
+        : Object.keys(a3.estimations).length > 0 || Object.keys(pipelineEstimations).length > 0
+          ? 'story_points'
+          : null;
 
     const estimations =
       Object.keys(a3.estimations).length > 0 ? a3.estimations : pipelineEstimations;
@@ -56,6 +66,7 @@ export default function Agent3Page() {
       setState({
         input: a3.input ?? pipelineInput ?? null,
         estimations,
+        estimationMode,
         status: resolveHydratedStatus({ ...a3, estimations }),
         error: null,
       });
@@ -67,6 +78,7 @@ export default function Agent3Page() {
       setState({
         input: pipelineInput,
         estimations: {},
+        estimationMode,
         status: 'idle',
         error: null,
       });
@@ -78,15 +90,16 @@ export default function Agent3Page() {
   // ── Persistir en Firestore (debounced) ────────────────────────
   useEffect(() => {
     if (!isHydrated) return;
-    if (state.input || Object.keys(state.estimations).length > 0) {
+    if (state.input || Object.keys(state.estimations).length > 0 || state.estimationMode) {
       saveAgent3({
         input: state.input,
         estimations: state.estimations,
+        estimationMode: state.estimationMode ?? null,
         status: state.status,
         error: state.error,
       });
     }
-  }, [state.input, state.estimations, state.status, state.error, isHydrated, saveAgent3]);
+  }, [state.input, state.estimations, state.estimationMode, state.status, state.error, isHydrated, saveAgent3]);
 
   const handleEstimationsChange = useCallback(
     (estimations: Record<string, StoryEstimation>) => {
@@ -100,6 +113,14 @@ export default function Agent3Page() {
     []
   );
 
+  const handleEstimationModeChange = useCallback((mode: EstimationMode) => {
+    setState((prev) => ({
+      ...prev,
+      estimationMode: mode,
+      error: null,
+    }));
+  }, []);
+
   const handleStatusChange = useCallback((status: Agent3Status) => {
     setState((prev) => ({ ...prev, status, error: null }));
   }, []);
@@ -112,6 +133,7 @@ export default function Agent3Page() {
       await approveAgent3({
         epics: state.input.epics,
         estimations: state.estimations,
+        estimationMode: state.estimationMode ?? 'story_points',
         sourceWishIds: state.input.sourceWishIds,
         approvedAt: Date.now(),
       });
@@ -131,18 +153,21 @@ export default function Agent3Page() {
     } finally {
       setIsApproving(false);
     }
-  }, [state.input, state.estimations, approveAgent3]);
+  }, [state.input, state.estimations, state.estimationMode, approveAgent3]);
 
   const allStories = state.input?.epics.flatMap((e) => e.userStories) ?? [];
   const epicCount = state.input?.epics.length ?? 0;
   const storyCount = allStories.length;
-  const totalPoints = allStories.reduce(
-    (sum, s) => sum + (state.estimations[s.id]?.points ?? 0),
-    0
-  );
+  const activeMode: EstimationMode = state.estimationMode ?? 'story_points';
+  const totalEffort = allStories.reduce((sum, s) => {
+    const est = state.estimations[s.id];
+    if (activeMode === 'time') return sum + (est?.durationMinutes ?? 0);
+    return sum + (est?.points ?? 0);
+  }, 0);
   const isApprovable =
     allStories.length > 0 &&
-    allStories.every((s) => (state.estimations[s.id]?.points ?? 0) > 0);
+    Boolean(state.estimationMode) &&
+    allStories.every((s) => isStoryEstimated(state.estimations[s.id], activeMode));
 
   if (isLoading || !isHydrated) {
     return (
@@ -166,8 +191,12 @@ export default function Agent3Page() {
       <AgentPageHero
         step={3}
         variant="measure"
-        title="Estimación en Story Points"
-        description="El agente sugiere Story Points para cada historia según su complejidad técnica. Tu equipo revisa y ajusta antes de consolidar."
+        title={activeMode === 'time' ? 'Estimación en tiempo' : 'Estimación en Story Points'}
+        description={
+          activeMode === 'time'
+            ? 'El agente sugiere una duración calendario para cada historia. Tu equipo revisa y ajusta antes de consolidar.'
+            : 'El agente sugiere Story Points para cada historia según su complejidad técnica. Tu equipo revisa y ajusta antes de consolidar.'
+        }
         statusBadge={
           isApproved ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
@@ -205,8 +234,8 @@ export default function Agent3Page() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
-                value={totalPoints}
-                label="Story Points"
+                value={formatEffortTotal(totalEffort, activeMode)}
+                label={activeMode === 'time' ? 'Tiempo total' : 'Story Points'}
               />
             </>
           ) : undefined
@@ -226,6 +255,8 @@ export default function Agent3Page() {
             input={state.input}
             estimations={state.estimations}
             onEstimationsChange={handleEstimationsChange}
+            estimationMode={state.estimationMode ?? null}
+            onEstimationModeChange={handleEstimationModeChange}
             status={state.status}
             onStatusChange={handleStatusChange}
             onApprove={handleApprove}
@@ -237,7 +268,7 @@ export default function Agent3Page() {
           {isApproved && (
             <AgentCelebrationBanner
               title="Backlog estimado"
-              description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${totalPoints} Story Points listos para el Agente 4.`}
+              description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${formatEffortTotal(totalEffort, activeMode)} listos para el Agente 4.`}
               action={
                 <button
                   type="button"

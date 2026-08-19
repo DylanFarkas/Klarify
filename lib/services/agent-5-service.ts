@@ -8,6 +8,7 @@ import type { Agent5Input } from '@/lib/types/workspace';
 import type { SprintPlan, SprintPlanningConfig } from '@/lib/types/agent-5';
 import { toLocalStoriesForPlanning } from '@/lib/types/agent-5';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { isStoryEstimated } from '@/lib/utils/estimation';
 
 import { ISprintPlanningAdapter } from '../adapters/agent-5/ISprintPlanningAdapter';
 import { MockSprintPlanningAdapter } from '../adapters/agent-5/MockSprintPlanningAdapter';
@@ -34,7 +35,8 @@ export function validateAgent5Input(input: Agent5Input | null): ValidationResult
     return { valid: false, error: 'El listado de épicas entrante está vacío.', code: 'EMPTY_BACKLOG' };
   }
   const allStoryIds = input.epics.flatMap((e) => e.userStories.map((s) => s.id));
-  const missingEst = allStoryIds.filter((id) => !input.estimations[id]?.points);
+  const mode = input.estimationMode ?? 'story_points';
+  const missingEst = allStoryIds.filter((id) => !isStoryEstimated(input.estimations[id], mode));
   if (missingEst.length > 0) {
     return {
       valid: false,

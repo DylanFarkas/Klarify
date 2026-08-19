@@ -7,7 +7,7 @@ export function EmptyAgent4State() {
   return (
     <EmptyAgentState
       title="No hay datos del Agente 3"
-      description="Para priorizar el backlog, primero debes completar el Agente 3 y consolidar las estimaciones en Story Points."
+      description="Para priorizar el backlog, primero debes completar el Agente 3 y consolidar las estimaciones."
       icon={
         <svg
           className="h-6 w-6 text-muted"

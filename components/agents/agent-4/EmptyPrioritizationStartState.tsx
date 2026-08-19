@@ -12,7 +12,7 @@ interface EmptyPrioritizationStartStateProps {
   isPrioritizing: boolean;
   epicCount: number;
   storyCount: number;
-  totalPoints: number;
+  effortLabel: string;
 }
 
 export function EmptyPrioritizationStartState({
@@ -22,7 +22,7 @@ export function EmptyPrioritizationStartState({
   isPrioritizing,
   epicCount,
   storyCount,
-  totalPoints,
+  effortLabel,
 }: EmptyPrioritizationStartStateProps) {
   const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
 
@@ -50,7 +50,7 @@ export function EmptyPrioritizationStartState({
       </h3>
       <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
         Clasifica {storyCount} historia{storyCount !== 1 ? 's' : ''} de {epicCount} épica
-        {epicCount !== 1 ? 's' : ''} ({totalPoints} SP) según valor de negocio con{' '}
+        {epicCount !== 1 ? 's' : ''} ({effortLabel}) según valor de negocio con{' '}
         {frameworkLabel}.
       </p>
 

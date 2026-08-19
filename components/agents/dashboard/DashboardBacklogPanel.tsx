@@ -11,6 +11,7 @@ import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDeta
 import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
 import type { DashboardMetrics, DashboardSprintStoryRow } from './dashboardMetrics';
+import { formatEffortTotal, formatEstimation, getEffortValue } from '@/lib/utils/estimation';
 
 interface DashboardBacklogPanelProps {
 	metrics: DashboardMetrics;
@@ -83,7 +84,7 @@ export function DashboardBacklogPanel({ metrics }: DashboardBacklogPanelProps) {
 						<span className="text-[12px] tabular-nums text-subtle">{epics.length}</span>
 					</div>
 					<p className="mt-1 text-[12px] text-muted">
-						{storyCount} historia{storyCount !== 1 ? 's' : ''} · {metrics.totalPoints} SP
+						{storyCount} historia{storyCount !== 1 ? 's' : ''} · {formatEffortTotal(metrics.totalPoints, metrics.estimationMode)}
 					</p>
 				</div>
 			</div>
@@ -95,6 +96,7 @@ export function DashboardBacklogPanel({ metrics }: DashboardBacklogPanelProps) {
 						epic={epic}
 						index={index}
 						estimations={estimations}
+						estimationMode={metrics.estimationMode}
 						priorities={priorities}
 						framework={framework}
 						sprintByStoryId={sprintByStoryId}
@@ -109,6 +111,7 @@ function DashboardEpicGroup({
 	epic,
 	index,
 	estimations,
+	estimationMode,
 	priorities,
 	framework,
 	sprintByStoryId,
@@ -116,6 +119,7 @@ function DashboardEpicGroup({
 	epic: Epic;
 	index: number;
 	estimations: DashboardMetrics['estimations'];
+	estimationMode: DashboardMetrics['estimationMode'];
 	priorities: DashboardMetrics['priorities'];
 	framework: PrioritizationFramework | null;
 	sprintByStoryId: Map<string, { label: string }>;
@@ -124,7 +128,7 @@ function DashboardEpicGroup({
 	const [detailStory, setDetailStory] = useState<UserStory | null>(null);
 	const displayNumber = String(index + 1).padStart(2, '0');
 	const epicPoints = epic.userStories.reduce(
-		(sum, story) => sum + (estimations[story.id]?.points ?? 0),
+		(sum, story) => sum + getEffortValue(estimations[story.id], estimationMode),
 		0
 	);
 
@@ -162,7 +166,7 @@ function DashboardEpicGroup({
 								{epic.userStories.length} HU
 								{epic.userStories.length !== 1 ? 's' : ''}
 								{' · '}
-								{epicPoints} SP
+								{formatEffortTotal(epicPoints, estimationMode)}
 							</span>
 						</div>
 						{epic.description ? (
@@ -180,7 +184,7 @@ function DashboardEpicGroup({
 						</li>
 					) : (
 						epic.userStories.map((story, storyIndex) => {
-							const points = estimations[story.id]?.points;
+							const estimateLabel = formatEstimation(estimations[story.id], estimationMode);
 							const prioritization = priorities[story.id];
 							const sprint = sprintByStoryId.get(story.id);
 
@@ -204,9 +208,9 @@ function DashboardEpicGroup({
 										</p>
 									</div>
 									<div className="flex shrink-0 flex-wrap items-center gap-1.5">
-										{points != null ? (
+										{estimateLabel !== '—' ? (
 											<span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] tabular-nums text-muted">
-												{points} SP
+												{estimateLabel}
 											</span>
 										) : null}
 										{framework && prioritization ? (
@@ -242,6 +246,7 @@ function DashboardEpicGroup({
 						story={detailStory}
 						epicTitle={epic.title}
 						estimation={estimations[detailStory.id]}
+						estimationMode={estimationMode}
 						prioritization={priorities[detailStory.id]}
 						framework={framework ?? undefined}
 					/>

@@ -3,7 +3,7 @@
  */
 
 import type { UserStory, Epic, WorkItemType } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { StoryPrioritization, PrioritizationFramework } from '@/lib/types/agent-4';
 import type { SprintPlan, StoryDependency } from '@/lib/types/agent-5';
 import { getSprintStatus } from '@/lib/types/agent-5';
@@ -14,6 +14,7 @@ import type {
   StoryExecution,
 } from '@/lib/types/execution';
 import type { Agent6Input, UserWorkspace } from '@/lib/types/workspace';
+import { getEffortValue } from '@/lib/utils/estimation';
 import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
 
 export interface BoardStory {
@@ -22,6 +23,8 @@ export interface BoardStory {
   epicId: string;
   epicTitle: string;
   points: number;
+  estimation?: StoryEstimation;
+  estimationMode: EstimationMode;
   priority: StoryPrioritization | null;
   sprintId: string | null;
   sprintNumber: number | null;
@@ -129,7 +132,7 @@ export function resolveBoardData(
     };
   }
 
-  const { epics, estimations, priorities, framework, plan } = snapshot;
+  const { epics, estimations, estimationMode = 'story_points', priorities, framework, plan } = snapshot;
   const dependencies = plan?.dependencies ?? [];
   const stories: BoardStory[] = [];
 
@@ -174,7 +177,9 @@ export function resolveBoardData(
         execution: exec,
         epicId: epic.id,
         epicTitle: epic.title,
-        points: estimations[story.id]?.points ?? 0,
+        points: getEffortValue(estimations[story.id], estimationMode ?? 'story_points'),
+        estimation: estimations[story.id],
+        estimationMode: estimationMode ?? 'story_points',
         priority: priorities[story.id] ?? null,
         sprintId: sprintInfo?.sprintId ?? null,
         sprintNumber: sprintInfo?.sprintNumber ?? null,

@@ -3,6 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { BoardStory } from '@/lib/board/board-utils';
+import { formatEstimation, isStoryEstimated } from '@/lib/utils/estimation';
 import { memberInitials } from '@/lib/board/board-utils';
 import type { ProjectMember } from '@/lib/types/execution';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
@@ -116,9 +117,9 @@ export function KanbanCard({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          {item.points > 0 && (
+          {isStoryEstimated(item.estimation, item.estimationMode) && (
             <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted">
-              {item.points} SP
+              {formatEstimation(item.estimation, item.estimationMode)}
             </span>
           )}
           {priorityLabel && (

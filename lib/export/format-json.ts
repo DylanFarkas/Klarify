@@ -15,6 +15,7 @@ export function formatProjectAsJson(payload: ProjectExportPayload): ProjectExpor
         pipelineCompletionPercentage: payload.pipelineCompletionPercentage,
         framework: payload.framework,
         frameworkLabel: payload.frameworkLabel,
+        estimationMode: payload.estimationMode,
         summary: payload.summary,
       },
       wishes: payload.wishes,

@@ -1,7 +1,7 @@
 'use client';
 
 import type { UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { StoryPrioritization, PrioritizationFramework } from '@/lib/types/agent-4';
 import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
 import {
@@ -11,11 +11,13 @@ import {
 } from '@/components/agents/shared/WorkItemTypeBadge';
 import { FRAMEWORK_DESCRIPTIONS } from '@/lib/constants/agent-4';
 import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
+import { formatEstimation, isStoryEstimated } from '@/lib/utils/estimation';
 
 interface UserStoryDetailContentProps {
   story: UserStory;
   epicTitle?: string;
   estimation?: StoryEstimation;
+  estimationMode?: EstimationMode;
   prioritization?: StoryPrioritization;
   framework?: PrioritizationFramework;
 }
@@ -39,11 +41,12 @@ export function UserStoryDetailContent({
   story,
   epicTitle,
   estimation,
+  estimationMode = 'story_points',
   prioritization,
   framework,
 }: UserStoryDetailContentProps) {
   const type = resolveWorkItemType(story);
-  const hasEstimation = estimation && estimation.points > 0;
+  const hasEstimation = isStoryEstimated(estimation, estimationMode);
   const hasPrioritization = prioritization?.category && framework;
   const steps = story.stepsToReproduce ?? [];
 
@@ -137,11 +140,11 @@ export function UserStoryDetailContent({
         )}
       </DetailSection>
 
-      {hasEstimation ? (
+      {hasEstimation && estimation ? (
         <DetailSection label="Estimación">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-[15px] font-medium tabular-nums text-foreground">
-              {estimation.points} SP
+              {formatEstimation(estimation, estimationMode)}
             </span>
             {estimation.isModified ? (
               <span className="text-[12px] text-subtle">· Ajustado manualmente</span>

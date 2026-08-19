@@ -250,7 +250,7 @@ export async function exportProjectToGithub(params: {
 
       const milestone = await createMilestone(accessToken, owner, repo, {
         title,
-        description: buildSprintMilestoneDescription(sprint),
+        description: buildSprintMilestoneDescription(sprint, backlog.estimationMode),
         due_on: sprint.endDate ? `${sprint.endDate}T23:59:59Z` : undefined,
       });
       milestoneMappings[sprint.id] = { number: milestone.number };

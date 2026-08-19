@@ -11,6 +11,7 @@ import type {
 } from '@/lib/types/agent-4';
 import { toLocalEpicsWithEstimation } from '@/lib/types/agent-4';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { isStoryEstimated } from '@/lib/utils/estimation';
 
 import { IPrioritizationAdapter } from '../adapters/agent-4/IPrioritizationAdapter';
 import { MockPrioritizationAdapter } from '../adapters/agent-4/MockPrioritizationAdapter';
@@ -41,8 +42,9 @@ export function validateAgent4Input(input: Agent4Input | null): ValidationResult
       code: 'EMPTY_BACKLOG',
     };
   }
+  const mode = input.estimationMode ?? 'story_points';
   const allStoryIds = input.epics.flatMap((e) => e.userStories.map((s) => s.id));
-  const missing = allStoryIds.filter((id) => !input.estimations[id]?.points);
+  const missing = allStoryIds.filter((id) => !isStoryEstimated(input.estimations[id], mode));
   if (missing.length > 0) {
     return {
       valid: false,
@@ -61,6 +63,10 @@ export async function prioritizeBacklogStream(
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Agent4SuggestionItem[]> {
   const prioritizationAdapter = await resolvePrioritizationAdapter(uid);
-  const localEpics = toLocalEpicsWithEstimation(input.epics, input.estimations);
+  const localEpics = toLocalEpicsWithEstimation(
+    input.epics,
+    input.estimations,
+    input.estimationMode ?? 'story_points'
+  );
   return prioritizationAdapter.prioritizeBacklogStream(localEpics, framework, onThought, aiConfig);
 }

@@ -7,10 +7,16 @@ import { getFrameworkLabels } from '@/lib/constants/agent-4';
 import { KANBAN_COLUMNS, MEMBER_ROLE_LABELS } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 import type { Epic } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
-import type { SprintPlan, StoryDependency, PlannedSprint } from '@/lib/types/agent-5';
+import type { PlannedSprint, SprintPlan, StoryDependency } from '@/lib/types/agent-5';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import {
+  formatEffortTotal,
+  formatEstimation,
+  getEffortValue,
+  isStoryEstimated,
+} from '@/lib/utils/estimation';
 import type { ProjectExportPayload, ProjectExportStoryRow } from '@/lib/export/types';
 
 const KANBAN_LABELS = Object.fromEntries(
@@ -44,6 +50,7 @@ function resolveDependencies(plan: SprintPlan | null): StoryDependency[] {
 function buildStoryRows(
   epics: Epic[],
   estimations: Record<string, StoryEstimation>,
+  estimationMode: EstimationMode,
   priorities: Record<string, StoryPrioritization>,
   framework: PrioritizationFramework | null,
   plan: SprintPlan | null,
@@ -90,7 +97,17 @@ function buildStoryRows(
         epicId: epic.id,
         epicTitle: epic.title,
         epicDescription: epic.description,
-        storyPoints: estimation?.points ?? null,
+        storyPoints: estimationMode === 'story_points' && isStoryEstimated(estimation, estimationMode)
+          ? estimation.points
+          : null,
+        durationLabel:
+          estimationMode === 'time' && isStoryEstimated(estimation, estimationMode)
+            ? formatEstimation(estimation, estimationMode)
+            : null,
+        effortLabel: isStoryEstimated(estimation, estimationMode)
+          ? formatEstimation(estimation, estimationMode)
+          : null,
+        effortValue: getEffortValue(estimation, estimationMode),
         estimationJustification: estimation?.justification ?? null,
         priorityCategory: prioritization?.category ?? null,
         priorityLabel: prioritization && labels ? labels[prioritization.category] ?? prioritization.category : null,
@@ -117,17 +134,28 @@ export function resolveProjectExport(
   projectName: string
 ): ProjectExportPayload {
   const epics = resolveEpics(workspace);
+  const live = getLiveBacklog(workspace);
   const estimations = resolveEstimations(workspace);
+  const estimationMode = live.estimationMode;
   const priorities = resolvePriorities(workspace);
   const framework = resolveFramework(workspace);
   const plan = resolvePlan(workspace);
-  const stories = buildStoryRows(epics, estimations, priorities, framework, plan, workspace);
+  const stories = buildStoryRows(
+    epics,
+    estimations,
+    estimationMode,
+    priorities,
+    framework,
+    plan,
+    workspace
+  );
   const storyCount = stories.length;
-  const estimatedStoryCount = stories.filter((row) => row.storyPoints !== null).length;
+  const estimatedStoryCount = stories.filter((row) => row.effortLabel !== null).length;
   const prioritizedStoryCount = stories.filter((row) => row.priorityCategory !== null).length;
   const plannedStoryCount = plan
     ? new Set(plan.sprints.flatMap((sprint) => sprint.storyIds)).size
     : 0;
+  const totalEffort = stories.reduce((sum, row) => sum + row.effortValue, 0);
 
   const completionCount = [
     workspace.agent1.status,
@@ -141,6 +169,7 @@ export function resolveProjectExport(
     exportedAt: new Date().toISOString(),
     projectName,
     pipelineCompletionPercentage: Math.round((completionCount / 5) * 100),
+    estimationMode,
     framework,
     frameworkLabel: framework ? FRAMEWORK_DESCRIPTIONS[framework].label : null,
     wishes: workspace.agent1.wishes,
@@ -157,7 +186,8 @@ export function resolveProjectExport(
     summary: {
       epicCount: epics.length,
       storyCount,
-      totalStoryPoints: stories.reduce((sum, row) => sum + (row.storyPoints ?? 0), 0),
+      totalStoryPoints: totalEffort,
+      totalEffortLabel: formatEffortTotal(totalEffort, estimationMode),
       estimatedStoryCount,
       prioritizedStoryCount,
       sprintCount: plan?.sprints.length ?? 0,

@@ -14,6 +14,9 @@ import {
   WORK_ITEM_TYPE_LABELS,
 } from '@/lib/constants/agent-2';
 import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
+import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
+import type { EstimationMode } from '@/lib/types/agent-3';
+import { defaultDurationLabel, tryParseDurationLabel } from '@/lib/utils/estimation';
 import type {
   CreateDashboardUserStoryInput,
   UpdateDashboardUserStoryOptions,
@@ -46,6 +49,7 @@ interface DashboardCreateStoryModalProps {
   epics: Epic[];
   framework: PrioritizationFramework | null;
   sprintOptions: SprintOption[];
+  estimationMode?: EstimationMode;
   onCreate: (input: CreateDashboardUserStoryInput) => Promise<void>;
 }
 
@@ -55,6 +59,7 @@ export function DashboardCreateStoryModal({
   epics,
   framework,
   sprintOptions,
+  estimationMode = 'story_points',
   onCreate,
 }: DashboardCreateStoryModalProps) {
   const [workItemType, setWorkItemType] = useState<WorkItemType>('story');
@@ -67,6 +72,7 @@ export function DashboardCreateStoryModal({
   const [steps, setSteps] = useState<string[]>([]);
   const [technicalNotes, setTechnicalNotes] = useState('');
   const [points, setPoints] = useState(String(ALLOWED_STORY_POINTS[0]));
+  const [durationLabel, setDurationLabel] = useState(defaultDurationLabel('story'));
   const [category, setCategory] = useState<FrameworkCategory | ''>('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -82,6 +88,7 @@ export function DashboardCreateStoryModal({
     setSteps([]);
     setTechnicalNotes('');
     setPoints(String(ALLOWED_STORY_POINTS[0]));
+    setDurationLabel(defaultDurationLabel('story'));
     setCategory('');
     setIsSaving(false);
   }, [open, epics]);
@@ -89,6 +96,7 @@ export function DashboardCreateStoryModal({
   useEffect(() => {
     if (workItemType === 'bug') {
       setPoints('1');
+      setDurationLabel(defaultDurationLabel('bug'));
     }
   }, [workItemType]);
 
@@ -102,6 +110,7 @@ export function DashboardCreateStoryModal({
     !description.trim() ||
     !storyCriteriaOk ||
     !bugStepsOk ||
+    (estimationMode === 'time' && !tryParseDurationLabel(durationLabel)) ||
     isSaving;
 
   const typeLabel = WORK_ITEM_TYPE_LABELS[workItemType];
@@ -134,6 +143,8 @@ export function DashboardCreateStoryModal({
         steps={steps}
         technicalNotes={technicalNotes}
         points={points}
+        durationLabel={durationLabel}
+        estimationMode={estimationMode}
         category={category}
         onWorkItemTypeChange={setWorkItemType}
         onEpicIdChange={setEpicId}
@@ -145,6 +156,7 @@ export function DashboardCreateStoryModal({
         onStepsChange={setSteps}
         onTechnicalNotesChange={setTechnicalNotes}
         onPointsChange={setPoints}
+        onDurationChange={setDurationLabel}
         onCategoryChange={setCategory}
       />
 
@@ -170,7 +182,8 @@ export function DashboardCreateStoryModal({
                 title: title.trim(),
                 description: description.trim(),
                 acceptanceCriteria: workItemType === 'story' ? criteria : criteria.filter((c) => c.trim()),
-                points: Number(points),
+                points: estimationMode === 'story_points' ? Number(points) : undefined,
+                durationLabel: estimationMode === 'time' ? durationLabel : undefined,
                 ...(category ? { category } : {}),
                 ...(workItemType === 'bug'
                   ? { severity, stepsToReproduce: steps }
@@ -205,6 +218,7 @@ interface DashboardEditStoryModalProps {
   framework: PrioritizationFramework | null;
   sprintOptions: SprintOption[];
   sprintAssignmentLocked?: boolean;
+  estimationMode?: EstimationMode;
   onSave: (
     updates: Partial<UserStory>,
     estimationUpdates?: Partial<StoryEstimation>,
@@ -221,6 +235,7 @@ export function DashboardEditStoryModal({
   framework,
   sprintOptions,
   sprintAssignmentLocked = false,
+  estimationMode = 'story_points',
   onSave,
 }: DashboardEditStoryModalProps) {
   const workItemType = resolveWorkItemType(row.story);
@@ -240,6 +255,9 @@ export function DashboardEditStoryModal({
   const [points, setPoints] = useState(
     String(isAllowedStoryPoint(initialPoints) ? initialPoints : 1)
   );
+  const [durationLabel, setDurationLabel] = useState(
+    row.estimation?.durationLabel ?? defaultDurationLabel(workItemType)
+  );
   const [category, setCategory] = useState<FrameworkCategory | ''>(
     row.prioritization?.category ?? ''
   );
@@ -257,12 +275,16 @@ export function DashboardEditStoryModal({
     setSprintId(row.sprintId ?? '');
     const pts = row.estimation?.points ?? 1;
     setPoints(String(isAllowedStoryPoint(pts) ? pts : 1));
+    setDurationLabel(row.estimation?.durationLabel ?? defaultDurationLabel(workItemType));
     setCategory(row.prioritization?.category ?? '');
     setIsSaving(false);
   }, [open, row]);
 
   const parsedPoints = Number(points);
-  const isInvalidPoints = !isAllowedStoryPoint(parsedPoints);
+  const isInvalidPoints =
+    estimationMode === 'story_points' && !isAllowedStoryPoint(parsedPoints);
+  const isInvalidDuration =
+    estimationMode === 'time' && !tryParseDurationLabel(durationLabel);
   const storyCriteriaOk =
     workItemType !== 'story' || criteria.some((c) => c.trim());
   const bugStepsOk =
@@ -272,6 +294,7 @@ export function DashboardEditStoryModal({
     !description.trim() ||
     !epicId ||
     isInvalidPoints ||
+    isInvalidDuration ||
     !storyCriteriaOk ||
     !bugStepsOk ||
     isSaving;
@@ -311,6 +334,8 @@ export function DashboardEditStoryModal({
         steps={steps}
         technicalNotes={technicalNotes}
         points={points}
+        durationLabel={durationLabel}
+        estimationMode={estimationMode}
         category={category}
         onEpicIdChange={setEpicId}
         onSprintIdChange={setSprintId}
@@ -321,6 +346,7 @@ export function DashboardEditStoryModal({
         onStepsChange={setSteps}
         onTechnicalNotesChange={setTechnicalNotes}
         onPointsChange={setPoints}
+        onDurationChange={setDurationLabel}
         onCategoryChange={setCategory}
       />
 
@@ -354,11 +380,22 @@ export function DashboardEditStoryModal({
               await onSave(
                 updates,
                 {
-                  points: parsedPoints,
-                  justification:
-                    row.estimation?.justification ||
-                    'Estimacion ajustada manualmente desde el dashboard.',
-                  isModified: true,
+                  ...(estimationMode === 'time'
+                    ? {
+                        points: 0,
+                        durationLabel,
+                        justification:
+                          row.estimation?.justification ||
+                          'Estimacion ajustada manualmente desde el dashboard.',
+                        isModified: true,
+                      }
+                    : {
+                        points: parsedPoints,
+                        justification:
+                          row.estimation?.justification ||
+                          'Estimacion ajustada manualmente desde el dashboard.',
+                        isModified: true,
+                      }),
                 },
                 {
                   ...(hasEpicChange ? { epicId } : {}),
@@ -408,6 +445,8 @@ function StoryFormFields({
   steps,
   technicalNotes,
   points,
+  durationLabel,
+  estimationMode = 'story_points',
   category,
   onWorkItemTypeChange,
   onEpicIdChange,
@@ -419,6 +458,7 @@ function StoryFormFields({
   onStepsChange,
   onTechnicalNotesChange,
   onPointsChange,
+  onDurationChange,
   onCategoryChange,
 }: {
   epics: Epic[];
@@ -436,6 +476,8 @@ function StoryFormFields({
   steps: string[];
   technicalNotes: string;
   points: string;
+  durationLabel: string;
+  estimationMode?: EstimationMode;
   category: FrameworkCategory | '';
   onWorkItemTypeChange?: (value: WorkItemType) => void;
   onEpicIdChange: (value: string) => void;
@@ -447,6 +489,7 @@ function StoryFormFields({
   onStepsChange: (value: string[]) => void;
   onTechnicalNotesChange: (value: string) => void;
   onPointsChange: (value: string) => void;
+  onDurationChange: (value: string) => void;
   onCategoryChange: (value: FrameworkCategory | '') => void;
 }) {
   const descriptionPlaceholder =
@@ -511,17 +554,26 @@ function StoryFormFields({
           ) : null}
         </label>
         <label className={fieldLabelClass}>
-          Story points
-          <DropdownSelect
-            value={points}
-            onChange={onPointsChange}
-            options={ALLOWED_STORY_POINTS.map((value) => ({
-              value: String(value),
-              label: String(value),
-            }))}
-            placeholder="SP"
-            className={fieldSelectClass}
-          />
+          {estimationMode === 'time' ? 'Tiempo' : 'Story points'}
+          {estimationMode === 'time' ? (
+            <div className="mt-1.5">
+              <TimeDurationInput
+                value={durationLabel}
+                onCommit={(label) => onDurationChange(label)}
+              />
+            </div>
+          ) : (
+            <DropdownSelect
+              value={points}
+              onChange={onPointsChange}
+              options={ALLOWED_STORY_POINTS.map((value) => ({
+                value: String(value),
+                label: String(value),
+              }))}
+              placeholder="SP"
+              className={fieldSelectClass}
+            />
+          )}
         </label>
         <label className={`min-w-0 ${fieldLabelClass}`}>
           Prioridad

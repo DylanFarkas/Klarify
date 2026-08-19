@@ -89,7 +89,7 @@ export class LlmPrioritizationAdapter implements IPrioritizationAdapter {
 
 REGLAS CRÍTICAS:
 - 'suggestedCategory' debe ser exactamente uno de: ${validCategories.join(', ')}.
-- Evalúa el valor de negocio, dependencias, riesgo y esfuerzo (Story Points) de cada historia.
+- Evalúa el valor de negocio, dependencias, riesgo y esfuerzo estimado de cada historia.
 - La justificación debe ser clara y profesional (máximo ${MAX_PRIORITIZATION_JUSTIFICATION_LENGTH} caracteres).`;
 
     const userPrompt = `Eres un Product Owner experto en priorización ágil usando la metodología ${frameworkInfo.label}.
@@ -98,7 +98,7 @@ METODOLOGÍA: ${frameworkInfo.label}
 DESCRIPCIÓN: ${frameworkInfo.summary}
 DETALLES: ${frameworkInfo.details}
 
-A partir del siguiente backlog estructurado y estimado en Story Points, clasifica cada historia de usuario en una de las siguientes categorías: ${validCategories.join(', ')}.
+A partir del siguiente backlog estructurado y estimado (effortLabel = Story Points o tiempo), clasifica cada historia de usuario en una de las siguientes categorías: ${validCategories.join(', ')}.
 
 BACKLOG A PRIORIZAR:
 ${JSON.stringify(epics, null, 2)}`;

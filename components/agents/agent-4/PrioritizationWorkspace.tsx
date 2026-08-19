@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { authFetch } from '@/lib/api-client';
 import type { Agent4Input } from '@/lib/types/workspace';
 import type { UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type {
   Agent4PrioritizationResponse,
   Agent4Status,
@@ -25,6 +25,7 @@ import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDeta
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
+import { formatEffortTotal, formatEstimation, getEffortValue } from '@/lib/utils/estimation';
 import { CategorySelect, CategoryBadge } from './CategorySelect';
 import { FrameworkSelector } from './FrameworkSelector';
 import { EmptyPrioritizationStartState } from './EmptyPrioritizationStartState';
@@ -70,6 +71,7 @@ interface PrioritizationStoryRowProps {
   epicTitle: string;
   pri: StoryPrioritization | undefined;
   est: StoryEstimation | undefined;
+  estimationMode: EstimationMode;
   framework: PrioritizationFramework;
   isAnalyzing: boolean;
   isApproved: boolean;
@@ -82,6 +84,7 @@ function PrioritizationStoryRow({
   epicTitle,
   pri,
   est,
+  estimationMode,
   framework,
   isAnalyzing,
   isApproved,
@@ -119,7 +122,9 @@ function PrioritizationStoryRow({
             {story.description}
           </p>
           {est ? (
-            <p className="mt-1.5 text-[12px] tabular-nums text-subtle">{est.points} SP</p>
+            <p className="mt-1.5 text-[12px] tabular-nums text-subtle">
+              {formatEstimation(est, estimationMode)}
+            </p>
           ) : null}
         </div>
 
@@ -160,6 +165,7 @@ function PrioritizationStoryRow({
           story={story}
           epicTitle={epicTitle}
           estimation={est}
+          estimationMode={estimationMode}
           prioritization={pri}
           framework={framework}
         />
@@ -199,11 +205,16 @@ export function PrioritizationWorkspace({
     () => allStories.filter((s) => priorities[s.id]?.category).length,
     [allStories, priorities]
   );
-  const totalPoints = useMemo(
+  const estimationMode = input.estimationMode ?? 'story_points';
+  const totalEffort = useMemo(
     () =>
-      allStories.reduce((sum, s) => sum + (input.estimations[s.id]?.points ?? 0), 0),
-    [allStories, input.estimations]
+      allStories.reduce(
+        (sum, s) => sum + getEffortValue(input.estimations[s.id], estimationMode),
+        0
+      ),
+    [allStories, input.estimations, estimationMode]
   );
+  const effortLabel = formatEffortTotal(totalEffort, estimationMode);
   const hasPriorities = Object.keys(priorities).length > 0;
   const showIdleStart = !hasPriorities && !isAnalyzing && !isApproved;
   const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
@@ -224,6 +235,7 @@ export function PrioritizationWorkspace({
         body: JSON.stringify({
           epics: input.epics,
           estimations: input.estimations,
+          estimationMode: input.estimationMode ?? 'story_points',
           framework,
           ...(hasPriorities ? { isRegeneration: true } : {}),
         }),
@@ -301,7 +313,7 @@ export function PrioritizationWorkspace({
           isPrioritizing={isAnalyzing}
           epicCount={input.epics.length}
           storyCount={totalStories}
-          totalPoints={totalPoints}
+          effortLabel={effortLabel}
         />
       </>
     );
@@ -450,6 +462,7 @@ export function PrioritizationWorkspace({
                         epicTitle={epic.title}
                         pri={priorities[story.id]}
                         est={input.estimations[story.id]}
+                        estimationMode={estimationMode}
                         framework={framework}
                         isAnalyzing={isAnalyzing}
                         isApproved={isApproved}

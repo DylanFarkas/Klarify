@@ -1,4 +1,5 @@
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 export function DashboardEpicProgress({ metrics }: { metrics: DashboardMetrics }) {
 	if (metrics.epicBreakdown.length === 0) return null;
@@ -30,7 +31,7 @@ export function DashboardEpicProgress({ metrics }: { metrics: DashboardMetrics }
 								<p className="mt-0.5 text-[11px] tabular-nums text-subtle">
 									{epic.doneCount}/{epic.storyCount} hechas
 									{' · '}
-									{epic.points} SP
+									{formatEffortTotal(epic.points, metrics.estimationMode)}
 								</p>
 							</div>
 							<div className="flex w-full items-center gap-2 sm:w-40">

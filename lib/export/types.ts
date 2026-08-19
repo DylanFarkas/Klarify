@@ -4,7 +4,7 @@
 
 import type { Wish } from '@/lib/types/agent-1';
 import type { Epic } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { PlannedSprint, SprintPlan, StoryDependency } from '@/lib/types/agent-5';
 import type { ExecutionState, KanbanStatus, ProjectMember } from '@/lib/types/execution';
@@ -24,6 +24,9 @@ export interface ProjectExportStoryRow {
   epicTitle: string;
   epicDescription: string;
   storyPoints: number | null;
+  durationLabel: string | null;
+  effortLabel: string | null;
+  effortValue: number;
   estimationJustification: string | null;
   priorityCategory: string | null;
   priorityLabel: string | null;
@@ -46,6 +49,7 @@ export interface ProjectExportPayload {
   exportedAt: string;
   projectName: string;
   pipelineCompletionPercentage: number;
+  estimationMode: EstimationMode;
   framework: PrioritizationFramework | null;
   frameworkLabel: string | null;
   wishes: Wish[];
@@ -63,6 +67,7 @@ export interface ProjectExportPayload {
     epicCount: number;
     storyCount: number;
     totalStoryPoints: number;
+    totalEffortLabel: string;
     estimatedStoryCount: number;
     prioritizedStoryCount: number;
     sprintCount: number;
