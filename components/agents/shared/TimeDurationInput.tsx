@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TIME_DURATION_EXAMPLES } from '@/lib/constants/agent-3';
 import { DurationParseError, parseDurationLabel } from '@/lib/utils/estimation';
 
@@ -25,19 +26,50 @@ export function TimeDurationInput({
   size = 'default',
 }: TimeDurationInputProps) {
   const isCompact = size === 'compact';
+  const inputRef = useRef<HTMLInputElement>(null);
+  const errorId = `${id ?? 'duration'}-error`;
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
+  const [errorPos, setErrorPos] = useState({ top: 0, left: 0 });
+
+  const updateErrorPosition = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setErrorPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+    });
+  }, []);
 
   useEffect(() => {
     setDraft(value);
     setError(null);
   }, [value]);
 
+  useEffect(() => {
+    if (!error || !isCompact) return;
+    updateErrorPosition();
+    window.addEventListener('scroll', updateErrorPosition, true);
+    window.addEventListener('resize', updateErrorPosition);
+    return () => {
+      window.removeEventListener('scroll', updateErrorPosition, true);
+      window.removeEventListener('resize', updateErrorPosition);
+    };
+  }, [error, isCompact, updateErrorPosition]);
+
+  const showError = (message: string) => {
+    setError(message);
+    if (isCompact) {
+      requestAnimationFrame(updateErrorPosition);
+    }
+  };
+
   const commit = () => {
     if (disabled) return;
     const trimmed = draft.trim();
     if (!trimmed) {
-      setError('Escribe una duración (2d, 3h, 50m, 2.5h).');
+      showError('Escribe una duración (2d, 3h, 50m, 2.5h).');
       return;
     }
     try {
@@ -46,7 +78,7 @@ export function TimeDurationInput({
       setError(null);
       onCommit(parsed.label, parsed.minutes);
     } catch (err) {
-      setError(
+      showError(
         err instanceof DurationParseError
           ? err.message
           : 'Formato inválido. Ejemplos: 2d, 3h, 50m, 2.5h.'
@@ -55,8 +87,9 @@ export function TimeDurationInput({
   };
 
   return (
-    <div className={className}>
+    <div className={['relative', className].filter(Boolean).join(' ')}>
       <input
+        ref={inputRef}
         id={id}
         type="text"
         inputMode="text"
@@ -65,9 +98,8 @@ export function TimeDurationInput({
         disabled={disabled}
         value={draft}
         placeholder={placeholder}
-        title={error ?? undefined}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error && !isCompact ? `${id ?? 'duration'}-error` : undefined}
+        aria-describedby={error ? errorId : undefined}
         onChange={(e) => {
           setDraft(e.target.value);
           if (error) setError(null);
@@ -85,14 +117,27 @@ export function TimeDurationInput({
           isCompact
             ? 'rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold focus:border-border-strong'
             : 'rounded-lg border border-input-border bg-input px-3 py-2 text-sm focus:border-border-strong',
-          error ? 'border-danger focus:border-danger' : '',
+          error ? 'border-danger bg-danger/5 focus:border-danger' : '',
         ].join(' ')}
       />
       {error && !isCompact ? (
-        <p id={`${id ?? 'duration'}-error`} className="mt-1 text-[11px] text-danger">
+        <p id={errorId} role="alert" className="mt-1 text-[11px] text-danger">
           {error}
         </p>
       ) : null}
+      {error && isCompact && typeof document !== 'undefined'
+        ? createPortal(
+            <p
+              id={errorId}
+              role="alert"
+              className="fixed z-9999 w-max max-w-55 rounded-md border border-danger/30 bg-surface px-2 py-1 text-[10px] leading-snug text-danger shadow-lg"
+              style={{ top: errorPos.top, left: errorPos.left }}
+            >
+              {error}
+            </p>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
