@@ -185,8 +185,13 @@ export function KanbanBoard({
   const activeItem = activeStoryId ? storiesById[activeStoryId] ?? null : null;
 
   const handleDragStart = (event: DragStartEvent) => {
+    const storyId = String(event.active.id);
+    if (storiesById[storyId]?.sprintLocked) {
+      isDraggingRef.current = false;
+      return;
+    }
     isDraggingRef.current = true;
-    setActiveStoryId(String(event.active.id));
+    setActiveStoryId(storyId);
   };
 
   const handleDragOver = (event: DragOverEvent) => {

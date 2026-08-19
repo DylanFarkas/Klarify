@@ -43,14 +43,11 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 function RepoSkeleton() {
   return (
-    <div className="space-y-2 px-1 py-1">
+    <div className="space-y-2 py-1">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-          <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-border" />
-          <div className="flex-1 space-y-1.5">
-            <div className="h-3 w-3/4 animate-pulse rounded bg-border" />
-            <div className="h-2.5 w-1/2 animate-pulse rounded bg-border/70" />
-          </div>
+        <div key={i} className="flex items-center gap-2 py-1.5">
+          <div className="h-3 w-2/5 animate-pulse rounded bg-border" />
+          <div className="h-2.5 w-1/4 animate-pulse rounded bg-border/70" />
         </div>
       ))}
     </div>
@@ -145,266 +142,83 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
   const displayName = githubUsername ?? 'github';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/80 bg-surface-muted/20">
-      {/* Header */}
-      <div className="flex items-start gap-3 border-b border-border px-3.5 py-3.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-foreground">
-          <GitHubIcon className="h-4 w-4" />
-        </div>
-
-        <div className="min-w-0 flex-1 pt-0.5">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h3>
-            {isGithubConnected && (
-              <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
-                Activo
-              </span>
-            )}
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h4>
           <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
-            {isGithubConnected
-              ? 'Exporta backlogs a GitHub Projects. Reconecta si falta acceso a Projects.'
-              : 'Conecta tu cuenta para exportar el backlog a GitHub Projects.'}
+            {isGithubConnected ? (
+              <>
+                <a
+                  href={`https://github.com/${displayName}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:underline"
+                >
+                  @{displayName}
+                </a>
+                {' · '}Exporta backlogs a GitHub Projects.
+              </>
+            ) : (
+              'Conecta tu cuenta para exportar el backlog a GitHub Projects.'
+            )}
           </p>
         </div>
+        {isGithubConnected ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 pt-1 text-[11px] font-medium text-success">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
+            Activo
+          </span>
+        ) : null}
       </div>
 
-      {/* Body */}
-      <div className="px-3.5 py-3.5">
-        {!isGithubConnected ? (
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={handleConnect}
-              disabled={linking || disconnecting}
-              className={[
-                'flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5',
-                'bg-foreground text-sm font-medium text-background',
-                'transition-opacity hover:opacity-90',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong',
-                'disabled:cursor-not-allowed disabled:opacity-40',
-              ].join(' ')}
-            >
-              {linking ? (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  Conectando…
-                </>
-              ) : (
-                <>
-                  <GitHubIcon className="h-4 w-4" />
-                  Conectar cuenta
-                </>
-              )}
-            </button>
-            {showDisconnect && (
-              <div className="rounded-lg border border-border bg-surface-muted/25 px-3 py-2.5">
-                <p className="text-[11px] text-muted">
-                  GitHub sigue vinculado en tu cuenta de Klarify pero sin token activo. Desconéctalo
-                  para volver a conectar.
-                </p>
-                {!confirmDisconnect ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDisconnect(true)}
-                    className="mt-2 text-xs font-medium text-danger hover:underline"
-                  >
-                    Desconectar GitHub
-                  </button>
-                ) : (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDisconnect}
-                      disabled={disconnecting}
-                      className="rounded-md px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
-                    >
-                      {disconnecting ? 'Desconectando…' : 'Confirmar desconexión'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDisconnect(false)}
-                      disabled={disconnecting}
-                      className="text-xs text-subtle hover:text-foreground"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {/* Perfil conectado */}
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-sm font-medium text-foreground">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">@{displayName}</p>
-                <p className="text-[11px] text-subtle">Cuenta vinculada</p>
-              </div>
-              <a
-                href={`https://github.com/${displayName}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 rounded-md p-1.5 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
-                aria-label={`Ver perfil de @${displayName} en GitHub`}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            </div>
-
-            {/* Acordeón de repos */}
-            <div className="overflow-hidden rounded-lg border border-border">
-              <button
-                type="button"
-                onClick={toggleRepos}
-                aria-expanded={reposExpanded}
-                className={[
-                  'flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-sm font-medium',
-                  'text-foreground transition-colors hover:bg-surface-hover/40',
-                ].join(' ')}
-              >
-                <svg
-                  className={[
-                    'h-4 w-4 shrink-0 text-subtle transition-transform duration-200',
-                    reposExpanded ? 'rotate-90' : '',
-                  ].join(' ')}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="flex-1">Repositorios</span>
-                {reposLoaded && repos.length > 0 && (
-                  <span className="tabular-nums text-[11px] text-subtle">
-                    {repos.length}
-                  </span>
-                )}
-                {loadingRepos && <Spinner className="h-3.5 w-3.5 text-subtle" />}
-              </button>
-
-              {reposExpanded && (
-                <div className="border-t border-border">
-                  {loadingRepos && <RepoSkeleton />}
-
-                  {!loadingRepos && reposError && (
-                    <div className="space-y-2 px-3 py-3">
-                      <p className="text-xs text-danger" role="alert">
-                        {reposError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={loadRepos}
-                        className="text-xs font-medium text-foreground hover:underline"
-                      >
-                        Reintentar
-                      </button>
-                    </div>
-                  )}
-
-                  {!loadingRepos && !reposError && reposLoaded && repos.length === 0 && (
-                    <p className="px-3 py-4 text-center text-xs text-muted">
-                      No se encontraron repositorios.
-                    </p>
-                  )}
-
-                  {!loadingRepos && !reposError && repos.length > 0 && (
-                    <ul className={`${reposListMaxHeight} space-y-0.5 overflow-y-auto p-1.5`}>
-                      {repos.map((repo) => {
-                        const [owner, name] = repo.full_name.split('/');
-                        return (
-                          <li key={repo.id}>
-                            <a
-                              href={repo.html_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={[
-                                'group flex items-center gap-2.5 rounded-lg px-2 py-2',
-                                'transition-colors hover:bg-surface-hover/40',
-                              ].join(' ')}
-                            >
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
-                                <svg
-                                  className="h-3.5 w-3.5 text-subtle group-hover:text-foreground"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.75}
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                                  />
-                                </svg>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-medium text-foreground">{name}</p>
-                                <p className="truncate text-[10px] text-subtle">{owner}</p>
-                              </div>
-                              <div className="flex shrink-0 items-center gap-1">
-                                {repo.private && (
-                                  <span
-                                    className="rounded border border-border px-1.5 py-0.5 text-[9px] text-subtle"
-                                    title="Repositorio privado"
-                                  >
-                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                  </span>
-                                )}
-                                <svg
-                                  className="h-3.5 w-3.5 text-subtle opacity-0 transition-opacity group-hover:opacity-100"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                  aria-hidden="true"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                              </div>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {!confirmDisconnect ? (
-              <button
-                type="button"
-                onClick={() => setConfirmDisconnect(true)}
-                disabled={disconnecting}
-                className="w-full cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-40"
-              >
-                Desconectar GitHub
-              </button>
+      {!isGithubConnected ? (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleConnect}
+            disabled={linking || disconnecting}
+            className={[
+              'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2',
+              'bg-foreground text-sm font-medium text-background',
+              'transition-opacity hover:opacity-90',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong',
+              'disabled:cursor-not-allowed disabled:opacity-40',
+            ].join(' ')}
+          >
+            {linking ? (
+              <>
+                <Spinner className="h-4 w-4" />
+                Conectando…
+              </>
             ) : (
-              <div className="rounded-lg border border-border bg-surface-muted/25 px-3 py-2.5">
-                <p className="text-[11px] leading-relaxed text-muted">
-                  Se eliminará el acceso a tus repositorios. Podrás volver a conectar GitHub cuando
-                  quieras.
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+              <>
+                <GitHubIcon className="h-4 w-4" />
+                Conectar cuenta
+              </>
+            )}
+          </button>
+          {showDisconnect && (
+            <div>
+              <p className="text-[12px] leading-relaxed text-muted">
+                GitHub sigue vinculado en tu cuenta de Klarify pero sin token activo. Desconéctalo
+                para volver a conectar.
+              </p>
+              {!confirmDisconnect ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDisconnect(true)}
+                  className="mt-2 cursor-pointer text-[12px] font-medium text-muted transition-colors hover:text-danger"
+                >
+                  Desconectar GitHub
+                </button>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={handleDisconnect}
                     disabled={disconnecting}
-                    className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 disabled:opacity-40"
+                    className="cursor-pointer text-[12px] font-medium text-danger hover:underline disabled:opacity-40"
                   >
                     {disconnecting ? 'Desconectando…' : 'Confirmar desconexión'}
                   </button>
@@ -412,22 +226,155 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                     type="button"
                     onClick={() => setConfirmDisconnect(false)}
                     disabled={disconnecting}
-                    className="cursor-pointer text-xs text-subtle hover:text-foreground"
+                    className="cursor-pointer text-[12px] text-subtle hover:text-foreground"
                   >
                     Cancelar
                   </button>
                 </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <button
+              type="button"
+              onClick={toggleRepos}
+              aria-expanded={reposExpanded}
+              className="flex w-full cursor-pointer items-center gap-2 py-1 text-left text-[13px] font-medium text-foreground"
+            >
+              <svg
+                className={[
+                  'h-3.5 w-3.5 shrink-0 text-subtle transition-transform duration-200',
+                  reposExpanded ? 'rotate-90' : '',
+                ].join(' ')}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              <span>Repositorios</span>
+              {reposLoaded && repos.length > 0 && (
+                <span className="tabular-nums text-[11px] font-normal text-subtle">
+                  {repos.length}
+                </span>
+              )}
+              {loadingRepos && <Spinner className="h-3.5 w-3.5 text-subtle" />}
+            </button>
+
+            {reposExpanded && (
+              <div className="mt-1">
+                {loadingRepos && <RepoSkeleton />}
+
+                {!loadingRepos && reposError && (
+                  <div className="space-y-1.5 py-2">
+                    <p className="text-xs text-danger" role="alert">
+                      {reposError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={loadRepos}
+                      className="text-xs font-medium text-foreground hover:underline"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+
+                {!loadingRepos && !reposError && reposLoaded && repos.length === 0 && (
+                  <p className="py-3 text-[12px] text-muted">No se encontraron repositorios.</p>
+                )}
+
+                {!loadingRepos && !reposError && repos.length > 0 && (
+                  <ul className={`${reposListMaxHeight} overflow-y-auto`}>
+                    {repos.map((repo) => {
+                      const [owner, name] = repo.full_name.split('/');
+                      return (
+                        <li key={repo.id} className="border-t border-border/50 first:border-t-0">
+                          <a
+                            href={repo.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-center gap-2 py-2 transition-colors hover:bg-surface-hover/40"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[13px] text-foreground">{name}</p>
+                              <p className="truncate text-[11px] text-subtle">{owner}</p>
+                            </div>
+                            {repo.private && (
+                              <span title="Repositorio privado" className="shrink-0 text-subtle">
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                              </span>
+                            )}
+                            <svg
+                              className="h-3.5 w-3.5 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        {authError && (
-          <p className="mt-2.5 rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs text-danger" role="alert">
-            {authError}
-          </p>
-        )}
-      </div>
+          {!confirmDisconnect ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDisconnect(true)}
+              disabled={disconnecting}
+              className="cursor-pointer text-[12px] font-medium text-muted transition-colors hover:text-danger disabled:opacity-40"
+            >
+              Desconectar GitHub
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[12px] leading-relaxed text-muted">
+                Se eliminará el acceso a tus repositorios. Podrás volver a conectar GitHub cuando
+                quieras.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="cursor-pointer text-[12px] font-medium text-danger hover:underline disabled:opacity-40"
+                >
+                  {disconnecting ? 'Desconectando…' : 'Confirmar desconexión'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDisconnect(false)}
+                  disabled={disconnecting}
+                  className="cursor-pointer text-[12px] text-subtle hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {authError && (
+        <p className="text-xs text-danger" role="alert">
+          {authError}
+        </p>
+      )}
     </div>
   );
 }

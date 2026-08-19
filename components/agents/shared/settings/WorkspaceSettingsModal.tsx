@@ -103,7 +103,7 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
         className={[
           'relative z-10 flex w-full max-w-3xl flex-col overflow-hidden',
           'rounded-t-2xl border border-border/70 bg-surface shadow-2xl sm:rounded-2xl',
-          'h-[min(90vh,680px)] animate-[slideUp_0.25s_ease-out] sm:animate-[fadeIn_0.2s_ease-out]',
+          'h-[min(90vh,700px)] animate-[slideUp_0.25s_ease-out] sm:animate-[fadeIn_0.2s_ease-out]',
         ].join(' ')}
       >
         {/* Header */}
@@ -195,13 +195,17 @@ export function WorkspaceSettingsModal({ isOpen, onClose }: WorkspaceSettingsMod
               {activeTab === 'appearance' && <ThemeSettingsPanel />}
 
               {activeTab === 'integrations' && (
-                <div className="space-y-4">
-                  <AiProviderConnectionPanel />
-                  {githubEnabled ? (
-                    <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
-                  ) : (
-                    <GitHubExportUpgradeGate />
-                  )}
+                <div className="divide-y divide-border/70">
+                  <div className="pb-6">
+                    <AiProviderConnectionPanel />
+                  </div>
+                  <div className="pt-6">
+                    {githubEnabled ? (
+                      <GitHubConnectionPanel reposListMaxHeight="max-h-56" />
+                    ) : (
+                      <GitHubExportUpgradeGate compact />
+                    )}
+                  </div>
                 </div>
               )}
 

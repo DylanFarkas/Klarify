@@ -26,9 +26,12 @@ import type { Agent5State, SprintDatePatch, SprintPlan } from '@/lib/types/agent
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
   addSprintToPlan,
+  assertCompletedSprintsUnchanged,
+  assertStoryNotInCompletedSprint,
   buildAgent6InputFromAgent4,
   completeSprintInPlan,
   deleteEmptySprintFromPlan,
+  isStoryInCompletedSprint,
   normalizeSprintPlan,
   startSprintInPlan,
   updateSprintDates,
@@ -436,6 +439,14 @@ export async function updateStoryExecution(
   }
 
   const current = execution.stories[storyId] ?? createDefaultStoryExecution(0);
+  const plan = getLiveBacklog(workspace).plan;
+  if (
+    (patch.status !== undefined && patch.status !== current.status) ||
+    (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) ||
+    (patch.columnOrder !== undefined && patch.columnOrder !== current.columnOrder)
+  ) {
+    assertStoryNotInCompletedSprint(plan, storyId);
+  }
   let updated = { ...current, ...patch, updatedAt: Date.now() };
 
   if (patch.status !== undefined && patch.status !== current.status) {
@@ -478,9 +489,16 @@ export async function bulkUpdateStoryExecutions(
   }
   const stories = { ...execution.stories };
   const now = Date.now();
+  const plan = getLiveBacklog(workspace).plan;
 
   for (const update of updates) {
     const current = stories[update.storyId] ?? createDefaultStoryExecution(update.columnOrder);
+    if (isStoryInCompletedSprint(plan, update.storyId)) {
+      if (update.status !== current.status) {
+        assertStoryNotInCompletedSprint(plan, update.storyId);
+      }
+      continue;
+    }
     let next = { ...current, status: update.status, columnOrder: update.columnOrder, updatedAt: now };
 
     if (update.status !== current.status) {
@@ -581,6 +599,8 @@ export async function updateUserStoryAcrossWorkspace(
     throw new Error(`Historia no encontrada: ${storyId}`);
   }
 
+  assertStoryNotInCompletedSprint(live.plan, storyId);
+
   // MVP: no se permite cambiar el tipo ni el id tras crear.
   const { type: _ignoredType, id: _ignoredId, ...safeUpdates } = updates;
   const type = resolveWorkItemType(current);
@@ -647,6 +667,10 @@ export async function updateSprintPlanAcrossWorkspace(
   plan: SprintPlan
 ): Promise<UserWorkspace> {
   const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const currentPlan = resolveSprintPlan(workspace);
+  if (currentPlan) {
+    assertCompletedSprintsUnchanged(currentPlan, plan);
+  }
   const normalizedPlan = normalizeSprintPlan(plan);
   const updatedWorkspace = withUpdatedSprintPlan(workspace, normalizedPlan);
 
@@ -879,6 +903,12 @@ export async function deleteUserStoryAcrossWorkspace(
   storyId: string
 ): Promise<UserWorkspace> {
   const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const live = getLiveBacklog(workspace);
+  const exists = live.epics.some((epic) => epic.userStories.some((story) => story.id === storyId));
+  if (!exists) {
+    throw new Error(`Historia no encontrada: ${storyId}`);
+  }
+  assertStoryNotInCompletedSprint(live.plan, storyId, 'eliminar');
   const updatedWorkspace = withDeletedUserStory(workspace, storyId);
   await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return updatedWorkspace;
@@ -930,6 +960,10 @@ export async function deleteEpicAcrossWorkspace(
   const target = getLiveBacklog(workspace).epics.find((epic) => epic.id === epicId);
   if (!target) {
     throw new Error(`Épica no encontrada: ${epicId}`);
+  }
+  const plan = getLiveBacklog(workspace).plan;
+  for (const story of target.userStories) {
+    assertStoryNotInCompletedSprint(plan, story.id, 'eliminar');
   }
 
   const updatedWorkspace = withDeletedEpic(workspace, epicId);

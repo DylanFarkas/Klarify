@@ -43,6 +43,7 @@ import {
 	hasSprintLabelMismatches,
 	moveStoryInPlan,
 	normalizeSprintPlan,
+	SprintLifecycleError,
 	updateSprintDates,
 	updateSprintGoal,
 } from '@/lib/utils/sprint-plan-mutations';
@@ -285,7 +286,15 @@ export function DashboardSprintStoriesTable({
 			const current = planRef.current;
 			if (!current || !onUpdateSprintPlan) return;
 			const storyPoints = estimations[storyId]?.points ?? 0;
-			persistPlan(moveStoryInPlan(current, storyId, fromSprintId, toSprintId, storyPoints));
+			try {
+				persistPlan(moveStoryInPlan(current, storyId, fromSprintId, toSprintId, storyPoints));
+			} catch (err) {
+				notifyError(
+					err instanceof SprintLifecycleError
+						? err.message
+						: errorMessage(err, 'No se pudo mover la historia')
+				);
+			}
 		},
 		[estimations, onUpdateSprintPlan, persistPlan]
 	);
@@ -421,6 +430,26 @@ export function DashboardSprintStoriesTable({
 				: null,
 		[editingStoryId, rows, unassignedRows]
 	);
+	const editingSprintLocked = Boolean(
+		editingRow?.sprintId &&
+			safePlan?.sprints.some(
+				(sprint) => sprint.id === editingRow.sprintId && getSprintStatus(sprint) === 'completed'
+			)
+	);
+	const editSprintOptions = useMemo(() => {
+		if (!editingRow?.sprintId || sprintOptions.some((option) => option.id === editingRow.sprintId)) {
+			return sprintOptions;
+		}
+		return [
+			...sprintOptions,
+			{
+				id: editingRow.sprintId,
+				label: editingRow.sprintNumber
+					? `Sprint ${editingRow.sprintNumber}`
+					: editingRow.sprintId,
+			},
+		];
+	}, [editingRow, sprintOptions]);
 
 	const dependenciesBanner =
 		safePlan && safePlan.dependencies.length > 0 ? (
@@ -519,7 +548,9 @@ export function DashboardSprintStoriesTable({
 										: undefined
 								}
 								onDeleteSprint={
-									group.sprintIndex != null && group.sprint?.storyIds.length === 0
+									group.sprintIndex != null &&
+									group.sprint?.storyIds.length === 0 &&
+									status !== 'completed'
 										? () => handleDeleteSprint(group.sprintIndex!)
 										: undefined
 								}
@@ -681,7 +712,8 @@ export function DashboardSprintStoriesTable({
 					row={editingRow}
 					epics={epics}
 					framework={framework}
-					sprintOptions={sprintOptions}
+					sprintOptions={editSprintOptions}
+					sprintAssignmentLocked={editingSprintLocked}
 					onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
 						const savePromise = handleEditStory(
 							editingRow.story.id,
@@ -882,8 +914,14 @@ function groupRowsBySprint(rows: DashboardSprintStoryRow[]): Omit<
 
 function getSprintOptions(plan: SprintPlan | null, rows: DashboardSprintStoryRow[]): SprintOption[] {
 	const options = new Map<string, SprintOption>();
+	const closedIds = new Set(
+		(plan?.sprints ?? [])
+			.filter((sprint) => getSprintStatus(sprint) === 'completed')
+			.map((sprint) => sprint.id)
+	);
 
 	plan?.sprints.forEach((sprint) => {
+		if (closedIds.has(sprint.id)) return;
 		options.set(sprint.id, {
 			id: sprint.id,
 			label: `Sprint ${sprint.number}`,
@@ -891,7 +929,7 @@ function getSprintOptions(plan: SprintPlan | null, rows: DashboardSprintStoryRow
 	});
 
 	rows.forEach((row) => {
-		if (!row.sprintId || !row.sprintNumber) return;
+		if (!row.sprintId || !row.sprintNumber || closedIds.has(row.sprintId)) return;
 		options.set(row.sprintId, {
 			id: row.sprintId,
 			label: `Sprint ${row.sprintNumber}`,
@@ -976,11 +1014,6 @@ function SprintGroupRows({
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="text-sm font-bold text-foreground">{group.label}</span>
 								{status ? <SprintStatusBadge status={status} /> : null}
-								{group.sprint?.isEdited && (
-									<span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-amber-600">
-										editado
-									</span>
-								)}
 							</div>
 							{group.sprint && onEditSprint ? (
 								<button
@@ -1073,6 +1106,7 @@ function SprintGroupRows({
 						}
 						members={members}
 						canDrag={canManagePlan && status !== 'completed'}
+						locked={status === 'completed'}
 						onDelete={async () => onDeleteStory(row.story.id)}
 						onEditStory={onEditStory}
 						onUpdateStoryStatus={onUpdateStoryStatus}
@@ -1093,6 +1127,7 @@ function StoryRow({
 	assignee,
 	members,
 	canDrag,
+	locked = false,
 	onDelete,
 	onEditStory,
 	onUpdateStoryStatus,
@@ -1106,6 +1141,7 @@ function StoryRow({
 	assignee: ProjectMember | null;
 	members: ProjectMember[];
 	canDrag: boolean;
+	locked?: boolean;
 	onDelete: () => Promise<void>;
 	onEditStory: (
 		storyId: string,
@@ -1222,7 +1258,10 @@ function StoryRow({
 		}
 	};
 
-	const statusControl = onUpdateStoryStatus ? (
+	const fieldsDisabled = locked || isSavingField !== null;
+
+	const statusControl =
+		onUpdateStoryStatus && !locked ? (
 		<ExecutionStatusSelect
 			status={row.executionStatus}
 			onChange={handleStatusChange}
@@ -1233,7 +1272,8 @@ function StoryRow({
 		<ExecutionStatusBadge status={row.executionStatus} />
 	);
 
-	const assigneeControl = onUpdateStoryAssignee ? (
+	const assigneeControl =
+		onUpdateStoryAssignee && !locked ? (
 		<AssigneeSelect
 			assignee={assignee}
 			members={members}
@@ -1328,7 +1368,7 @@ function StoryRow({
 					onChange={handlePointsChange}
 					options={pointsOptions}
 					placeholder="—"
-					disabled={isSavingField !== null}
+					disabled={fieldsDisabled}
 					size="compact"
 					className="w-14 @lg:w-16"
 					aria-label={`Story points de ${row.story.id}`}
@@ -1341,7 +1381,7 @@ function StoryRow({
 						onChange={handlePriorityChange}
 						options={priorityOptions}
 						placeholder="—"
-						disabled={isSavingField !== null}
+						disabled={fieldsDisabled}
 						size="compact"
 						className="w-full min-w-0"
 						aria-label={`Prioridad de ${row.story.id}`}
@@ -1359,6 +1399,8 @@ function StoryRow({
 			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
 				<div className="flex justify-end gap-0.5 @lg:gap-1.5">
 					<ViewDetailsButton onClick={onOpenDetail} label="Ver HU en detalle" />
+					{locked ? null : (
+						<>
 					<button
 						type="button"
 						onClick={onStartEdit}
@@ -1397,6 +1439,8 @@ function StoryRow({
 					>
 						<TrashIcon />
 					</button>
+						</>
+					)}
 				</div>
 			</td>
 		</tr>

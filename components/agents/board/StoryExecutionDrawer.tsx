@@ -49,7 +49,7 @@ export function StoryExecutionDrawer({
 }: StoryExecutionDrawerProps) {
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!open || !item) return;
+      if (!open || !item || item.sprintLocked) return;
       const idx = Number(event.key) - 1;
       if (idx >= 0 && idx < KANBAN_COLUMNS.length) {
         onStatusChange(item.story.id, KANBAN_COLUMNS[idx].id);
@@ -88,7 +88,8 @@ export function StoryExecutionDrawer({
                 id="story-status"
                 value={item.execution.status}
                 onChange={(e) => onStatusChange(item.story.id, e.target.value as KanbanStatus)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
+                disabled={item.sprintLocked}
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {KANBAN_COLUMNS.map((col) => (
                   <option key={col.id} value={col.id}>
@@ -96,7 +97,9 @@ export function StoryExecutionDrawer({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] text-subtle">Atajos: teclas 1–4</p>
+              <p className="mt-1 text-[10px] text-subtle">
+                {item.sprintLocked ? 'Sprint cerrado: no se puede cambiar.' : 'Atajos: teclas 1–4'}
+              </p>
             </div>
             <div>
               <label htmlFor="story-assignee" className="text-[11px] font-medium text-subtle">
@@ -108,7 +111,8 @@ export function StoryExecutionDrawer({
                 onChange={(e) =>
                   onAssigneeChange(item.story.id, e.target.value ? e.target.value : null)
                 }
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none"
+                disabled={item.sprintLocked}
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Sin asignar</option>
                 {members.map((m) => (

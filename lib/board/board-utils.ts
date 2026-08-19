@@ -6,6 +6,7 @@ import type { UserStory, Epic, WorkItemType } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type { StoryPrioritization, PrioritizationFramework } from '@/lib/types/agent-4';
 import type { SprintPlan, StoryDependency } from '@/lib/types/agent-5';
+import { getSprintStatus } from '@/lib/types/agent-5';
 import type {
   ExecutionState,
   KanbanStatus,
@@ -24,6 +25,7 @@ export interface BoardStory {
   priority: StoryPrioritization | null;
   sprintId: string | null;
   sprintNumber: number | null;
+  sprintLocked: boolean;
   dependencies: StoryDependency[];
 }
 
@@ -49,11 +51,18 @@ export function findStoryInEpics(epics: Epic[], storyId: string): { story: UserS
   return null;
 }
 
-export function findSprintForStory(plan: SprintPlan | null | undefined, storyId: string): { sprintId: string; sprintNumber: number } | null {
+export function findSprintForStory(
+  plan: SprintPlan | null | undefined,
+  storyId: string
+): { sprintId: string; sprintNumber: number; locked: boolean } | null {
   if (!plan) return null;
   for (const sprint of plan.sprints) {
     if (sprint.storyIds.includes(storyId)) {
-      return { sprintId: sprint.id, sprintNumber: sprint.number };
+      return {
+        sprintId: sprint.id,
+        sprintNumber: sprint.number,
+        locked: getSprintStatus(sprint) === 'completed',
+      };
     }
   }
   return null;
@@ -169,6 +178,7 @@ export function resolveBoardData(
         priority: priorities[story.id] ?? null,
         sprintId: sprintInfo?.sprintId ?? null,
         sprintNumber: sprintInfo?.sprintNumber ?? null,
+        sprintLocked: sprintInfo?.locked ?? false,
         dependencies: storyDeps,
       });
     }

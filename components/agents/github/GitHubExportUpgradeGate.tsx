@@ -2,7 +2,24 @@
 
 import Link from 'next/link';
 
-export function GitHubExportUpgradeGate() {
+export function GitHubExportUpgradeGate({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div>
+        <h4 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h4>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
+          Exporta épicas, historias y sprints a GitHub Projects. Disponible en el plan Pro.
+        </p>
+        <Link
+          href="/#pricing"
+          className="mt-3 inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          Ver planes
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center rounded-2xl border border-border bg-surface/80 px-8 py-12 text-center shadow-sm">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">

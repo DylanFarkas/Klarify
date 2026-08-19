@@ -144,9 +144,15 @@ export function SprintPlanningWorkspace({
     (storyId: string, fromSprintId: string | null, toSprintId: string | null) => {
       if (!plan) return;
       const storyPoints = input.estimations[storyId]?.points ?? 0;
-      onPlanChange(moveStoryInPlan(plan, storyId, fromSprintId, toSprintId, storyPoints));
+      try {
+        onPlanChange(moveStoryInPlan(plan, storyId, fromSprintId, toSprintId, storyPoints));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'No se pudo mover la historia.';
+        onError?.(message);
+      }
     },
-    [plan, input.estimations, onPlanChange]
+    [plan, input.estimations, onPlanChange, onError]
   );
 
   const handleAddSprint = useCallback(() => {

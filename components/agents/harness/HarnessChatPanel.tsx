@@ -53,7 +53,7 @@ const EXAMPLES = [
   },
   {
     label: 'Ejecución',
-    example: '«Pasa HU-012 a in progress» o «Asigna BUG-003 a Ana»',
+    example: '«Pasa HU-012 a in progress» o «Asigna BUG-003 a Juan»',
     hint: 'Kanban',
   },
   {
@@ -643,7 +643,7 @@ export function HarnessChatPanel({
             <div className="harness-chat__avatar harness-chat__avatar--assistant" aria-hidden>
               K
             </div>
-            <div className="min-w-0 pt-1">
+            <div className="min-w-0">
               <HarnessThoughtThread
                 steps={trace}
                 live={showLiveThread}

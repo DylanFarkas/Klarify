@@ -36,7 +36,7 @@ export function KanbanCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.story.id });
+  } = useSortable({ id: item.story.id, disabled: item.sprintLocked });
 
   const assignee = members.find((m) => m.id === item.execution.assigneeId);
   const priorityLabel = item.priority
@@ -63,6 +63,13 @@ export function KanbanCard({
       ].join(' ')}
     >
       <div className="flex items-start gap-2">
+        {item.sprintLocked ? (
+          <span
+            className="flex h-7 w-5 shrink-0 items-center justify-center self-start text-subtle"
+            title="Sprint cerrado"
+            aria-hidden
+          />
+        ) : (
         <button
           type="button"
           ref={setActivatorNodeRef}
@@ -80,6 +87,7 @@ export function KanbanCard({
             <circle cx="7.5" cy="15.5" r="1.5" />
           </svg>
         </button>
+        )}
 
         <button
           type="button"

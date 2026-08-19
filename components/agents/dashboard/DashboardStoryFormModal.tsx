@@ -204,6 +204,7 @@ interface DashboardEditStoryModalProps {
   epics: Epic[];
   framework: PrioritizationFramework | null;
   sprintOptions: SprintOption[];
+  sprintAssignmentLocked?: boolean;
   onSave: (
     updates: Partial<UserStory>,
     estimationUpdates?: Partial<StoryEstimation>,
@@ -219,6 +220,7 @@ export function DashboardEditStoryModal({
   epics,
   framework,
   sprintOptions,
+  sprintAssignmentLocked = false,
   onSave,
 }: DashboardEditStoryModalProps) {
   const workItemType = resolveWorkItemType(row.story);
@@ -274,7 +276,8 @@ export function DashboardEditStoryModal({
     !bugStepsOk ||
     isSaving;
   const hasEpicChange = epicId !== row.epicId;
-  const hasSprintChange = (sprintId || null) !== row.sprintId;
+  const hasSprintChange =
+    !sprintAssignmentLocked && (sprintId || null) !== row.sprintId;
   const hasPriorityChange = framework
     ? category !== (row.prioritization?.category ?? '')
     : false;
@@ -296,6 +299,7 @@ export function DashboardEditStoryModal({
         epics={epics}
         framework={framework}
         sprintOptions={sprintOptions}
+        sprintDisabled={sprintAssignmentLocked}
         workItemType={workItemType}
         typeEditable={false}
         epicId={epicId}
@@ -392,6 +396,7 @@ function StoryFormFields({
   epics,
   framework,
   sprintOptions,
+  sprintDisabled = false,
   workItemType,
   typeEditable,
   epicId,
@@ -419,6 +424,7 @@ function StoryFormFields({
   epics: Epic[];
   framework: PrioritizationFramework | null;
   sprintOptions: SprintOption[];
+  sprintDisabled?: boolean;
   workItemType: WorkItemType;
   typeEditable: boolean;
   epicId: string;
@@ -496,7 +502,13 @@ function StoryFormFields({
             ]}
             placeholder="Sin sprint"
             className={fieldSelectClass}
+            disabled={sprintDisabled}
           />
+          {sprintDisabled ? (
+            <span className="mt-1 block text-[11px] text-muted">
+              No se puede mover: el sprint está cerrado.
+            </span>
+          ) : null}
         </label>
         <label className={fieldLabelClass}>
           Story points

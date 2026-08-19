@@ -5,11 +5,18 @@ interface SettingsToggleProps {
   onChange: (checked: boolean) => void;
   label: string;
   description?: string;
+  className?: string;
 }
 
-export function SettingsToggle({ checked, onChange, label, description }: SettingsToggleProps) {
+export function SettingsToggle({
+  checked,
+  onChange,
+  label,
+  description,
+  className,
+}: SettingsToggleProps) {
   return (
-    <div className="flex items-center justify-between gap-6 px-4 py-3.5">
+    <div className={['flex items-center justify-between gap-6', className ?? 'px-4 py-3.5'].join(' ')}>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium text-foreground">{label}</p>
         {description && (

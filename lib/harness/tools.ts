@@ -29,7 +29,11 @@ import {
   updateUserStoryAcrossWorkspace,
 } from '@/lib/workspace-service';
 import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
-import { findActiveSprint } from '@/lib/utils/sprint-plan-mutations';
+import {
+  assertStoryNotInCompletedSprint,
+  findActiveSprint,
+  SprintLifecycleError,
+} from '@/lib/utils/sprint-plan-mutations';
 import { getSprintStatus } from '@/lib/types/agent-5';
 import type { KanbanStatus } from '@/lib/types/execution';
 import { KANBAN_COLUMNS } from '@/lib/types/execution';
@@ -496,7 +500,8 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         },
         sprintId: {
           type: 'string',
-          description: 'ID de sprint opcional; omite para dejar sin asignar',
+          description:
+            'ID de sprint opcional; omite para dejar sin asignar. No uses un sprint [completed].',
           nullable: true,
         },
       },
@@ -506,7 +511,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'update_story',
     description:
-      'Actualiza un ítem (HU/bug/task): título, descripción, CA, severity/steps/notes, épica, puntos, prioridad o sprint. No cambia el type.',
+      'Actualiza un ítem (HU/bug/task): título, descripción, CA, severity/steps/notes, épica, puntos, prioridad o sprint. No cambia el type. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
     parameters: {
       type: 'object',
       properties: {
@@ -529,7 +534,8 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         },
         sprintId: {
           type: 'string',
-          description: 'Nuevo sprint; null o cadena vacía para desasignar',
+          description:
+            'Nuevo sprint; null o cadena vacía para desasignar. No uses un sprint [completed] ni saques HU de uno cerrado.',
           nullable: true,
         },
       },
@@ -539,7 +545,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'delete_story',
     description:
-      'Elimina un ítem (HU/bug/task). Requiere confirm=true tras confirmación explícita del usuario.',
+      'Elimina un ítem (HU/bug/task). Requiere confirm=true tras confirmación explícita del usuario. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
     parameters: {
       type: 'object',
       properties: {
@@ -599,14 +605,16 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   },
   {
     name: 'assign_story_sprint',
-    description: 'Asigna una historia a un sprint o la deja sin asignar.',
+    description:
+      'Asigna una historia a un sprint o la deja sin asignar. Falla con SPRINT_CLOSED si el origen o el destino está cerrado.',
     parameters: {
       type: 'object',
       properties: {
         storyId: { type: 'string' },
         sprintId: {
           type: 'string',
-          description: 'ID del sprint; null o vacío para desasignar',
+          description:
+            'ID del sprint; null o vacío para desasignar. Falla si el sprint origen o destino está cerrado.',
           nullable: true,
         },
       },
@@ -674,7 +682,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'update_story_status',
     description:
-      'Cambia el estado Kanban de una historia (todo, in_progress, code_review, done). Requiere tablero de ejecución.',
+      'Cambia el estado Kanban de una historia (todo, in_progress, code_review, done). Requiere tablero de ejecución. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
     parameters: {
       type: 'object',
       properties: {
@@ -690,7 +698,7 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
   {
     name: 'assign_story',
     description:
-      'Asigna o desasigna un responsable del equipo a una historia (tablero). Usa memberId o nombre.',
+      'Asigna o desasigna un responsable del equipo a una historia (tablero). Usa memberId o nombre. Falla con SPRINT_CLOSED si la HU está en un sprint cerrado.',
     parameters: {
       type: 'object',
       properties: {
@@ -948,6 +956,9 @@ export async function executeHarnessTool(
               : undefined
           );
         } catch (err) {
+          if (err instanceof SprintLifecycleError) {
+            return toolError(err.message, err.code);
+          }
           const message = err instanceof Error ? err.message : 'No se pudo actualizar.';
           return toolError(message, 'INVALID_ARGS');
         }
@@ -974,6 +985,7 @@ export async function executeHarnessTool(
           return toolError(resolved.summary, 'STORY_NOT_FOUND');
         }
         const { storyId, title } = resolved;
+        assertStoryNotInCompletedSprint(getLiveBacklog(workspace).plan, storyId, 'eliminar');
 
         if (!asBoolean(args.confirm)) {
           return toolNeedsConfirmation(
@@ -1034,6 +1046,13 @@ export async function executeHarnessTool(
           return toolError(resolved.summary, 'EPIC_NOT_FOUND');
         }
         const { epicId, title, storyCount } = resolved;
+        const live = getLiveBacklog(workspace);
+        const epic = live.epics.find((item) => item.id === epicId);
+        if (epic) {
+          for (const story of epic.userStories) {
+            assertStoryNotInCompletedSprint(live.plan, story.id, 'eliminar');
+          }
+        }
 
         if (!asBoolean(args.confirm)) {
           return toolNeedsConfirmation(
@@ -1288,6 +1307,9 @@ export async function executeHarnessTool(
         return toolError(`Tool desconocida: ${name}`, 'UNKNOWN_TOOL');
     }
   } catch (error) {
+    if (error instanceof SprintLifecycleError) {
+      return toolError(error.message, error.code);
+    }
     const message = error instanceof Error ? error.message : 'Error al ejecutar la tool';
     return toolError(message, 'TOOL_EXCEPTION');
   }

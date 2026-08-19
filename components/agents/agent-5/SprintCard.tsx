@@ -125,9 +125,6 @@ export function SprintCard({
                 <span className="shrink-0 text-[11px] font-medium tabular-nums text-subtle">
                   Sprint {sprintIndex + 1}
                 </span>
-                {sprint.isEdited && (
-                  <span className="shrink-0 text-[11px] text-subtle">· Editado</span>
-                )}
               </div>
               <h4
                 className={`truncate text-[15px] font-medium text-foreground ${isEditable ? 'cursor-pointer hover:text-muted' : ''}`}

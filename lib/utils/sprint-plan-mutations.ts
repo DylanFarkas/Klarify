@@ -20,9 +20,12 @@ import { applySprintDatePatch, computeEndDateForDuration } from '@/lib/utils/spr
 export type SprintCompleteRollover = 'backlog' | 'next_planned';
 
 export class SprintLifecycleError extends Error {
-  constructor(message: string) {
+  readonly code: string;
+
+  constructor(message: string, code = 'SPRINT_LIFECYCLE') {
     super(message);
     this.name = 'SprintLifecycleError';
+    this.code = code;
   }
 }
 
@@ -167,6 +170,84 @@ export function findStorySprintId(plan: SprintPlan, storyId: string): string | n
   return sprint?.id ?? null;
 }
 
+function assertSprintOpenForAssignment(
+  plan: SprintPlan,
+  sprintId: string | null,
+  role: 'origen' | 'destino'
+): void {
+  if (!sprintId) return;
+  const sprint = plan.sprints.find((s) => s.id === sprintId);
+  if (!sprint) return;
+  if (getSprintStatus(sprint) !== 'completed') return;
+
+  const message =
+    role === 'origen'
+      ? `No se puede sacar una historia de ${sprintId}: el sprint está cerrado.`
+      : `No se puede asignar una historia a ${sprintId}: el sprint está cerrado.`;
+  throw new SprintLifecycleError(message, 'SPRINT_CLOSED');
+}
+
+export function isStoryInCompletedSprint(
+  plan: SprintPlan | null | undefined,
+  storyId: string
+): boolean {
+  if (!plan) return false;
+  const sprint = plan.sprints.find((s) => s.storyIds.includes(storyId));
+  return Boolean(sprint && getSprintStatus(sprint) === 'completed');
+}
+
+/** Bloquea editar, borrar o cambiar ejecución de una HU que ya está en un sprint cerrado. */
+export function assertStoryNotInCompletedSprint(
+  plan: SprintPlan | null | undefined,
+  storyId: string,
+  action: 'modificar' | 'eliminar' = 'modificar'
+): void {
+  if (!plan || !isStoryInCompletedSprint(plan, storyId)) return;
+  const sprintId = findStorySprintId(plan, storyId);
+  throw new SprintLifecycleError(
+    action === 'eliminar'
+      ? `No se puede eliminar ${storyId}: pertenece a ${sprintId}, que está cerrado.`
+      : `No se puede modificar ${storyId}: pertenece a ${sprintId}, que está cerrado.`,
+    'SPRINT_CLOSED'
+  );
+}
+
+/**
+ * Un sprint cerrado es histórico: no se puede eliminar, reabrir ni cambiar sus HU.
+ * completeSprintInPlan no pasa por aquí (el sprint aún era active en el plan anterior).
+ */
+export function assertCompletedSprintsUnchanged(previous: SprintPlan, next: SprintPlan): void {
+  const prevNorm = normalizeSprintPlan(previous);
+  const nextById = new Map(normalizeSprintPlan(next).sprints.map((s) => [s.id, s]));
+
+  for (const sprint of prevNorm.sprints) {
+    if (getSprintStatus(sprint) !== 'completed') continue;
+
+    const updated = nextById.get(sprint.id);
+    if (!updated) {
+      throw new SprintLifecycleError(
+        `No se puede eliminar ${sprint.id}: el sprint está cerrado.`,
+        'SPRINT_CLOSED'
+      );
+    }
+    if (getSprintStatus(updated) !== 'completed') {
+      throw new SprintLifecycleError(
+        `No se puede reabrir ${sprint.id}: el sprint está cerrado.`,
+        'SPRINT_CLOSED'
+      );
+    }
+
+    const prevIds = [...sprint.storyIds].sort().join(',');
+    const nextIds = [...updated.storyIds].sort().join(',');
+    if (prevIds !== nextIds) {
+      throw new SprintLifecycleError(
+        `No se puede modificar el contenido de ${sprint.id}: el sprint está cerrado.`,
+        'SPRINT_CLOSED'
+      );
+    }
+  }
+}
+
 export function moveStoryInPlan(
   plan: SprintPlan,
   storyId: string,
@@ -176,6 +257,9 @@ export function moveStoryInPlan(
 ): SprintPlan {
   const base = normalizeSprintPlan(plan);
   if (fromSprintId === toSprintId) return base;
+
+  assertSprintOpenForAssignment(base, fromSprintId, 'origen');
+  assertSprintOpenForAssignment(base, toSprintId, 'destino');
 
   let unassignedStoryIds = [...base.unassignedStoryIds];
   let sprints = base.sprints.map((s) => ({ ...s, storyIds: [...s.storyIds] }));
@@ -435,12 +519,18 @@ export function addStoryToSprintPlan(
     };
   }
 
-  const sprintExists = plan.sprints.some((sprint) => sprint.id === sprintId);
-  if (!sprintExists) {
+  const sprint = plan.sprints.find((item) => item.id === sprintId);
+  if (!sprint) {
     return {
       ...plan,
       unassignedStoryIds: Array.from(new Set([...plan.unassignedStoryIds, storyId])),
     };
+  }
+  if (getSprintStatus(sprint) === 'completed') {
+    throw new SprintLifecycleError(
+      `No se puede asignar una historia a ${sprintId}: el sprint está cerrado.`,
+      'SPRINT_CLOSED'
+    );
   }
 
   return normalizeSprintPlan({
