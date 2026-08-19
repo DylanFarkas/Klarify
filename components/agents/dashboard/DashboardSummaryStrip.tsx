@@ -107,12 +107,20 @@ export function DashboardSummaryStrip({
 						<span className="mx-1.5 text-subtle">·</span>
 						<span className="text-muted">En planned</span> {plannedStoryCount}
 					</p>
-					<p className="mt-1 text-[11px] text-subtle">
-						{plannedSprintCount} sprint{plannedSprintCount !== 1 ? 's' : ''} planificado
-						{plannedSprintCount !== 1 ? 's' : ''}
-						{' · '}
-						{metrics.storyCount} HU totales
-					</p>
+					<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-subtle">
+						<span>
+							{plannedSprintCount} sprint{plannedSprintCount !== 1 ? 's' : ''} planificado
+							{plannedSprintCount !== 1 ? 's' : ''}
+							{' · '}
+							{metrics.storyCount} HU totales
+						</span>
+						<Link
+							href="/agentes/backlog"
+							className="font-medium text-foreground underline-offset-2 hover:underline"
+						>
+							Ver backlog
+						</Link>
+					</div>
 				</SummaryBlock>
 
 				<SummaryBlock label="Ejecución" bordered>

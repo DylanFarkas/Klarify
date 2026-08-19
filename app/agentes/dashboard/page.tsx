@@ -17,15 +17,7 @@ export default function DashboardPage() {
 		plan,
 		activeProjectId,
 		projects,
-		createUserStory,
-		deleteUserStory,
-		updateUserStory,
 		updateStoryExecution,
-		createEpic,
-		updateEpic,
-		deleteEpic,
-		updateSprintPlan,
-		startSprint,
 		completeSprint,
 		bootstrapDashboardFromAgent4,
 	} = useWorkspace();
@@ -59,20 +51,9 @@ export default function DashboardPage() {
 			projectId={activeProjectId}
 			projectName={activeProject?.name ?? 'Proyecto activo'}
 			canExportGithub={canExportGithub}
-			onCreateStory={createUserStory}
-			onDeleteStory={deleteUserStory}
-			onEditStory={updateUserStory}
 			onUpdateStoryStatus={async (storyId, status) => {
 				await updateStoryExecution(storyId, { status });
 			}}
-			onUpdateStoryAssignee={async (storyId, assigneeId) => {
-				await updateStoryExecution(storyId, { assigneeId });
-			}}
-			onCreateEpic={createEpic}
-			onUpdateEpic={updateEpic}
-			onDeleteEpic={deleteEpic}
-			onUpdateSprintPlan={updateSprintPlan}
-			onStartSprint={startSprint}
 			onCompleteSprint={completeSprint}
 			workspace={workspace}
 		/>

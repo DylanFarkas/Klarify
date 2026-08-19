@@ -291,12 +291,12 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 					: !plan || plan.sprints.length === 0
 						? {
 								label: 'Crear sprints',
-								href: '/agentes/dashboard',
+								href: '/agentes/backlog',
 								description: 'Organiza el backlog en sprints de forma manual.',
 							}
 						: {
 								label: 'Revisar el backlog',
-								href: '/agentes/dashboard',
+								href: '/agentes/backlog',
 								description: 'Ajusta sprints, mueve HU o edita historias cuando lo necesites.',
 							};
 

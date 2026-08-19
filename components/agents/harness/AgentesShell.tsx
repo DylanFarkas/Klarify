@@ -11,7 +11,12 @@ import { HarnessChatDock } from '@/components/agents/harness/HarnessChatDock';
 export function AgentesShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showKlark =
-    pathname === '/agentes/dashboard' || pathname.startsWith('/agentes/dashboard/');
+    pathname === '/agentes/dashboard' ||
+    pathname.startsWith('/agentes/dashboard/') ||
+    pathname === '/agentes/backlog' ||
+    pathname.startsWith('/agentes/backlog/') ||
+    pathname === '/agentes/stack' ||
+    pathname.startsWith('/agentes/stack/');
 
   return (
     <div className="agentes-klark-shell">

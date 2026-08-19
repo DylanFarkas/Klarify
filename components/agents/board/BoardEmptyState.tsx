@@ -23,13 +23,13 @@ export function BoardEmptyState({ reason }: BoardEmptyStateProps) {
           Pipeline incompleto
         </h3>
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
-          Completa la priorización y organiza sprints en el dashboard para desbloquear el tablero.
+          Completa la priorización y organiza sprints en el backlog para desbloquear el tablero.
         </p>
         <Link
-          href="/agentes/dashboard"
+          href="/agentes/backlog"
           className="mt-6 inline-flex rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
         >
-          Ir al dashboard
+          Ir al backlog
         </Link>
       </div>
     );
@@ -41,7 +41,7 @@ export function BoardEmptyState({ reason }: BoardEmptyStateProps) {
         Sin historias en el tablero
       </h3>
       <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
-        Ajusta los filtros o añade historias desde el dashboard.
+        Ajusta los filtros o añade historias desde el backlog.
       </p>
     </div>
   );
