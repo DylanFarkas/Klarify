@@ -30,6 +30,7 @@ import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
+import type { ProjectStack } from '@/lib/types/stack';
 import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
 import { buildInitialExecutionState } from '@/lib/board/board-utils';
 import {
@@ -131,6 +132,8 @@ export interface UseWorkspaceResult {
     updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]
   ) => void;
   updateExecutionSprintFilter: (sprintFilter: string | 'all') => Promise<void>;
+  saveStack: (stack: ProjectStack) => Promise<void>;
+  clearStack: () => Promise<void>;
   resetAgent1: () => Promise<void>;
   resetAgent2: () => Promise<void>;
   resetAgent3: () => Promise<void>;
@@ -1276,6 +1279,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const resetAgent4 = useCallback(() => runAction('resetAgent4'), [runAction]);
   const resetAgent5 = useCallback(() => runAction('resetAgent5'), [runAction]);
 
+  const saveStack = useCallback(
+    async (stack: ProjectStack) => {
+      if (!user) return;
+      const result = await postWorkspaceAction<{ workspace?: UserWorkspace }>(
+        'saveStack',
+        { ...stack, status: 'saved' },
+        'No se pudo guardar el stack'
+      );
+      if (result.workspace) {
+        setWorkspace(result.workspace);
+      } else {
+        setWorkspace((prev) => (prev ? { ...prev, stack } : prev));
+      }
+    },
+    [postWorkspaceAction, user]
+  );
+
+  const clearStack = useCallback(async () => {
+    if (!user) return;
+    const result = await postWorkspaceAction<{ workspace?: UserWorkspace }>(
+      'clearStack',
+      {},
+      'No se pudo limpiar el stack'
+    );
+    if (result.workspace) {
+      setWorkspace(result.workspace);
+    } else {
+      setWorkspace((prev) => (prev ? { ...prev, stack: null } : prev));
+    }
+  }, [postWorkspaceAction, user]);
+
   const resetSession = useCallback(async () => {
     if (!user) return;
     cancelPendingSaves();
@@ -1326,6 +1360,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         updateStoryExecution,
         bulkReorderExecutions,
         updateExecutionSprintFilter,
+        saveStack,
+        clearStack,
         resetAgent1,
         resetAgent2,
         resetAgent3,

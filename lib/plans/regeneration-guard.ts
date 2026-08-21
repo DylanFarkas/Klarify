@@ -23,6 +23,12 @@ function inferRegeneration(workspace: UserWorkspace, agent: RegenerationAgent): 
       );
     case 'agent5':
       return workspace.agent5.status === 'review' || Boolean(workspace.agent5.plan);
+    case 'stack':
+      return (
+        workspace.stack != null &&
+        workspace.stack.status !== 'empty' &&
+        (workspace.stack.status === 'saved' || Boolean(workspace.stack.rationale))
+      );
     default:
       return false;
   }

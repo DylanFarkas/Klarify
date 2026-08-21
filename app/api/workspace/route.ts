@@ -47,6 +47,8 @@ import {
   updateStoryExecution,
   bulkUpdateStoryExecutions,
   updateExecutionSprintFilter,
+  saveStackAcrossWorkspace,
+  clearStackAcrossWorkspace,
 } from '@/lib/workspace-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
@@ -55,6 +57,7 @@ import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 import type { KanbanStatus, ProjectMember, ProjectMemberRole } from '@/lib/types/execution';
+import type { ProjectStack } from '@/lib/types/stack';
 import type { SprintCompleteRollover } from '@/lib/utils/sprint-plan-mutations';
 
 interface PatchBody {
@@ -86,6 +89,8 @@ interface PostBody {
     | 'updateStoryExecution'
     | 'bulkUpdateStoryExecutions'
     | 'updateExecutionSprintFilter'
+    | 'saveStack'
+    | 'clearStack'
     | 'resetAgent1'
     | 'resetAgent2'
     | 'resetAgent3'
@@ -433,6 +438,18 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
         }
         const workspace = await updateExecutionSprintFilter(uid, payload.sprintFilter);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'saveStack': {
+        const payload = body.payload as ProjectStack | undefined;
+        if (!payload?.layers) {
+          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        }
+        const workspace = await saveStackAcrossWorkspace(uid, payload);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'clearStack': {
+        const workspace = await clearStackAcrossWorkspace(uid);
         return NextResponse.json({ ok: true, workspace });
       }
       case 'resetAgent1':

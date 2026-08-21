@@ -108,6 +108,13 @@ function normalizeWorkspace(ws: Partial<UserWorkspace> | undefined): UserWorkspa
         : null,
     },
     execution: ws.execution ?? null,
+    stack:
+      ws.stack != null
+        ? {
+            ...ws.stack,
+            status: ws.stack.status === 'proposed' ? 'saved' : ws.stack.status,
+          }
+        : null,
   };
 }
 

@@ -226,6 +226,7 @@ En cada etapa, **un elemento manda**:
 | Priorización (Agente 4) | Workspace de priorización; metodología en selector quieto     |
 | Sprints (Agente 5)    | Config + board de sprints; empty state compacto; cronograma en filas |
 | Tablero Kanban        | Columnas + cards de ejecución; filtros y equipo en chrome compacto   |
+| Stack                 | Tablero de capas con iconos de tecnología; picker o recomendación IA con web search |
 | Hub                | Lista de proyectos; stats en una línea meta, no 4 cards            |
 | Dashboard          | **Excepción al “un foco”:** franja densa de salud (coberturas, prioridad, ejecución) + **backlog jerárquico como pieza principal**; plan de sprints y export debajo. Pipeline detallado solo en sidebar. Sin `AgentPageHero` ni grids de métricas vanidosas. |
 
@@ -281,6 +282,7 @@ Si algo no encaja, mirar primero:
 - Agente 4: `app/agentes/4/page.tsx` + `PrioritizationWorkspace`
 - Agente 5: `app/agentes/5/page.tsx` + `SprintPlanningWorkspace` / `SprintBoard`
 - Tablero: `app/agentes/board/page.tsx` + `BoardWorkspace` / `KanbanBoard` / `KanbanColumn` / `KanbanCard`
+- Stack: `app/agentes/stack/page.tsx` + `StackContent` / `StackBoard` / `StackTechPicker`
 - Klark: `components/agents/harness/HarnessChatPanel.tsx` + `HarnessChatDock` (+ estilos en `globals.css`)
 - Configuración: `WorkspaceSettingsModal` + `ThemeSettingsPanel` / paneles de integraciones
 - Dashboard: `app/agentes/dashboard/page.tsx` + `DashboardContent` / `DashboardBacklogPanel` / `DashboardSummaryStrip`

@@ -77,6 +77,8 @@ import type {
   ExecutionActivityEntry,
 } from '@/lib/types/execution';
 import { AVATAR_COLORS } from '@/lib/types/execution';
+import type { ProjectStack } from '@/lib/types/stack';
+import { mergeStackUpdate, prepareStackForFirestore } from '@/lib/stack/normalize';
 import type {
   UserWorkspace,
   WorkspacePreferences,
@@ -195,6 +197,7 @@ async function saveProjectWorkspace(
       : current.pipeline,
     execution:
       partial.execution !== undefined ? partial.execution : current.execution,
+    stack: partial.stack !== undefined ? partial.stack : current.stack,
   };
   const progress = computePipelineProgress(nextWorkspace);
 
@@ -1234,6 +1237,7 @@ export async function resetWorkspace(uid: string): Promise<void> {
       agent6Input: null,
     },
     execution: null,
+    stack: null,
   });
   await userDoc(uid).set(
     {
@@ -1242,4 +1246,61 @@ export async function resetWorkspace(uid: string): Promise<void> {
     { merge: true }
   );
   await projectDoc(uid, projectId).set({ lastAgent: '1' }, { merge: true });
+}
+
+/** Persiste el stack tecnológico del proyecto activo. */
+export async function saveStackAcrossWorkspace(
+  uid: string,
+  stack: ProjectStack
+): Promise<UserWorkspace> {
+  const projectId = await activeProject(uid);
+  const workspace = await getProjectWorkspace(uid, projectId);
+  const merged = mergeStackUpdate(workspace.stack ?? undefined, {
+    ...stack,
+    updatedAt: Date.now(),
+  });
+  const prepared = sanitize(prepareStackForFirestore(merged));
+  const nextWorkspace: UserWorkspace = { ...workspace, stack: prepared };
+  const progress = computePipelineProgress(nextWorkspace);
+
+  // Reemplaza `workspace.stack` entero. `set({ merge: true })` fusiona mapas
+  // anidados y repondría capas vaciadas (p. ej. frontend sin tecnologías).
+  // En consola Firebase el campo aparece como workspace → stack; es la misma ruta
+  // que `workspace.stack` en código. Si existía un `stack` huérfano en la raíz
+  // del documento (legacy), se elimina para evitar confusión.
+  await projectDoc(uid, projectId).update({
+    'workspace.stack': prepared,
+    stack: FieldValue.delete(),
+    pipelineStep: progress.pipelineStep,
+    pipelineLabel: progress.pipelineLabel,
+    completionPercentage: progress.completionPercentage,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return getProjectWorkspace(uid, projectId);
+}
+
+/** Elimina el stack tecnológico del proyecto activo. */
+export async function clearStackAcrossWorkspace(uid: string): Promise<UserWorkspace> {
+  const projectId = await activeProject(uid);
+  const workspace = await getProjectWorkspace(uid, projectId);
+  const nextWorkspace: UserWorkspace = { ...workspace, stack: null };
+  const progress = computePipelineProgress(nextWorkspace);
+
+  await projectDoc(uid, projectId).update({
+    'workspace.stack': FieldValue.delete(),
+    stack: FieldValue.delete(),
+    pipelineStep: progress.pipelineStep,
+    pipelineLabel: progress.pipelineLabel,
+    completionPercentage: progress.completionPercentage,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return getProjectWorkspace(uid, projectId);
+}
+
+/** Lee el stack del workspace activo. */
+export async function getStackFromWorkspace(uid: string): Promise<ProjectStack | null> {
+  const { workspace } = await getWorkspaceData(uid);
+  return workspace.stack ?? null;
 }

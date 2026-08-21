@@ -32,6 +32,7 @@ interface HarnessChatPanelProps {
   remainingMessages: number | null | undefined;
   onWorkspaceMutated: () => Promise<void>;
   onClose?: () => void;
+  onReady?: (api: { send: (message: string) => void; canSend: () => boolean }) => void;
 }
 
 /** Ejemplos de capacidades (no ejecutables; el prompt real lo escribe el usuario). */
@@ -95,6 +96,7 @@ export function HarnessChatPanel({
   remainingMessages,
   onWorkspaceMutated,
   onClose,
+  onReady,
 }: HarnessChatPanelProps) {
   const { user } = useAuth();
   const { activeProjectId } = useWorkspace();
@@ -435,6 +437,13 @@ export function HarnessChatPanel({
     },
     [pendingConfirm, sendTurn]
   );
+
+  useEffect(() => {
+    onReady?.({
+      send: (message) => sendWithOptionalConfirm(message),
+      canSend: () => enabled && !isSending && Boolean(user),
+    });
+  }, [onReady, sendWithOptionalConfirm, enabled, isSending, user]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();

@@ -16,6 +16,7 @@ import {
 import { createPortal } from 'react-dom';
 import { HarnessChatPanel } from '@/components/agents/harness/HarnessChatPanel';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { useKlarkControl } from '@/context/KlarkControlContext';
 
 const PANEL_WIDTH_KEY = 'klarify.klark.panelWidth';
 const DEFAULT_WIDTH = 420;
@@ -46,6 +47,7 @@ function clampWidth(width: number): number {
 
 export function HarnessChatDock() {
   const { workspace, plan, refreshWorkspace } = useWorkspace();
+  const { registerKlark, unregisterKlark, notifyKlarkReady } = useKlarkControl();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
@@ -70,6 +72,28 @@ export function HarnessChatDock() {
 
   const close = useCallback(() => setOpen(false), []);
   const openPanel = useCallback(() => setOpen(true), []);
+
+  const panelApiRef = useRef<{
+    send: (message: string) => void;
+    canSend: () => boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    registerKlark({
+      open: openPanel,
+      send: (message) => panelApiRef.current?.send(message),
+      canSend: () => panelApiRef.current?.canSend() ?? false,
+    });
+    return unregisterKlark;
+  }, [registerKlark, unregisterKlark, openPanel]);
+
+  const handlePanelReady = useCallback(
+    (api: { send: (message: string) => void; canSend: () => boolean }) => {
+      panelApiRef.current = api;
+      notifyKlarkReady();
+    },
+    [notifyKlarkReady]
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -197,6 +221,7 @@ export function HarnessChatDock() {
             remainingMessages={harnessRemaining}
             onWorkspaceMutated={handleWorkspaceMutated}
             onClose={close}
+            onReady={handlePanelReady}
           />
         </div>
       </div>

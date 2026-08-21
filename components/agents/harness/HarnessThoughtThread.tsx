@@ -34,6 +34,8 @@ const TOOL_LABELS: Record<string, string> = {
   update_story_status: 'Cambiar estado Kanban',
   assign_story: 'Asignar responsable',
   delete_sprint: 'Eliminar sprint',
+  get_stack: 'Leer stack',
+  save_stack: 'Guardar stack',
 };
 
 function toolLabel(name: string): string {

@@ -7,6 +7,7 @@
 
 import { usePathname } from 'next/navigation';
 import { HarnessChatDock } from '@/components/agents/harness/HarnessChatDock';
+import { KlarkControlProvider } from '@/context/KlarkControlContext';
 
 export function AgentesShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,9 +20,11 @@ export function AgentesShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/agentes/stack/');
 
   return (
-    <div className="agentes-klark-shell">
-      <div className="agentes-klark-shell__main">{children}</div>
-      {showKlark ? <HarnessChatDock /> : null}
-    </div>
+    <KlarkControlProvider>
+      <div className="agentes-klark-shell">
+        <div className="agentes-klark-shell__main">{children}</div>
+        {showKlark ? <HarnessChatDock /> : null}
+      </div>
+    </KlarkControlProvider>
   );
 }

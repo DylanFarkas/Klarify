@@ -27,7 +27,17 @@ import {
   updateSprintAcrossWorkspace,
   updateStoryExecution,
   updateUserStoryAcrossWorkspace,
+  saveStackAcrossWorkspace,
 } from '@/lib/workspace-service';
+import { buildStackContextSummary } from '@/lib/services/stack-service';
+import {
+  buildProjectContextForStack,
+  inferStackLayerRequirements,
+  pruneStackToAllowedLayers,
+} from '@/lib/stack/layer-requirements';
+import { normalizeStackFromToolArgs, countStackItems } from '@/lib/stack/normalize';
+import { validateStackCompatibility } from '@/lib/stack/compatibility';
+import type { StackRecommendRaw } from '@/lib/types/stack';
 import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
 import {
   defaultDurationLabel,
@@ -760,6 +770,40 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
       required: ['sprintId'],
     },
   },
+  {
+    name: 'get_stack',
+    description:
+      'Lee el stack tecnológico actual del proyecto: producto, arquitectura, capas y tecnologías.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'save_stack',
+    description:
+      'Guarda o actualiza el stack del proyecto. Usa catalogId del catálogo interno o customName. Marca isPrimary en frontend/backend/database. Incluye solo capas justificadas por el backlog (realtime, pagos, CMS, etc. solo si el producto lo requiere). No incluyas sources.',
+    parameters: {
+      type: 'object',
+      properties: {
+        productKind: { type: 'string' },
+        architecturePattern: { type: 'string' },
+        layers: {
+          type: 'object',
+          description:
+            'Mapa capa → array de { catalogId?, customName?, isPrimary? }. Capas: frontend, backend, database, auth, hosting, styling, orm, etc.',
+        },
+        rationale: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['saved'],
+          description: 'El stack se persiste de inmediato en el proyecto.',
+        },
+      },
+      required: ['productKind', 'architecturePattern', 'layers'],
+    },
+  },
 ];
 
 export async function executeHarnessTool(
@@ -1365,6 +1409,59 @@ export async function executeHarnessTool(
           data: { sprintId },
           mutated: true,
         });
+      }
+
+      case 'get_stack': {
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const summary = buildStackContextSummary(workspace);
+        return toolSuccess('Stack del proyecto.', {
+          data: { stack: workspace.stack ?? null, summary },
+          mutated: false,
+        });
+      }
+
+      case 'save_stack': {
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const layerRequirements = inferStackLayerRequirements(
+          buildProjectContextForStack(workspace)
+        );
+
+        const productKind = asString(args.productKind);
+        const architecturePattern = asString(args.architecturePattern);
+        const layersRaw = args.layers;
+        const rationale = asString(args.rationale) ?? '';
+
+        if (!productKind || !architecturePattern || !layersRaw || typeof layersRaw !== 'object') {
+          return toolError('Faltan productKind, architecturePattern o layers.', 'INVALID_ARGS');
+        }
+
+        const raw: StackRecommendRaw = {
+          productKind,
+          architecturePattern,
+          layers: layersRaw as StackRecommendRaw['layers'],
+          rationale,
+        };
+
+        let stack: ReturnType<typeof normalizeStackFromToolArgs>;
+        try {
+          stack = normalizeStackFromToolArgs(raw);
+        } catch {
+          return toolError(
+            'El stack no es válido. Usa catalogId del catálogo o customName con capas coherentes.',
+            'INVALID_ARGS'
+          );
+        }
+
+        if (countStackItems(stack) === 0) {
+          return toolError('El stack debe incluir al menos una tecnología.', 'INVALID_ARGS');
+        }
+
+        stack.status = 'saved';
+        stack = pruneStackToAllowedLayers(stack, layerRequirements);
+        stack.warnings = validateStackCompatibility(stack);
+
+        await saveStackAcrossWorkspace(ctx.uid, stack);
+        return toolSuccess('Stack guardado.', { data: stack, mutated: true });
       }
 
       default:

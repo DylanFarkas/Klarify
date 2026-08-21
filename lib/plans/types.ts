@@ -6,7 +6,7 @@ export type PlanId = 'free' | 'starter' | 'pro';
 
 export type BacklogDetail = 'compact' | 'standard' | 'detailed';
 
-export type RegenerationAgent = 'agent2' | 'agent3' | 'agent4' | 'agent5';
+export type RegenerationAgent = 'agent2' | 'agent3' | 'agent4' | 'agent5' | 'stack';
 
 export type PlanErrorCode =
   | 'PLAN_PROJECT_LIMIT'
@@ -59,6 +59,7 @@ export interface RegenerationUsage {
   agent3: number;
   agent4: number;
   agent5: number;
+  stack: number;
 }
 
 export interface UserUsage {

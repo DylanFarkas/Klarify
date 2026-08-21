@@ -28,6 +28,7 @@ import { checkAndIncrementHarnessMessage } from '@/lib/plans/plan-service';
 import { isPlanLimitError } from '@/lib/plans/plan-errors';
 import { getWorkspaceData } from '@/lib/workspace-service';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import { buildStackContextSummary } from '@/lib/services/stack-service';
 import { resolveLlmCredentials } from '@/lib/llm/resolve';
 import { runToolLoop } from '@/lib/llm/tool-loop';
 import type { LlmCredentials } from '@/lib/llm/types';
@@ -159,11 +160,13 @@ async function runProviderHarnessTurn(
   const framework = resolveWorkspaceFramework(workspace);
   const backlogIndex = buildBacklogIndex(workspace);
   const estimationMode = getLiveBacklog(workspace).estimationMode;
+  const stackSummary = buildStackContextSummary(workspace);
   const systemInstruction = buildHarnessSystemPrompt(
     framework,
     backlogIndex,
     identityFromCredentials(credentials),
-    estimationMode
+    estimationMode,
+    stackSummary
   );
 
   let assistantText = groundedText;
@@ -178,7 +181,8 @@ async function runProviderHarnessTurn(
           framework,
           backlogIndex,
           identityFromCredentials(creds),
-          estimationMode
+          estimationMode,
+          stackSummary
         ),
       historyMessages,
       tools: HARNESS_TOOL_DECLARATIONS,

@@ -16,6 +16,7 @@ import type {
 } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { ExecutionState } from '@/lib/types/execution';
+import type { ProjectStack } from '@/lib/types/stack';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -81,6 +82,8 @@ export interface UserWorkspace {
   pipeline: WorkspacePipeline;
   /** Estado operativo del tablero Kanban (post-pipeline) */
   execution?: ExecutionState | null;
+  /** Stack tecnológico y arquitectura del proyecto */
+  stack?: ProjectStack | null;
 }
 
 /** Preferencias de usuario que antes vivían en localStorage */
@@ -156,5 +159,6 @@ export function createEmptyWorkspace(): UserWorkspace {
       agent5Input: null,
       agent6Input: null,
     },
+    stack: null,
   };
 }

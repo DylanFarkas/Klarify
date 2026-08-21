@@ -27,7 +27,8 @@ export function buildHarnessSystemPrompt(
   framework: PrioritizationFramework,
   backlogIndex?: string,
   identity?: HarnessPromptIdentity,
-  estimationMode: EstimationMode = 'story_points'
+  estimationMode: EstimationMode = 'story_points',
+  stackSummary?: string
 ): string {
   const { frameworkLabel, allowedCategories, categoryLabels } =
     describeFrameworkCategories(framework);
@@ -49,6 +50,21 @@ ${backlogIndex.trim()}
     identity?.source === 'byok'
       ? 'API key del usuario (BYOK)'
       : 'default de Klarify (servidor)';
+
+  const stackBlock = stackSummary?.trim()
+    ? `
+## Stack tecnológico del proyecto
+${stackSummary.trim()}
+- Para persistir el stack usa save_stack con catalogId del catálogo interno o customName justificado.
+- get_stack lee el estado actual.
+- Incluye SOLO capas justificadas por el backlog (ver reglas de capas abajo). No añadas realtime, pagos, CMS, mensajería, storage, observabilidad, devops ni mobile sin evidencia clara.
+- Si el usuario pide añadir o quitar una capa al iterar, respeta su instrucción.
+`
+    : `
+## Stack tecnológico
+- Aún no hay stack definido. Puedes recomendar y guardar con save_stack según el backlog y el contexto del proyecto.
+- Incluye SOLO capas justificadas por el backlog. No recomiendes capas especializadas (realtime, pagos, CMS, etc.) sin evidencia en historias o contexto.
+`;
 
   return `Eres Klark, el asistente de backlog de Klarify. Ayudas a Product Owners a editar el backlog del proyecto activo después del pipeline de agentes.
 
@@ -79,7 +95,7 @@ ${
 - Categorías válidas (usa el CÓDIGO canónico al llamar tools, nunca etiquetas largas):
 ${categoryLines}
 - ${buildPriorityToolHint(framework)}
-${indexBlock}
+${indexBlock}${stackBlock}
 ## Capacidades (solo mediante tools)
 - Consultar el backlog (list_backlog) o un ítem (get_story).
 - Crear, actualizar y eliminar ítems de backlog: historias (type=story), bugs (type=bug) y tasks (type=task) vía create_story / update_story / delete_story.
@@ -89,6 +105,7 @@ ${indexBlock}
 - Reasignar ítems a sprints planned/active o dejarlos sin asignar. NUNCA muevas, edites ni cambies estado de HU de un sprint [completed].
 - Cambiar estado Kanban (update_story_status) y asignar responsables (assign_story).
 - Asignar o cambiar prioridad con update_story({ storyId, category }).
+- Para recomendar o actualizar el stack: get_stack para leer el actual, save_stack con catalogId válidos (se guarda de inmediato). No incluyas campo sources. Respeta las reglas de capas del bloque de stack.
 
 ## Reglas de decisión
 1. Usa siempre las tools para leer o mutar datos. No inventes IDs.

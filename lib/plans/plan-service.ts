@@ -35,7 +35,7 @@ function currentPeriodKey(): string {
 function emptyUsage(): UserUsage {
   return {
     periodKey: currentPeriodKey(),
-    regenerations: { agent2: 0, agent3: 0, agent4: 0, agent5: 0 },
+    regenerations: { agent2: 0, agent3: 0, agent4: 0, agent5: 0, stack: 0 },
     harnessMessages: 0,
   };
 }
@@ -55,6 +55,7 @@ function normalizeUsage(raw: Partial<UserUsage> | undefined): UserUsage {
       agent3: raw.regenerations?.agent3 ?? 0,
       agent4: raw.regenerations?.agent4 ?? 0,
       agent5: raw.regenerations?.agent5 ?? 0,
+      stack: raw.regenerations?.stack ?? 0,
     },
     harnessMessages: raw.harnessMessages ?? 0,
   };

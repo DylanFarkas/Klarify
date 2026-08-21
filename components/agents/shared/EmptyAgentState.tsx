@@ -5,11 +5,25 @@ interface EmptyAgentStateProps {
   description: string;
   icon: ReactNode;
   action: ReactNode;
+  className?: string;
 }
 
-export function EmptyAgentState({ title, description, icon, action }: EmptyAgentStateProps) {
+export function EmptyAgentState({
+  title,
+  description,
+  icon,
+  action,
+  className = '',
+}: EmptyAgentStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-5 py-14 text-center animate-[fadeIn_0.3s_ease-out]">
+    <div
+      className={[
+        'flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-5 py-14 text-center animate-[fadeIn_0.3s_ease-out]',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-surface-muted text-muted [&>svg]:h-6 [&>svg]:w-6">
         {icon}
       </div>

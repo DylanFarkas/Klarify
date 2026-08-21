@@ -58,7 +58,7 @@ export type HarnessStreamEvent =
   | { type: 'error'; error: string };
 
 export const HARNESS_HISTORY_LIMIT = 20;
-export const HARNESS_MAX_TOOL_ITERATIONS = 6;
+export const HARNESS_MAX_TOOL_ITERATIONS = 10;
 
 /** Errores que el runtime muestra al usuario sin dejar que el modelo los reescriba. */
 export const HARNESS_TERMINAL_TOOL_ERRORS = new Set([
