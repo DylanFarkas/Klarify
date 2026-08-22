@@ -4,14 +4,14 @@ import { Navbar } from "@/components/landing/Navbar/Navbar";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { ImpactBento } from "@/components/landing/ImpactBento";
 import { PricingPlans } from "@/components/landing/PricingPlans";
-import { ProductDemoVideo } from "@/components/landing/ProductDemoVideo";
+import { WorkspaceProductDemo } from "@/components/landing/workspace-demo/WorkspaceProductDemo";
 
 export default function Home() {
   return (
     <div className="bg-[#000000]">
       <Navbar />
       <HeroLanding />
-      <ProductDemoVideo />
+      <WorkspaceProductDemo />
       <PricingPlans />
       <ImpactBento />
       <FaqSection />

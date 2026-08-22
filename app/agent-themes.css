@@ -67,8 +67,8 @@ html[data-agent-theme="light"],
   --grid-dot-opacity: 0.55;
   --grid-vignette: rgb(248 250 252 / 0.85);
   --grid-noise-opacity: 0.035;
-  --background: #f8fafc;
-  --surface: #ffffff;
+  --background: #FFFFFF;
+  --surface: #F5F5F5;
   --surface-muted: #f1f5f9;
   --surface-hover: #f1f5f9;
   --foreground: #0f172a;
@@ -104,15 +104,15 @@ html[data-agent-theme="klarify"],
   --grid-vignette: rgb(8 8 9 / 0.82);
   --grid-noise-opacity: 0.05;
   /* canvas < card < elevated — necesario para sidebar flotante */
-  --background: #030303;
-  --surface: #0c0c0c;
+  --background: #0a0a0a;
+  --surface: #111113;
   --surface-muted: #1c1c1f;
   --surface-hover: rgb(62 207 142 / 0.12);
   --foreground: #ffffff;
   --foreground-muted: #9ca3af;
   --foreground-subtle: rgb(156 163 175 / 0.7);
   --foreground-body: rgb(255 255 255 / 0.88);
-  --border: #2a2a2e;
+  --border: #1c1c1f;
   --border-strong: rgb(255 255 255 / 0.14);
   --primary: #3ecf8e;
   --primary-hover: #32b87d;
@@ -131,7 +131,8 @@ html[data-agent-theme="klarify"],
 }
 
 /* Acentos de Klarify — solo reescriben tokens tintados (hover, no el activo sólido) */
-html[data-agent-theme="klarify"][data-klarify-accent="sky"] {
+html[data-agent-theme="klarify"][data-klarify-accent="sky"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="sky"] {
   --grid-dot: rgb(77 159 255 / 0.18);
   --surface-hover: rgb(77 159 255 / 0.12);
   --primary: #4d9fff;
@@ -140,7 +141,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="sky"] {
   --icon-muted: rgb(77 159 255 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="cyan"] {
+html[data-agent-theme="klarify"][data-klarify-accent="cyan"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="cyan"] {
   --grid-dot: rgb(34 211 238 / 0.18);
   --surface-hover: rgb(34 211 238 / 0.12);
   --primary: #22d3ee;
@@ -149,7 +151,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="cyan"] {
   --icon-muted: rgb(34 211 238 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="violet"] {
+html[data-agent-theme="klarify"][data-klarify-accent="violet"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="violet"] {
   --grid-dot: rgb(167 139 250 / 0.18);
   --surface-hover: rgb(167 139 250 / 0.12);
   --primary: #a78bfa;
@@ -158,7 +161,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="violet"] {
   --icon-muted: rgb(167 139 250 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="amber"] {
+html[data-agent-theme="klarify"][data-klarify-accent="amber"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="amber"] {
   --grid-dot: rgb(251 191 36 / 0.18);
   --surface-hover: rgb(251 191 36 / 0.12);
   --primary: #fbbf24;
@@ -167,7 +171,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="amber"] {
   --icon-muted: rgb(251 191 36 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="coral"] {
+html[data-agent-theme="klarify"][data-klarify-accent="coral"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="coral"] {
   --grid-dot: rgb(251 113 133 / 0.18);
   --surface-hover: rgb(251 113 133 / 0.12);
   --primary: #fb7185;
@@ -176,7 +181,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="coral"] {
   --icon-muted: rgb(251 113 133 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="red"] {
+html[data-agent-theme="klarify"][data-klarify-accent="red"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="red"] {
   --grid-dot: rgb(239 68 68 / 0.18);
   --surface-hover: rgb(239 68 68 / 0.12);
   --primary: #ef4444;
@@ -185,7 +191,8 @@ html[data-agent-theme="klarify"][data-klarify-accent="red"] {
   --icon-muted: rgb(239 68 68 / 0.35);
 }
 
-html[data-agent-theme="klarify"][data-klarify-accent="cafe"] {
+html[data-agent-theme="klarify"][data-klarify-accent="cafe"],
+.agent-workspace[data-theme="klarify"][data-klarify-accent="cafe"] {
   --grid-dot: rgb(210 166 121 / 0.18);
   --surface-hover: rgb(210 166 121 / 0.12);
   --primary: #d2a679;

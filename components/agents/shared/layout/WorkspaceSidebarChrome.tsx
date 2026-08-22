@@ -18,7 +18,7 @@ export function WorkspaceSidebarChrome({
   footer,
 }: WorkspaceSidebarChromeProps) {
   return (
-    <aside className="relative z-10 my-3 ml-3 hidden w-64 shrink-0 flex-col overflow-hidden rounded-2xl border border-border-strong bg-surface lg:flex">
+    <aside className="relative z-10 my-3 ml-3 hidden w-64 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface lg:flex border border-border">
       <div className="flex min-h-0 flex-1 flex-col px-3.5 pt-5">
         <div className="mb-5">
           <Link

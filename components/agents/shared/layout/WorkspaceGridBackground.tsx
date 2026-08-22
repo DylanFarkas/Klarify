@@ -11,7 +11,7 @@ export function WorkspaceGridBackground() {
       <div className="workspace-grid__lines workspace-grid__lines--near" />
       <div className="workspace-grid__dots" />
       <WorkspaceShootingStars />
-      <div className="workspace-grid__vignette" />
+      <div className="" />
       <div className="workspace-grid__noise" />
     </div>
   );

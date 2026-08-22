@@ -56,7 +56,7 @@ export function KanbanColumn({
         isOver ? 'border-border-strong' : '',
       ].join(' ')}
     >
-      <header className="border-b border-border px-4 py-3">
+      <header className="border-b border-border px-4 py-3 bg-surface-muted rounded-t-xl">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span

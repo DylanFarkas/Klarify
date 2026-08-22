@@ -104,9 +104,9 @@ export function WorkspaceSidebarNav() {
             <span className={['truncate text-sm leading-5', isActive ? 'font-medium' : ''].join(' ')}>
               {item.label}
             </span>
-            {isActive ? (
+            {/* {isActive ? (
               <span className="col-start-2 text-xs leading-snug text-subtle">{item.description}</span>
-            ) : null}
+            ) : null} */}
           </Link>
         );
       })}
