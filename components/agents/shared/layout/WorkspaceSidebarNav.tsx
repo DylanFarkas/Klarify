@@ -95,7 +95,7 @@ export function WorkspaceSidebarNav() {
             className={[
               'grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-lg px-2.5 py-2 transition-colors',
               isActive
-                ? 'bg-surface-hover text-foreground'
+                ? 'bg-elevated text-foreground'
                 : 'text-muted hover:bg-surface-hover hover:text-foreground',
             ].join(' ')}
             aria-current={isActive ? 'page' : undefined}

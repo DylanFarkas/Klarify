@@ -7,6 +7,7 @@ import { WorkspaceAccountSection } from './WorkspaceAccountSection';
 import { WorkspaceGridBackground } from './WorkspaceGridBackground';
 import { WorkspaceHomeNav } from './WorkspaceHomeNav';
 import { WorkspacePlanSummary } from './WorkspacePlanSummary';
+import { WorkspaceSidebarChrome } from './WorkspaceSidebarChrome';
 
 interface WorkspaceHomeShellProps {
   children: React.ReactNode;
@@ -15,39 +16,26 @@ interface WorkspaceHomeShellProps {
 export function WorkspaceHomeShell({ children }: WorkspaceHomeShellProps) {
   return (
     <div className="flex h-full min-h-0 bg-background text-foreground">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface lg:flex">
-        <div className="flex min-h-0 flex-1 flex-col px-3.5 pt-5">
-          <div className="mb-5">
-            <Link
-              href="/agentes/proyectos"
-              className="block text-center text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80"
-            >
-              <span className="text-primary">K</span>larify
-            </Link>
-            <p className="mt-1.5 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">
-              Tu workspace
-            </p>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
-            <WorkspaceHomeNav />
-
-            <div className="mt-1">
-              <ProjectSwitcher />
+      <WorkspaceSidebarChrome
+        brandSubtitle="Tu workspace"
+        footer={
+          <>
+            <WorkspacePlanSummary />
+            <div className="mt-2.5">
+              <AgentSidebarSettings />
             </div>
-          </div>
-        </div>
+            <div className="mt-2.5">
+              <WorkspaceAccountSection />
+            </div>
+          </>
+        }
+      >
+        <WorkspaceHomeNav />
 
-        <div className="mt-auto shrink-0 border-t border-border px-3.5 py-3.5">
-          <WorkspacePlanSummary />
-          <div className="mt-2.5">
-            <AgentSidebarSettings />
-          </div>
-          <div className="mt-2.5">
-            <WorkspaceAccountSection />
-          </div>
+        <div className="mt-1">
+          <ProjectSwitcher />
         </div>
-      </aside>
+      </WorkspaceSidebarChrome>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceGridBackground />

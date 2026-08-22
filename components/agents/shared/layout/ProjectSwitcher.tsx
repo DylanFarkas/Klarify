@@ -58,7 +58,7 @@ export function ProjectSwitcher() {
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-lg">
           <ul className="max-h-56 overflow-y-auto py-1">
             {projects.map((project) => (
               <li key={project.id}>

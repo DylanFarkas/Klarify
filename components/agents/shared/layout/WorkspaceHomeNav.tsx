@@ -39,7 +39,7 @@ function navClass(isActive: boolean): string {
   return [
     'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
     isActive
-      ? 'bg-surface-hover font-medium text-foreground'
+      ? 'bg-elevated font-medium text-foreground'
       : 'text-muted hover:bg-surface-hover hover:text-foreground',
   ].join(' ');
 }

@@ -141,13 +141,24 @@ export function Navbar() {
     });
 
     const hash = window.location.hash.slice(1);
-    if (hash && SECTION_IDS.includes(hash as (typeof SECTION_IDS)[number])) {
+    const navigation = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const isReload = navigation?.type === "reload";
+
+    // En reload, ignorar el hash y quedarse en el hero.
+    if (isReload) {
+      if (hash) {
+        window.history.replaceState(null, "", pathname);
+      }
+      window.scrollTo(0, 0);
+    } else if (hash && SECTION_IDS.includes(hash as (typeof SECTION_IDS)[number])) {
       requestAnimationFrame(() => scrollToSection(hash));
       setActiveSection(hash);
     }
 
     return () => observers.forEach((observer) => observer.disconnect());
-  }, [isHome, scrollToSection]);
+  }, [isHome, pathname, scrollToSection]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -163,17 +174,17 @@ export function Navbar() {
   const linkClassName = (active: boolean) =>
     active
       ? "border-b-2 border-[#005bbf] pb-1 text-sm font-bold text-[#005bbf]"
-      : "border-b-2 border-transparent pb-1 text-sm font-medium text-[#5d616b] transition-colors hover:text-[#005bbf]";
+      : "border-b-2 border-transparent pb-1 text-sm font-medium text-white/50 transition-colors hover:text-white";
 
   return (
     <nav
-      className={`sticky top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl transition-transform duration-300 ease-in-out ${
+      className={`sticky top-0 left-0 right-0 z-50 bg-[#000000]/80 backdrop-blur-xl transition-transform duration-300 ease-in-out ${
         visible ? "translate-y-0" : "-translate-y-full"
       }`}
     >
       <div className="mx-auto flex h-16 w-full max-w-500 items-center justify-between px-5 md:px-16">
         <Link
-          className="text-xl font-extrabold tracking-tight text-[#191c1d]"
+          className="text-xl font-extrabold tracking-tight text-white"
           href="/"
           onClick={() => setMobileOpen(false)}
         >
@@ -199,13 +210,13 @@ export function Navbar() {
               <>
                 <button
                   onClick={goToMyAgent}
-                  className="hidden text-sm font-bold text-[#005bbf] hover:underline sm:inline"
+                  className="hidden text-sm font-bold text-[#4d8fff] hover:underline sm:inline"
                 >
                   Volver al workspace
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="hidden rounded-full border border-[#191c1d] px-5 py-2 text-sm font-bold text-[#191c1d] transition-colors hover:bg-gray-100 cursor-pointer sm:inline"
+                  className="hidden rounded-full border border-white/25 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-white/10 cursor-pointer sm:inline"
                 >
                   Cerrar sesión
                 </button>
@@ -213,7 +224,7 @@ export function Navbar() {
             ) : (
               <button
                 onClick={handleLogin}
-                className="rounded-full bg-[#191c1d] px-5 py-2 text-sm font-bold text-white transition-transform hover:scale-[0.98] cursor-pointer"
+                className="rounded-full bg-white px-5 py-2 text-sm font-bold text-[#0A0A0A] transition-transform hover:scale-[0.98] cursor-pointer"
               >
                 Iniciar sesión
               </button>
@@ -224,7 +235,7 @@ export function Navbar() {
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav"
             aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#191c1d]/15 text-[#191c1d] transition-colors hover:bg-gray-100 lg:hidden cursor-pointer"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white transition-colors hover:bg-white/10 lg:hidden cursor-pointer"
             onClick={() => setMobileOpen((open) => !open)}
           >
             <span className="sr-only">{mobileOpen ? "Cerrar menú" : "Abrir menú"}</span>
@@ -252,7 +263,7 @@ export function Navbar() {
       {mobileOpen && (
         <div
           id="mobile-nav"
-          className="border-t border-[#191c1d]/8 bg-white/95 px-5 py-4 backdrop-blur-xl lg:hidden md:px-16"
+          className="border-t border-white/10 bg-[#000000]/95 px-5 py-4 backdrop-blur-xl lg:hidden md:px-16"
         >
           <div className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
@@ -260,8 +271,8 @@ export function Navbar() {
                 key={link.href}
                 className={`rounded-lg px-3 py-2.5 text-sm ${
                   isLinkActive(link)
-                    ? "bg-[#005bbf]/8 font-bold text-[#005bbf]"
-                    : "font-medium text-[#5d616b] hover:bg-gray-50 hover:text-[#005bbf]"
+                    ? "bg-[#005bbf]/20 font-bold text-[#4d8fff]"
+                    : "font-medium text-white/50 hover:bg-white/5 hover:text-white"
                 }`}
                 href={link.href}
                 onClick={(event) => handleNavClick(event, link.sectionId)}
@@ -272,16 +283,16 @@ export function Navbar() {
           </div>
 
           {!loading && user && (
-            <div className="mt-3 flex flex-col gap-2 border-t border-[#191c1d]/8 pt-3 sm:hidden">
+            <div className="mt-3 flex flex-col gap-2 border-t border-white/10 pt-3 sm:hidden">
               <button
                 onClick={goToMyAgent}
-                className="rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#005bbf] cursor-pointer"
+                className="rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#4d8fff] cursor-pointer"
               >
                 Volver al workspace
               </button>
               <button
                 onClick={handleLogout}
-                className="rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#191c1d] cursor-pointer"
+                className="rounded-lg px-3 py-2.5 text-left text-sm font-bold text-white cursor-pointer"
               >
                 Cerrar sesión
               </button>

@@ -40,7 +40,7 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     return (
       <div
         className={[
-          'rounded-lg border border-border bg-surface px-2 py-2 text-xs text-muted',
+          'rounded-lg border border-border bg-elevated px-2 py-2 text-xs text-muted',
           className,
         ]
           .filter(Boolean)
@@ -55,7 +55,7 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     return (
       <div
         className={[
-          'rounded-lg border border-border bg-surface px-2.5 py-2 text-[11px] text-muted',
+          'rounded-lg border border-border bg-elevated px-2.5 py-2 text-[11px] text-muted',
           className,
         ]
           .filter(Boolean)

@@ -118,7 +118,7 @@ export function IdeaToBacklog() {
   return (
     <section
       aria-labelledby="idea-to-backlog-title"
-      className="bg-white px-5 pb-40 md:px-16 -mt-5 md:-mt-15"
+      className="bg-[#000000] px-5 pb-40 md:px-16 -mt-5 md:-mt-15"
       ref={sectionRef}
     >
       <div className="mx-auto grid max-w-360 gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">

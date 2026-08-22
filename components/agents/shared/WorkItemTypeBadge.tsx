@@ -8,7 +8,7 @@ import type { BugSeverity, WorkItemType } from '@/lib/types/agent-2';
 import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
 
 const TYPE_BADGE_CLASS: Record<WorkItemType, string> = {
-  story: 'bg-surface-hover text-muted',
+  story: 'bg-elevated text-muted',
   bug: 'bg-red-500/10 text-red-600 dark:text-red-400',
   task: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
 };

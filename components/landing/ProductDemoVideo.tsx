@@ -52,14 +52,14 @@ export function ProductDemoVideo() {
   return (
     <section
       aria-labelledby="product-demo-title"
-      className="scroll-mt-20 bg-black px-5 py-24 text-white md:px-16 md:py-32"
+      className="scroll-mt-20 bg-[#000000] px-5 py-24 text-white md:px-16 md:py-32"
       id="producto"
     >
       <div className="mx-auto grid max-w-360 items-start gap-16 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14 xl:gap-20">
         <div>
           <h2
             id="product-demo-title"
-            className="max-w-xl text-4xl font-light leading-[1.08] tracking-[-0.04em] text-white md:text-6xl lg:text-7xl"
+            className="max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-0.04em] text-white md:text-6xl lg:text-7xl"
           >
             Del ruido al backlog ejecutable
           </h2>
@@ -70,7 +70,7 @@ export function ProductDemoVideo() {
           >
             <span
               aria-hidden="true"
-              className="absolute bottom-3 left-[5px] top-3 w-px bg-white/15"
+              className="absolute bottom-3 left-1.25 top-3 w-px bg-white/15"
             />
 
             {features.map((feature, index) => {
@@ -83,7 +83,7 @@ export function ProductDemoVideo() {
                 >
                   <span
                     aria-hidden="true"
-                    className={`absolute left-0 top-[0.55rem] h-[11px] w-[11px] border transition-all duration-500 ${
+                    className={`absolute left-0 top-[0.55rem] h-2.75 w-2.75 border transition-all duration-500 ${
                       isActive
                         ? "border-white bg-white"
                         : "border-white/25 bg-transparent"
@@ -118,7 +118,7 @@ export function ProductDemoVideo() {
           </ol>
         </div>
 
-        <div className="w-full overflow-hidden rounded-2xl border border-white/12 bg-[#0a0a0a] shadow-[0_40px_120px_rgba(0,0,0,0.75)] lg:rounded-3xl">
+        <div className="w-full overflow-hidden rounded-2xl border border-white/12 bg-[#000000] shadow-[0_40px_120px_rgba(0,0,0,0.75)] lg:rounded-3xl">
           <div className="flex items-center gap-4 border-b border-white/8 bg-[#141414] px-5 py-3.5 lg:px-6 lg:py-4">
             <div className="flex gap-2">
               <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />

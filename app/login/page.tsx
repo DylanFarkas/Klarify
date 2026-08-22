@@ -60,17 +60,17 @@ function Spinner({ className = "" }: { className?: string }) {
   );
 }
 
-function BlueprintAtmosphere() {
+function DarkAtmosphere() {
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-0"
       style={{
         backgroundImage: `
-          linear-gradient(rgba(25, 28, 29, 0.055) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(25, 28, 29, 0.055) 1px, transparent 1px),
-          linear-gradient(rgba(25, 28, 29, 0.022) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(25, 28, 29, 0.022) 1px, transparent 1px)
+          linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+          linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px)
         `,
         backgroundSize: "64px 64px, 64px 64px, 16px 16px, 16px 16px",
         backgroundPosition: "-1px -1px",
@@ -123,57 +123,54 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className="relative flex min-h-screen items-center justify-center bg-white text-[#191c1d]">
-        <BlueprintAtmosphere />
+      <div className="relative flex min-h-screen items-center justify-center bg-[#000000] text-white">
+        <DarkAtmosphere />
         <div className="relative z-10 flex flex-col items-center gap-4">
-          <span aria-hidden="true" className="inline-flex h-5 w-5 rounded-[5px] bg-[#005bbf]" />
-          <p className="text-sm text-[#5d616b]">Cargando…</p>
+          <span aria-hidden="true" className="inline-flex h-5 w-5 rounded-[5px] bg-white" />
+          <p className="text-sm text-white/50">Cargando…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="bg-[#000000]">
       <Navbar />
 
-      <main className="relative overflow-hidden bg-white text-[#191c1d]">
-        <BlueprintAtmosphere />
+      <main className="relative overflow-hidden bg-[#000000] text-white">
+        <DarkAtmosphere />
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100vh-64px)] max-w-360 flex-col items-center justify-center px-5 py-16 md:px-16 md:py-24">
-          <div className="w-full max-w-[440px]">
+          <div className="w-full max-w-110">
             <div className="mb-10 text-center">
               <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-5 w-5 shrink-0 rounded-[5px] bg-[#005bbf]"
+                  className="inline-flex h-5 w-5 shrink-0 rounded-[5px] bg-white"
                 />
-                <span className="text-lg font-semibold tracking-[-0.02em] text-[#191c1d]">
-                  Klarify
-                </span>
-                <span className="text-[#191c1d]/25">·</span>
-                <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#191c1d]/45">
+                <span className="text-lg font-extrabold tracking-tight text-white">Klarify</span>
+                <span className="text-white/25">·</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-white/45">
                   Acceso
                 </span>
               </div>
 
-              <h1 className="text-3xl font-light leading-[1.1] tracking-[-0.04em] text-[#191c1d] md:text-[2.75rem] md:leading-[1.06]">
-                Continúa en{" "}
-                <span className="text-[#005bbf]">Klarify</span>
+              <h1 className="text-3xl font-semibold leading-[1.1] tracking-[-0.04em] text-white md:text-[2.75rem] md:leading-[1.06]">
+                Continúa en Klarify
               </h1>
-              <p className="mx-auto mt-4 max-w-sm text-base leading-7 text-[#414754]">
+              <p className="mx-auto mt-4 max-w-sm text-base leading-7 text-white/55">
                 Inicia sesión para acceder a tus proyectos y backlogs.
               </p>
             </div>
 
             <section
               aria-labelledby="login-providers-title"
-              className="rounded-2xl border border-[#191c1d]/10 bg-white/90 p-6 shadow-[0_24px_60px_rgba(25,28,29,0.06)] backdrop-blur-sm md:p-8"
+              className="rounded-2xl border border-white/10 bg-[#131313]/90 p-6 backdrop-blur-md md:p-8"
             >
               <div className="mb-5 flex items-center justify-center gap-3">
                 <p
                   id="login-providers-title"
-                  className="shrink-0 text-[11px] font-medium uppercase tracking-[0.2em] text-[#5d616b]"
+                  className="shrink-0 text-[11px] font-medium uppercase tracking-[0.2em] text-white/45"
                 >
                   Elige cómo entrar
                 </p>
@@ -182,7 +179,7 @@ export default function LoginPage() {
               <div className="space-y-3">
                 {authError && (
                   <p
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-300"
                     role="alert"
                   >
                     {authError}
@@ -193,16 +190,16 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={busy}
-                  className="group flex w-full cursor-pointer items-center gap-3 rounded-xl border border-[#c1c6d6]/60 bg-white px-4 py-3.5 text-left text-sm font-bold text-[#191c1d] transition-all hover:border-[#191c1d]/25 hover:bg-[#f7f8f9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#005bbf]/35 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group flex w-full cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-transparent px-4 py-3.5 text-left text-sm font-bold text-white transition-all hover:border-white/30 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#191c1d]/8 bg-[#f7f8f9] transition-colors group-hover:bg-white">
-                    {isGoogleLoading ? <Spinner className="text-[#5d616b]" /> : <GoogleIcon />}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 transition-colors group-hover:bg-white/10">
+                    {isGoogleLoading ? <Spinner className="text-white/70" /> : <GoogleIcon />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block">
                       {isGoogleLoading ? "Conectando con Google…" : "Continuar con Google"}
                     </span>
-                    <span className="mt-0.5 block text-xs font-medium text-[#5d616b]">
+                    <span className="mt-0.5 block text-xs font-medium text-white/45">
                       Usa tu cuenta de Google Workspace o personal
                     </span>
                   </span>
@@ -212,35 +209,35 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleGithubLogin}
                   disabled={busy}
-                  className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-[#191c1d] px-4 py-3.5 text-left text-sm font-bold text-white shadow-[0_12px_32px_rgba(25,28,29,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#2a2e30] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#191c1d]/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                  className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-white px-4 py-3.5 text-left text-sm font-bold text-[#0A0A0A] shadow-xl transition-all hover:-translate-y-0.5 hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                    {isGithubLoading ? <Spinner className="text-white" /> : <GithubIcon />}
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/5">
+                    {isGithubLoading ? <Spinner className="text-[#0A0A0A]" /> : <GithubIcon />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block">
                       {isGithubLoading ? "Conectando con GitHub…" : "Continuar con GitHub"}
                     </span>
-                    <span className="mt-0.5 block text-xs font-medium text-white/55">
+                    <span className="mt-0.5 block text-xs font-medium text-black/45">
                       Ideal si ya trabajas con repositorios
                     </span>
                   </span>
                 </button>
               </div>
 
-              <div className="mt-6 border-t border-[#191c1d]/8 pt-5">
-                <p className="text-center text-xs leading-5 text-[#5d616b]">
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <p className="text-center text-xs leading-5 text-white/45">
                   Al continuar, aceptas nuestros{" "}
                   <Link
                     href="/terminos"
-                    className="font-medium text-[#005bbf] underline-offset-4 transition-colors hover:underline"
+                    className="font-medium text-white underline-offset-4 transition-colors hover:underline"
                   >
                     Términos de servicio
                   </Link>{" "}
                   y{" "}
                   <Link
                     href="/privacidad"
-                    className="font-medium text-[#005bbf] underline-offset-4 transition-colors hover:underline"
+                    className="font-medium text-white underline-offset-4 transition-colors hover:underline"
                   >
                     Política de privacidad
                   </Link>
@@ -249,10 +246,10 @@ export default function LoginPage() {
               </div>
             </section>
 
-            <p className="mt-8 text-center text-sm text-[#5d616b]">
+            <p className="mt-8 text-center text-sm text-white/45">
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 font-medium text-[#191c1d] underline-offset-4 transition-colors hover:text-[#005bbf] hover:underline"
+                className="inline-flex items-center gap-1.5 font-medium text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline"
               >
                 <span aria-hidden="true">←</span>
                 Volver al inicio
@@ -263,6 +260,6 @@ export default function LoginPage() {
       </main>
 
       <LandingFooter />
-    </>
+    </div>
   );
 }

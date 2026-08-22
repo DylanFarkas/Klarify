@@ -29,7 +29,7 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
             key={step.number}
             className={[
               'grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-lg px-2.5 py-2 transition-colors',
-              isActive ? 'bg-surface-hover' : '',
+              isActive ? 'bg-elevated' : '',
               isFuture ? 'opacity-55' : '',
             ]
               .filter(Boolean)
