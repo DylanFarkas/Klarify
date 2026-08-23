@@ -4,7 +4,8 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   KLARK_STACK_RECOMMEND_PROMPT,
   useKlarkControl,
@@ -25,6 +26,18 @@ import type { ProjectStack, StackLayerId } from '@/lib/types/stack';
 import { createEmptyStack, PRIMARY_STACK_LAYERS } from '@/lib/types/stack';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
+function countStackTechnologies(stack: ProjectStack): number {
+  return Object.values(stack.layers).reduce((sum, items) => sum + (items?.length ?? 0), 0);
+}
+
+function stackSourceLabel(source: ProjectStack['source']): string {
+  if (source === 'ai') return 'Recomendado por Klark';
+  if (source === 'mixed') return 'Mixto';
+  return 'Armado manualmente';
+}
+
+const STACK_SAVE_DEBOUNCE_MS = 500;
+
 interface StackContentProps {
   workspace: UserWorkspace;
   pipelineReady: boolean;
@@ -41,7 +54,9 @@ export function StackContent({
   const { openKlarkWithMessage } = useKlarkControl();
 
   const [draft, setDraft] = useState<ProjectStack | null>(workspace.stack ?? null);
-  const [editing, setEditing] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerLayer, setPickerLayer] = useState<StackLayerId>('frontend');
   const [metaOpen, setMetaOpen] = useState(false);
@@ -55,10 +70,47 @@ export function StackContent({
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
-    if (!editing) {
+    if (!isDirty) {
       setDraft(workspace.stack ? prepareStackForFirestore(workspace.stack) : null);
     }
-  }, [workspace.stack, editing]);
+  }, [workspace.stack, isDirty]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  const persistDraft = useCallback(
+    async (stack: ProjectStack) => {
+      setSaving(true);
+      try {
+        await onSaveStack({
+          ...stack,
+          status: 'saved',
+          updatedAt: Date.now(),
+        });
+        if (!saveTimerRef.current) {
+          setIsDirty(false);
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onSaveStack]
+  );
+
+  const scheduleSave = useCallback(
+    (stack: ProjectStack) => {
+      setIsDirty(true);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        void persistDraft(stack);
+      }, STACK_SAVE_DEBOUNCE_MS);
+    },
+    [persistDraft]
+  );
 
   const displayStack = draft ?? (workspace.stack ? prepareStackForFirestore(workspace.stack) : null);
   const isEmpty = isStackEmpty(displayStack);
@@ -68,9 +120,10 @@ export function StackContent({
       const base = prev ?? workspace.stack ?? createEmptyStack();
       const next = updater(base);
       next.warnings = validateStackCompatibility(next);
+      scheduleSave(next);
       return next;
     });
-  }, [workspace.stack]);
+  }, [scheduleSave, workspace.stack]);
 
   const startManual = useCallback(() => {
     setMetaOpen(true);
@@ -84,7 +137,6 @@ export function StackContent({
           productKind,
           architecturePattern,
         }));
-        setEditing(true);
       } else {
         const initial = mergeStackUpdate(undefined, {
           ...createEmptyStack(),
@@ -93,12 +145,13 @@ export function StackContent({
           productKind,
           architecturePattern,
         });
+        initial.warnings = validateStackCompatibility(initial);
         setDraft(initial);
-        setEditing(true);
+        scheduleSave(initial);
       }
       setMetaOpen(false);
     },
-    [draft, updateDraft, workspace.stack]
+    [draft, scheduleSave, updateDraft, workspace.stack]
   );
 
   const addCatalogItem = useCallback(
@@ -156,18 +209,6 @@ export function StackContent({
     openKlarkWithMessage(KLARK_STACK_RECOMMEND_PROMPT);
   }, [openKlarkWithMessage]);
 
-  const handleSave = useCallback(async () => {
-    if (!draft) return;
-    const toSave: ProjectStack = {
-      ...draft,
-      status: 'saved',
-      updatedAt: Date.now(),
-    };
-    await onSaveStack(toSave);
-    setDraft(toSave);
-    setEditing(false);
-  }, [draft, onSaveStack]);
-
   const handleClearStack = useCallback(async () => {
     setClearing(true);
     try {
@@ -176,8 +217,10 @@ export function StackContent({
         success: 'Stack eliminado',
         error: 'No se pudo limpiar el stack',
       });
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
       setDraft(null);
-      setEditing(false);
+      setIsDirty(false);
       setClearConfirmOpen(false);
     } finally {
       setClearing(false);
@@ -192,164 +235,154 @@ export function StackContent({
         onRecommend={handleRecommend}
       />
     ) : (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 animate-[fadeIn_0.3s_ease-out]">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Stack tecnológico</h2>
-          <p className="mt-1 text-sm text-muted">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 md:gap-7 animate-[fadeIn_0.3s_ease-out]">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+            Stack tecnológico
+          </h1>
+          <p className="text-sm text-muted">
             Arquitectura y tecnologías para implementar el backlog actual.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!editing ? (
-            <button
-              type="button"
-              onClick={() => {
-                const base = draft ?? workspace.stack ?? createEmptyStack();
-                setDraft(prepareStackForFirestore(base));
-                setEditing(true);
-              }}
-              className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
-            >
-              Editar
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleRecommend}
-            className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
-          >
-            Preguntar a Klark
-          </button>
-          {!editing ? (
-            <button
-              type="button"
-              onClick={() => setClearConfirmOpen(true)}
-              className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:border-danger/40 hover:bg-danger/10 hover:text-danger cursor-pointer"
-            >
-              Limpiar stack
-            </button>
+          {displayStack ? (
+            <p className="text-[12px] tabular-nums text-subtle">
+              {countStackTechnologies(displayStack)} tecnologías
+              {' · '}
+              {stackSourceLabel(displayStack.source)}
+              {saving ? (
+                <>
+                  {' · '}
+                  Guardando…
+                </>
+              ) : null}
+              {displayStack.warnings && displayStack.warnings.length > 0 ? (
+                <>
+                  {' · '}
+                  {displayStack.warnings.length} aviso
+                  {displayStack.warnings.length !== 1 ? 's' : ''}
+                </>
+              ) : null}
+            </p>
           ) : null}
         </div>
-      </header>
 
-      {displayStack ? (
-        <StackBoard
-          stack={displayStack}
-          editing={editing}
-          onEditMeta={() => setMetaOpen(true)}
-          onAddToLayer={(layer) => {
-            setPickerLayer(layer);
-            setPickerOpen(true);
-          }}
-          onRemoveItem={(layer, index) => {
-            updateDraft((prev) => {
-              const items = [...(prev.layers[layer] ?? [])];
-              items.splice(index, 1);
-              return { ...prev, layers: { ...prev.layers, [layer]: items } };
-            });
-          }}
-        />
-      ) : null}
-
-      {editing ? (
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => {
               setPickerLayer('frontend');
               setPickerOpen(true);
             }}
-            className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground cursor-pointer"
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
           >
-            + Añadir tecnología
+            Añadir tecnología
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 cursor-pointer"
+            onClick={handleRecommend}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
           >
-            Guardar stack
+            Preguntar a Klark
           </button>
           <button
             type="button"
-            onClick={() => {
-              setDraft(workspace.stack ?? null);
-              setEditing(false);
+            onClick={() => setClearConfirmOpen(true)}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-danger cursor-pointer"
+          >
+            Limpiar
+          </button>
+        </div>
+      </header>
+
+      <section className="flex flex-col gap-4">
+        {displayStack ? (
+          <StackBoard
+            stack={displayStack}
+            editing
+            onEditMeta={() => setMetaOpen(true)}
+            onRemoveItem={(layer, index) => {
+              updateDraft((prev) => {
+                const items = [...(prev.layers[layer] ?? [])];
+                items.splice(index, 1);
+                return { ...prev, layers: { ...prev.layers, [layer]: items } };
+              });
             }}
-            className="rounded-lg px-3.5 py-2 text-sm text-muted hover:text-foreground cursor-pointer"
-          >
-            Cancelar
-          </button>
-        </div>
-      ) : null}
+          />
+        ) : null}
+      </section>
 
-      {conflictPrompt ? (
-        <div className="fixed inset-0 z-95 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5">
-            <p className="text-sm text-muted">{conflictPrompt.message}</p>
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  addCatalogItem(conflictPrompt.catalogId, conflictPrompt.layer, true);
-                  setConflictPrompt(null);
-                }}
-                className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
-              >
-                Reemplazar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  addCatalogItem(conflictPrompt.catalogId, conflictPrompt.layer, false);
-                  setConflictPrompt(null);
-                }}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover"
-              >
-                Mantener ambos
-              </button>
-              <button
-                type="button"
-                onClick={() => setConflictPrompt(null)}
-                className="text-sm text-subtle hover:text-muted"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {conflictPrompt
+        ? createPortal(
+            <div className="fixed inset-0 z-110 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+              <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl">
+                <p className="text-sm leading-relaxed text-muted">{conflictPrompt.message}</p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addCatalogItem(conflictPrompt.catalogId, conflictPrompt.layer, true);
+                      setConflictPrompt(null);
+                    }}
+                    className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 cursor-pointer"
+                  >
+                    Reemplazar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addCatalogItem(conflictPrompt.catalogId, conflictPrompt.layer, false);
+                      setConflictPrompt(null);
+                    }}
+                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover cursor-pointer"
+                  >
+                    Mantener ambos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConflictPrompt(null)}
+                    className="text-sm text-subtle hover:text-muted cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
-      {clearConfirmOpen ? (
-        <div className="fixed inset-0 z-95 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5">
-            <h3 className="text-[15px] font-semibold text-foreground">¿Limpiar el stack?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted">
-              Se borrará el stack guardado de este proyecto. Podrás pedírselo de nuevo a Klark o
-              armarlo manualmente desde cero.
-            </p>
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => void handleClearStack()}
-                disabled={clearing}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-              >
-                {clearing ? 'Limpiando…' : 'Sí, limpiar stack'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setClearConfirmOpen(false)}
-                disabled={clearing}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {clearConfirmOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-110 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+              <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-2xl">
+                <h3 className="text-[15px] font-semibold text-foreground">¿Limpiar el stack?</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  Se borrará el stack guardado de este proyecto. Podrás pedírselo de nuevo a Klark o
+                  armarlo manualmente desde cero.
+                </p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleClearStack()}
+                    disabled={clearing}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  >
+                    {clearing ? 'Limpiando…' : 'Sí, limpiar stack'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClearConfirmOpen(false)}
+                    disabled={clearing}
+                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
     );
 
@@ -369,7 +402,29 @@ export function StackContent({
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         initialLayer={pickerLayer}
+        selectedCatalogIds={
+          displayStack
+            ? Object.values(displayStack.layers)
+                .flat()
+                .map((item) => item.catalogId)
+                .filter((id): id is string => Boolean(id))
+            : []
+        }
         onSelect={(id, layer) => tryAddCatalog(id, layer)}
+        onDeselect={(catalogId) => {
+          updateDraft((prev) => {
+            const layers = { ...prev.layers };
+            for (const layerId of Object.keys(layers) as StackLayerId[]) {
+              const items = layers[layerId];
+              if (!items?.length) continue;
+              const next = items.filter((i) => i.catalogId !== catalogId);
+              if (next.length !== items.length) {
+                layers[layerId] = next;
+              }
+            }
+            return { ...prev, layers };
+          });
+        }}
         onAddCustom={(name, layer) => {
           updateDraft((prev) => {
             const items = [...(prev.layers[layer] ?? []), { customName: name, isPrimary: false }];
