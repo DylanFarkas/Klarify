@@ -1,5 +1,9 @@
 /**
  * @fileoverview Mutaciones puras de HU — compartidas entre API y dashboard.
+ *
+ * En memoria se mantiene `UserWorkspace`. Firestore (schema v4) solo persiste
+ * el backlog canónico (`backlog/epics|stories` + `pipeline/meta`); el fan-out
+ * pre-dashboard no se vuelve a escribir en el documento raíz.
  */
 
 import type { Epic, UserStory } from '@/lib/types/agent-2';

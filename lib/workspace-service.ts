@@ -6,9 +6,15 @@
  * acceso server-side vía Admin SDK, expuesto a través de API routes autenticadas.
  */
 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot } from 'firebase-admin/firestore';
+
 import { adminDb } from '@/lib/firebase-admin';
-import { checkAndIncrementRegeneration, resolveUserPlan, ensureUserAccount } from '@/lib/plans/plan-service';
+import {
+  assertProjectSlotAccessible,
+  checkAndIncrementRegeneration,
+  ensureUserAccount,
+  resolveUserPlan,
+} from '@/lib/plans/plan-service';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { RegenerationAgent } from '@/lib/plans/types';
 import {
@@ -16,18 +22,54 @@ import {
   loadActiveProjectWorkspace,
   projectDoc,
   readActiveProjectId,
+  resolveActiveProject,
 } from '@/lib/project-service';
+import {
+  persistAgent1Only,
+  persistCanonicalBacklogWrite,
+  persistCanonicalEpicPatch,
+  persistCanonicalStoryPatch,
+  persistExecutionStories,
+  persistExecutionStoryFields,
+  persistExecutionWorkspaceMeta,
+  persistSprintFilterOnly,
+  persistSprintPlanOnly,
+  persistStackOnly,
+  persistWorkspace,
+  readBacklogIds,
+  readCanonicalEpic,
+  readCanonicalStory,
+  readExecutionStories,
+  readPipelineMeta,
+  readPipelinePlan,
+  projectRef,
+  type PersistSlice,
+} from '@/lib/project-store';
+import { deleteProjectSlices } from '@/lib/project-store/cleanup';
+import type { ProjectDocument } from '@/lib/types/project';
+import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
+import type { PipelineMeta, WorkspaceScope } from '@/lib/types/project-schema';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
-import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
-import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
+import type {
+  Agent2State,
+  Agent2Input,
+  BugSeverity,
+  Epic,
+  UserStory,
+  WorkItemType,
+} from '@/lib/types/agent-2';
+import type { Agent3State, EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintDatePatch, SprintPlan } from '@/lib/types/agent-5';
-import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
   addSprintToPlan,
+  addStoryToSprintPlan,
+  adjustSprintVelocityForStoryPoints,
   assertCompletedSprintsUnchanged,
   assertStoryNotInCompletedSprint,
+  assignStoryToSprintInPlan,
+  removeStoryFromSprintPlan,
   buildAgent6InputFromAgent4,
   completeSprintInPlan,
   deleteEmptySprintFromPlan,
@@ -45,9 +87,11 @@ import {
   nextLiveEpicId,
   nextLiveWorkItemId,
 } from '@/lib/utils/live-backlog';
+import { nextEpicIdFromIds, nextWorkItemIdFromIds } from '@/lib/utils/agent-2-ids';
 import {
   buildManualEstimation,
   getEffortValue,
+  isEstimationMode,
   normalizeEstimationPatchForMode,
 } from '@/lib/utils/estimation';
 import {
@@ -58,6 +102,8 @@ import {
   validateWorkItemFields,
 } from '@/lib/utils/work-item-validation';
 import {
+  updateStoryEstimation,
+  updateStoryPrioritization,
   withCreatedEpic,
   withCreatedUserStory,
   withDeletedEpic,
@@ -167,10 +213,51 @@ async function activeProject(uid: string): Promise<string> {
   return projectId;
 }
 
+/**
+ * Proyecto sobre el que operar.
+ *
+ * Cuando el cliente manda `projectId` no hay que leer el doc de usuario para
+ * resolver el proyecto activo: la ruta `users/{uid}/projects/{id}` hace
+ * imposible tocar datos de otro usuario, y el estado del slot se valida en el
+ * punto donde se lee el doc del proyecto.
+ */
+interface TargetProject {
+  projectId: string;
+  /** Doc del proyecto si hubo que leerlo para resolver el activo. */
+  snapshot: DocumentSnapshot | null;
+  /** Doc del usuario si hubo que leerlo (reutilizable en checks de plan). */
+  userSnapshot: DocumentSnapshot | null;
+}
+
+async function resolveTargetProject(
+  uid: string,
+  clientProjectId?: string
+): Promise<TargetProject> {
+  const trimmed = clientProjectId?.trim();
+  if (trimmed) {
+    return { projectId: trimmed, snapshot: null, userSnapshot: null };
+  }
+  const resolved = await resolveActiveProject(uid);
+  if (!resolved) {
+    throw new Error('NO_PROJECTS');
+  }
+  return resolved;
+}
+
+/** Valida existencia y estado del slot a partir del doc raíz ya leído. */
+function assertProjectDocAccessible(snap: DocumentSnapshot): ProjectDocument {
+  if (!snap.exists) {
+    throw new Error('PROJECT_NOT_FOUND');
+  }
+  const doc = snap.data() as ProjectDocument;
+  assertProjectSlotAccessible(doc.status === 'locked' ? 'locked' : 'active');
+  return doc;
+}
+
 async function loadProjectWorkspace(
   uid: string
 ): Promise<{ projectId: string; workspace: UserWorkspace }> {
-  const loaded = await loadActiveProjectWorkspace(uid);
+  const loaded = await loadActiveProjectWorkspace(uid, undefined, 'shell');
   if (!loaded) {
     throw new Error('NO_PROJECTS');
   }
@@ -185,7 +272,7 @@ async function saveProjectWorkspace(
 ): Promise<void> {
   const current = currentWorkspace ?? (await getProjectWorkspace(uid, projectId));
   const partial = workspacePartial as Partial<UserWorkspace>;
-  const nextWorkspace: UserWorkspace = {
+  let nextWorkspace: UserWorkspace = {
     ...current,
     agent1: partial.agent1 ? { ...current.agent1, ...partial.agent1 } : current.agent1,
     agent2: partial.agent2 ? { ...current.agent2, ...partial.agent2 } : current.agent2,
@@ -199,18 +286,35 @@ async function saveProjectWorkspace(
       partial.execution !== undefined ? partial.execution : current.execution,
     stack: partial.stack !== undefined ? partial.stack : current.stack,
   };
-  const progress = computePipelineProgress(nextWorkspace);
+  const slices = inferPersistSlices(workspacePartial, nextWorkspace);
+  await persistWorkspace(uid, projectId, nextWorkspace, slices, current);
+}
 
-  await projectDoc(uid, projectId).set(
-    {
-      workspace: workspacePartial,
-      pipelineStep: progress.pipelineStep,
-      pipelineLabel: progress.pipelineLabel,
-      completionPercentage: progress.completionPercentage,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+function inferPersistSlices(
+  partial: Record<string, unknown>,
+  next: UserWorkspace
+): PersistSlice[] {
+  const keys = Object.keys(partial);
+  if (keys.length === 0) return ['all'];
+  const slices = new Set<PersistSlice>();
+  if (keys.includes('agent1')) slices.add('transcription');
+  if (
+    keys.includes('agent2') ||
+    keys.includes('agent3') ||
+    keys.includes('agent4') ||
+    keys.includes('agent5') ||
+    keys.includes('pipeline')
+  ) {
+    slices.add('backlog');
+  }
+  if (keys.includes('agent2') || keys.includes('agent3') || keys.includes('agent4') || keys.includes('agent5')) {
+    slices.add('history');
+  }
+  if (keys.includes('pipeline') && isDashboardPhase(next) && next.agent2.epics.length > 0) {
+    slices.add('history');
+  }
+  if (keys.includes('execution')) slices.add('execution');
+  return [...slices];
 }
 
 async function resetAgentWithRegenerationCheck(
@@ -224,6 +328,40 @@ async function resetAgentWithRegenerationCheck(
 }
 
 export type { UpdateUserStoryOptions };
+
+/** Contexto para mutar el backlog canónico sin cargar el workspace completo. */
+interface CanonicalBacklogContext {
+  meta: PipelineMeta;
+  plan: SprintPlan | null;
+  estimationMode: EstimationMode;
+  executionInitialized: boolean;
+}
+
+/**
+ * Devuelve `null` en proyectos pre-v4 o anteriores al dashboard, donde el
+ * backlog vivo todavía es el fan-out de agentes 2–5 y hay que rematerializarlo.
+ */
+async function resolveCanonicalBacklogContext(
+  uid: string,
+  projectId: string,
+  preloadedDoc?: DocumentSnapshot
+): Promise<CanonicalBacklogContext | null> {
+  const [snap, meta] = await Promise.all([
+    preloadedDoc ?? projectRef(uid, projectId).get(),
+    readPipelineMeta(uid, projectId),
+  ]);
+  const doc = assertProjectDocAccessible(snap);
+  if (!meta) return null;
+  if ((doc.schemaVersion ?? 1) < SCHEMA_VERSION_CURRENT || doc.workspace) return null;
+  if ((doc.pipelineStep ?? 0) < 6) return null;
+
+  return {
+    meta,
+    plan: meta.plan ? normalizeSprintPlan(meta.plan) : null,
+    estimationMode: isEstimationMode(meta.estimationMode) ? meta.estimationMode : 'story_points',
+    executionInitialized: Boolean(doc.workspaceMeta?.executionInitializedAt),
+  };
+}
 
 async function persistBacklogMutation(
   uid: string,
@@ -257,12 +395,39 @@ async function persistBacklogMutation(
   );
 }
 
-async function assertCanCreateEpic(uid: string, workspace: UserWorkspace): Promise<void> {
-  const plan = await resolveUserPlan(uid);
-  if (getLiveBacklog(workspace).epics.length >= plan.limits.maxEpics) {
+type UserPlanSnapshot = Awaited<ReturnType<typeof resolveUserPlan>>;
+
+function assertCanCreateEpicCount(plan: UserPlanSnapshot, epicCount: number): void {
+  if (epicCount >= plan.limits.maxEpics) {
     throw new PlanLimitError(
       `Tu plan ${plan.id} permite hasta ${plan.limits.maxEpics} épica(s).`,
       'PLAN_EPIC_LIMIT',
+      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+}
+
+async function assertCanCreateEpic(uid: string, workspace: UserWorkspace): Promise<void> {
+  assertCanCreateEpicCount(await resolveUserPlan(uid), getLiveBacklog(workspace).epics.length);
+}
+
+function assertCanCreateStoryCounts(
+  plan: UserPlanSnapshot,
+  totalStories: number,
+  storiesInEpic: number | null
+): void {
+  if (totalStories >= plan.limits.maxStories) {
+    throw new PlanLimitError(
+      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStories} historia(s).`,
+      'PLAN_STORY_LIMIT',
+      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+
+  if (storiesInEpic !== null && storiesInEpic >= plan.limits.maxStoriesPerEpic) {
+    throw new PlanLimitError(
+      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStoriesPerEpic} historia(s) por épica.`,
+      'PLAN_STORY_LIMIT',
       { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
     );
   }
@@ -273,25 +438,14 @@ async function assertCanCreateStory(
   workspace: UserWorkspace,
   epicId: string
 ): Promise<void> {
-  const plan = await resolveUserPlan(uid);
   const liveEpics = getLiveBacklog(workspace).epics;
   const totalStories = liveEpics.reduce((sum, epic) => sum + epic.userStories.length, 0);
-  if (totalStories >= plan.limits.maxStories) {
-    throw new PlanLimitError(
-      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStories} historia(s).`,
-      'PLAN_STORY_LIMIT',
-      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
-    );
-  }
-
   const epic = liveEpics.find((item) => item.id === epicId);
-  if (epic && epic.userStories.length >= plan.limits.maxStoriesPerEpic) {
-    throw new PlanLimitError(
-      `Tu plan ${plan.id} permite hasta ${plan.limits.maxStoriesPerEpic} historia(s) por épica.`,
-      'PLAN_STORY_LIMIT',
-      { upgradeTo: plan.id === 'free' ? 'starter' : plan.id === 'starter' ? 'pro' : undefined }
-    );
-  }
+  assertCanCreateStoryCounts(
+    await resolveUserPlan(uid),
+    totalStories,
+    epic ? epic.userStories.length : null
+  );
 }
 
 export interface CreateEpicInput {
@@ -316,26 +470,25 @@ function pickAvatarColor(index: number): string {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
-function appendActivity(
-  current: StoryExecution,
-  entry: ExecutionActivityEntry
-): StoryExecution {
-  const activity = [...(current.activity ?? []), entry].slice(-20);
-  return { ...current, activity, updatedAt: Date.now() };
-}
-
 async function saveExecutionState(
   uid: string,
   execution: ExecutionState,
-  ctx?: { projectId: string; workspace: UserWorkspace }
+  ctx?: { projectId: string; workspace: UserWorkspace },
+  options?: { persistStories?: boolean }
 ): Promise<UserWorkspace> {
   const projectId = ctx?.projectId ?? (await readActiveProjectId(uid));
   if (!projectId) {
     throw new Error('NO_PROJECTS');
   }
-  const workspace = ctx?.workspace ?? (await getProjectWorkspace(uid, projectId));
+  const workspace = ctx?.workspace ?? (await getProjectWorkspace(uid, projectId, 'shell'));
   const sanitized = sanitize(execution);
-  await saveProjectWorkspace(uid, projectId, { execution: sanitized }, workspace);
+  const persistStories = options?.persistStories !== false;
+  await Promise.all([
+    persistStories
+      ? persistExecutionStories(uid, projectId, sanitized.stories)
+      : Promise.resolve(),
+    persistExecutionWorkspaceMeta(uid, projectId, sanitized),
+  ]);
   return { ...workspace, execution: sanitized };
 }
 
@@ -433,123 +586,265 @@ export async function deleteProjectMember(uid: string, memberId: string): Promis
 export async function updateStoryExecution(
   uid: string,
   storyId: string,
-  patch: Partial<Pick<StoryExecution, 'status' | 'assigneeId' | 'columnOrder'>>
+  patch: Partial<Pick<StoryExecution, 'status' | 'assigneeId' | 'columnOrder'>>,
+  clientProjectId?: string,
+  previous?: { status?: KanbanStatus; assigneeId?: string | null }
 ): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace: initial } = await loadProjectWorkspace(uid);
-  let workspace = initial;
-  let execution = workspace.execution;
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const touchesLifecycle =
+    patch.status !== undefined || patch.assigneeId !== undefined;
 
-  if (!execution?.initializedAt) {
-    workspace = await ensureExecutionInitialized(uid);
-    execution = workspace.execution;
-    if (!execution?.initializedAt) {
-      throw new Error('No se pudo inicializar el tablero de ejecución.');
-    }
-  }
+  // Sin leer la historia: el cliente manda el estado previo para el activity log.
+  // El plan solo hace falta si cambia status/assignee (gate de sprint cerrado).
+  const [, plan] = await Promise.all([
+    assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined),
+    touchesLifecycle
+      ? readPipelinePlan(uid, projectId)
+      : Promise.resolve(null),
+  ]);
 
-  const current = execution.stories[storyId] ?? createDefaultStoryExecution(0);
-  const plan = getLiveBacklog(workspace).plan;
-  if (
-    (patch.status !== undefined && patch.status !== current.status) ||
-    (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) ||
-    (patch.columnOrder !== undefined && patch.columnOrder !== current.columnOrder)
-  ) {
+  if (touchesLifecycle) {
     assertStoryNotInCompletedSprint(plan, storyId);
   }
-  let updated = { ...current, ...patch, updatedAt: Date.now() };
 
-  if (patch.status !== undefined && patch.status !== current.status) {
-    updated = appendActivity(updated, {
+  const now = Date.now();
+  const activityEntries: ExecutionActivityEntry[] = [];
+  if (
+    patch.status !== undefined &&
+    previous?.status !== undefined &&
+    patch.status !== previous.status
+  ) {
+    activityEntries.push({
       type: 'status_change',
-      from: current.status,
+      from: previous.status,
       to: patch.status,
-      at: Date.now(),
+      at: now,
+    });
+  } else if (patch.status !== undefined && previous?.status === undefined) {
+    activityEntries.push({
+      type: 'status_change',
+      from: null,
+      to: patch.status,
+      at: now,
     });
   }
 
-  if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
-    updated = appendActivity(updated, {
+  if (
+    patch.assigneeId !== undefined &&
+    previous?.assigneeId !== undefined &&
+    patch.assigneeId !== previous.assigneeId
+  ) {
+    activityEntries.push({
       type: 'assignee_change',
-      from: current.assigneeId,
+      from: previous.assigneeId,
       to: patch.assigneeId,
-      at: Date.now(),
+      at: now,
+    });
+  } else if (patch.assigneeId !== undefined && previous?.assigneeId === undefined) {
+    activityEntries.push({
+      type: 'assignee_change',
+      from: null,
+      to: patch.assigneeId,
+      at: now,
     });
   }
 
-  const stories = { ...execution.stories, [storyId]: updated };
-  return saveExecutionState(uid, { ...execution, stories }, { projectId, workspace });
+  // Evitar activity duplicada cuando el patch no cambia nada respecto a previous.
+  const meaningfulActivity = activityEntries.filter((entry) => entry.from !== entry.to);
+
+  const data: FirebaseFirestore.DocumentData = { updatedAt: now };
+  if (patch.status !== undefined) data.status = patch.status;
+  if (patch.assigneeId !== undefined) data.assigneeId = patch.assigneeId;
+  if (patch.columnOrder !== undefined) data.columnOrder = patch.columnOrder;
+  if (meaningfulActivity.length > 0) {
+    data.activity = FieldValue.arrayUnion(...meaningfulActivity);
+  }
+
+  await persistExecutionStoryFields(uid, projectId, { [storyId]: data });
+
+  const empty = createEmptyWorkspace();
+  return {
+    ...empty,
+    execution: {
+      initializedAt: Date.now(),
+      members: [],
+      sprintFilter: 'all',
+      stories: {
+        [storyId]: {
+          status: patch.status ?? previous?.status ?? 'todo',
+          assigneeId:
+            patch.assigneeId !== undefined ? patch.assigneeId : (previous?.assigneeId ?? null),
+          columnOrder: patch.columnOrder ?? 0,
+          updatedAt: now,
+          activity: meaningfulActivity,
+        },
+      },
+    },
+  };
 }
 
 export interface StoryExecutionReorderUpdate {
   storyId: string;
   status: KanbanStatus;
   columnOrder: number;
+  previousStatus?: KanbanStatus;
 }
 
 export async function bulkUpdateStoryExecutions(
   uid: string,
-  updates: StoryExecutionReorderUpdate[]
+  updates: StoryExecutionReorderUpdate[],
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const execution = workspace.execution;
-  if (!execution?.initializedAt) {
-    return ensureExecutionInitialized(uid);
-  }
-  const stories = { ...execution.stories };
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+
+  const [, plan] = await Promise.all([
+    assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined),
+    readPipelinePlan(uid, projectId),
+  ]);
+
   const now = Date.now();
-  const plan = getLiveBacklog(workspace).plan;
+  const fields: Record<string, FirebaseFirestore.DocumentData> = {};
+  const changed: Record<string, StoryExecution> = {};
 
   for (const update of updates) {
-    const current = stories[update.storyId] ?? createDefaultStoryExecution(update.columnOrder);
     if (isStoryInCompletedSprint(plan, update.storyId)) {
-      if (update.status !== current.status) {
-        assertStoryNotInCompletedSprint(plan, update.storyId);
+      if (
+        update.previousStatus === undefined ||
+        update.status !== update.previousStatus
+      ) {
+        // Reorden con cambio de columna en sprint cerrado → error; si no hay
+        // previousStatus no podemos distinguir y omitimos por seguridad.
+        if (
+          update.previousStatus !== undefined &&
+          update.status !== update.previousStatus
+        ) {
+          assertStoryNotInCompletedSprint(plan, update.storyId);
+        }
       }
       continue;
     }
-    let next = { ...current, status: update.status, columnOrder: update.columnOrder, updatedAt: now };
 
-    if (update.status !== current.status) {
-      next = appendActivity(next, {
+    const data: FirebaseFirestore.DocumentData = {
+      status: update.status,
+      columnOrder: update.columnOrder,
+      updatedAt: now,
+    };
+
+    const statusChanged =
+      update.previousStatus !== undefined && update.previousStatus !== update.status;
+    if (statusChanged && update.previousStatus !== undefined) {
+      const fromStatus = update.previousStatus;
+      data.activity = FieldValue.arrayUnion({
         type: 'status_change',
-        from: current.status,
+        from: fromStatus,
         to: update.status,
         at: now,
-      });
+      } satisfies ExecutionActivityEntry);
     }
 
-    stories[update.storyId] = next;
+    fields[update.storyId] = data;
+    changed[update.storyId] = {
+      status: update.status,
+      assigneeId: null,
+      columnOrder: update.columnOrder,
+      updatedAt: now,
+      activity:
+        statusChanged && update.previousStatus !== undefined
+          ? [
+              {
+                type: 'status_change',
+                from: update.previousStatus,
+                to: update.status,
+                at: now,
+              },
+            ]
+          : [],
+    };
   }
 
-  return saveExecutionState(uid, { ...execution, stories }, { projectId, workspace });
+  if (Object.keys(fields).length > 0) {
+    await persistExecutionStoryFields(uid, projectId, fields);
+  }
+
+  const empty = createEmptyWorkspace();
+  return {
+    ...empty,
+    execution: {
+      initializedAt: Date.now(),
+      members: [],
+      sprintFilter: 'all',
+      stories: changed,
+    },
+  };
 }
 
+/**
+ * Cambia el filtro de sprint del tablero.
+ *
+ * Devuelve `null` en el camino rápido (el cliente ya aplicó el cambio de forma
+ * optimista). El tablero se inicializa en un flujo aparte (`initializeExecution`).
+ */
 export async function updateExecutionSprintFilter(
   uid: string,
-  sprintFilter: string | 'all'
-): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const execution = workspace.execution;
-  if (!execution?.initializedAt) {
-    return ensureExecutionInitialized(uid);
-  }
-  return saveExecutionState(uid, { ...execution, sprintFilter }, { projectId, workspace });
+  sprintFilter: string | 'all',
+  clientProjectId?: string
+): Promise<UserWorkspace | null> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  await assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined);
+  await persistSprintFilterOnly(uid, target.projectId, sprintFilter);
+  return null;
 }
 
 /** Lee el workspace del proyecto activo + preferencias y plan del usuario. */
-export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> {
+export async function getWorkspaceData(
+  uid: string,
+  options?: { scope?: WorkspaceScope; agent?: string; projectId?: string }
+): Promise<WorkspaceResponse> {
+  const clientProjectId = options?.projectId?.trim();
+
+  // Con el projectId del cliente, el doc de usuario y el workspace del proyecto
+  // se leen en paralelo en vez de encadenar usuario → proyecto → subcolecciones.
+  if (clientProjectId) {
+    try {
+      const [snapshot, workspace] = await Promise.all([
+        ensureUserAccount(uid),
+        getProjectWorkspace(uid, clientProjectId, options?.scope ?? 'shell', options?.agent),
+      ]);
+      const plan = await resolveUserPlan(uid, snapshot);
+      const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
+      return {
+        workspace,
+        preferences: { lastAgent: prefs?.lastAgent ?? '1' },
+        activeProjectId: clientProjectId,
+        plan: {
+          id: plan.id,
+          limits: plan.limits,
+          usage: plan.usage,
+          subscription: plan.subscription,
+        },
+        scope: options?.scope ?? 'shell',
+        agent: options?.agent,
+      };
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== 'PROJECT_NOT_FOUND') {
+        throw error;
+      }
+      // El proyecto que el cliente creía activo ya no existe: resolver en servidor.
+    }
+  }
+
   const snapshot = await ensureUserAccount(uid);
   const prefs = snapshot.data()?.preferences as Partial<WorkspacePreferences> | undefined;
   const preferences: WorkspacePreferences = {
     lastAgent: prefs?.lastAgent ?? '1',
   };
+  const scope = options?.scope ?? 'shell';
 
   const [plan, loaded] = await Promise.all([
     resolveUserPlan(uid, snapshot),
-    loadActiveProjectWorkspace(uid, snapshot),
+    loadActiveProjectWorkspace(uid, snapshot, scope, options?.agent),
   ]);
   const planSnapshot = {
     id: plan.id,
@@ -564,6 +859,8 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
       preferences,
       activeProjectId: null,
       plan: planSnapshot,
+      scope,
+      agent: options?.agent,
     };
   }
 
@@ -572,15 +869,15 @@ export async function getWorkspaceData(uid: string): Promise<WorkspaceResponse> 
     preferences,
     activeProjectId: loaded.projectId,
     plan: planSnapshot,
+    scope,
+    agent: options?.agent,
   };
 }
 
 /** Guarda (merge) el estado del Agente 1. */
 export async function saveAgent1State(uid: string, state: Agent1State): Promise<void> {
   const projectId = await activeProject(uid);
-  await saveProjectWorkspace(uid, projectId, {
-    agent1: sanitize(state),
-  });
+  await persistAgent1Only(uid, projectId, sanitize(state));
 }
 
 /** Guarda (merge) el estado del Agente 2. */
@@ -591,44 +888,27 @@ export async function saveAgent2State(uid: string, state: Agent2State): Promise<
   });
 }
 
-/** Actualiza una HU en todas las copias del backlog que conserva el pipeline. */
-export async function updateUserStoryAcrossWorkspace(
-  uid: string,
-  storyId: string,
-  updates: Partial<UserStory>,
-  estimationUpdates?: Partial<StoryEstimation>,
-  options?: UpdateUserStoryOptions,
-  prioritizationUpdates?: Partial<StoryPrioritization>
-): Promise<UserWorkspace> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const live = getLiveBacklog(workspace);
-  const current = live.epics
-    .flatMap((epic) => epic.userStories)
-    .find((story) => story.id === storyId);
-  if (!current) {
-    throw new Error(`Historia no encontrada: ${storyId}`);
-  }
-
-  assertStoryNotInCompletedSprint(live.plan, storyId);
-
-  // MVP: no se permite cambiar el tipo ni el id tras crear.
+function normalizeUserStoryPatch(
+  current: UserStory,
+  updates: Partial<UserStory>
+): Partial<UserStory> {
   const { type: _ignoredType, id: _ignoredId, ...safeUpdates } = updates;
   const type = resolveWorkItemType(current);
 
-  const mergedForValidation = {
-    type,
-    title: safeUpdates.title ?? current.title,
-    description: safeUpdates.description ?? current.description,
-    acceptanceCriteria:
-      safeUpdates.acceptanceCriteria ?? current.acceptanceCriteria ?? [],
-    severity: safeUpdates.severity ?? current.severity,
-    stepsToReproduce:
-      safeUpdates.stepsToReproduce ?? current.stepsToReproduce ?? [],
-    technicalNotes: safeUpdates.technicalNotes ?? current.technicalNotes,
-  };
-  const validationError = validateWorkItemFields(mergedForValidation, {
-    partial: false,
-  });
+  const validationError = validateWorkItemFields(
+    {
+      type,
+      title: safeUpdates.title ?? current.title,
+      description: safeUpdates.description ?? current.description,
+      acceptanceCriteria:
+        safeUpdates.acceptanceCriteria ?? current.acceptanceCriteria ?? [],
+      severity: safeUpdates.severity ?? current.severity,
+      stepsToReproduce:
+        safeUpdates.stepsToReproduce ?? current.stepsToReproduce ?? [],
+      technicalNotes: safeUpdates.technicalNotes ?? current.technicalNotes,
+    },
+    { partial: false }
+  );
   if (validationError) {
     throw new Error(validationError);
   }
@@ -657,10 +937,150 @@ export async function updateUserStoryAcrossWorkspace(
     delete normalizedPatch.stepsToReproduce;
     delete normalizedPatch.technicalNotes;
   }
+  return normalizedPatch;
+}
 
-  const mode = live.estimationMode;
+/** Actualiza una HU en el backlog canónico (story + meta, sin recargar el workspace). */
+export async function updateUserStoryAcrossWorkspace(
+  uid: string,
+  storyId: string,
+  updates: Partial<UserStory>,
+  estimationUpdates?: Partial<StoryEstimation>,
+  options?: UpdateUserStoryOptions,
+  prioritizationUpdates?: Partial<StoryPrioritization>,
+  clientProjectId?: string
+): Promise<UserWorkspace> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const requestedEpicId = options?.epicId;
+  const [rootSnap, stored, meta, targetEpic] = await Promise.all([
+    target.snapshot ?? projectRef(uid, projectId).get(),
+    readCanonicalStory(uid, projectId, storyId),
+    readPipelineMeta(uid, projectId),
+    requestedEpicId
+      ? readCanonicalEpic(uid, projectId, requestedEpicId)
+      : Promise.resolve(null),
+  ]);
+  assertProjectDocAccessible(rootSnap);
+
+  const needsPipelineMeta =
+    estimationUpdates !== undefined ||
+    prioritizationUpdates !== undefined ||
+    options?.sprintId !== undefined;
+
+  if (!stored || (needsPipelineMeta && !meta)) {
+    return updateUserStoryAcrossWorkspaceLegacy(
+      uid,
+      projectId,
+      storyId,
+      updates,
+      estimationUpdates,
+      options,
+      prioritizationUpdates
+    );
+  }
+
+  assertStoryNotInCompletedSprint(meta?.plan ?? null, storyId);
+
+  const { epicId: currentEpicId, ...currentStory } = stored;
+  const normalizedPatch = normalizeUserStoryPatch(currentStory, updates);
+  const mode = isEstimationMode(meta?.estimationMode) ? meta.estimationMode : 'story_points';
   const normalizedEstimation = normalizeEstimationPatchForMode(mode, estimationUpdates);
 
+  const nextStory = {
+    ...stored,
+    ...normalizedPatch,
+    isEdited: true,
+  };
+
+  const shouldMoveEpic =
+    options?.epicId !== undefined && options.epicId !== currentEpicId;
+  if (shouldMoveEpic) {
+    if (!targetEpic) {
+      throw new Error(`Épica no encontrada: ${options.epicId}`);
+    }
+    nextStory.epicId = options.epicId!;
+  }
+
+  const currentEstimation = meta?.estimations[storyId];
+  const nextEstimation = normalizedEstimation
+    ? updateStoryEstimation(meta?.estimations ?? {}, storyId, normalizedEstimation)[storyId]
+    : currentEstimation;
+  const oldEffort = getEffortValue(currentEstimation, mode);
+  const newEffort = getEffortValue(nextEstimation, mode);
+  const effortChanged = normalizedEstimation !== undefined && oldEffort !== newEffort;
+
+  let nextPlan = meta?.plan ?? null;
+  if (nextPlan) {
+    if (options?.sprintId !== undefined) {
+      nextPlan = assignStoryToSprintInPlan(nextPlan, storyId, options.sprintId, newEffort);
+    } else if (effortChanged) {
+      nextPlan = adjustSprintVelocityForStoryPoints(nextPlan, storyId, oldEffort, newEffort);
+    }
+  }
+
+  const nextPrioritization = prioritizationUpdates
+    ? updateStoryPrioritization(meta?.priorities ?? {}, storyId, prioritizationUpdates)[storyId]
+    : undefined;
+
+  const metaPatch =
+    normalizedEstimation !== undefined ||
+    nextPrioritization !== undefined ||
+    options?.sprintId !== undefined ||
+    effortChanged
+      ? {
+          ...(normalizedEstimation && nextEstimation
+            ? { estimation: nextEstimation }
+            : {}),
+          ...(nextPrioritization ? { prioritization: nextPrioritization } : {}),
+          ...(options?.sprintId !== undefined || effortChanged ? { plan: nextPlan } : {}),
+        }
+      : null;
+
+  // Mover de épica sin releer docs: arrayRemove / arrayUnion en un solo batch.
+  if (shouldMoveEpic && options?.epicId) {
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      stories: [nextStory],
+      epicStoryIdPatches: [
+        { epicId: currentEpicId, removeStoryIds: [storyId], markEdited: true },
+        { epicId: options.epicId, addStoryIds: [storyId], markEdited: true },
+      ],
+      ...(metaPatch?.estimation
+        ? { estimations: { [storyId]: metaPatch.estimation } }
+        : {}),
+      ...(metaPatch?.prioritization
+        ? { prioritizations: { [storyId]: metaPatch.prioritization } }
+        : {}),
+      ...(metaPatch?.plan !== undefined ? { plan: metaPatch.plan } : {}),
+    });
+  } else {
+    await persistCanonicalStoryPatch(uid, projectId, nextStory, metaPatch);
+  }
+
+  return createEmptyWorkspace();
+}
+
+async function updateUserStoryAcrossWorkspaceLegacy(
+  uid: string,
+  projectId: string,
+  storyId: string,
+  updates: Partial<UserStory>,
+  estimationUpdates?: Partial<StoryEstimation>,
+  options?: UpdateUserStoryOptions,
+  prioritizationUpdates?: Partial<StoryPrioritization>
+): Promise<UserWorkspace> {
+  const workspace = await getProjectWorkspace(uid, projectId);
+  const live = getLiveBacklog(workspace);
+  const current = live.epics
+    .flatMap((epic) => epic.userStories)
+    .find((story) => story.id === storyId);
+  if (!current) {
+    throw new Error(`Historia no encontrada: ${storyId}`);
+  }
+
+  assertStoryNotInCompletedSprint(live.plan, storyId);
+  const normalizedPatch = normalizeUserStoryPatch(current, updates);
+  const normalizedEstimation = normalizeEstimationPatchForMode(live.estimationMode, estimationUpdates);
   const updatedWorkspace = withUpdatedUserStory(
     workspace,
     storyId,
@@ -671,24 +1091,6 @@ export async function updateUserStoryAcrossWorkspace(
   );
 
   await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
-
-  return updatedWorkspace;
-}
-
-export async function updateSprintPlanAcrossWorkspace(
-  uid: string,
-  plan: SprintPlan
-): Promise<UserWorkspace> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const currentPlan = resolveSprintPlan(workspace);
-  if (currentPlan) {
-    assertCompletedSprintsUnchanged(currentPlan, plan);
-  }
-  const normalizedPlan = normalizeSprintPlan(plan);
-  const updatedWorkspace = withUpdatedSprintPlan(workspace, normalizedPlan);
-
-  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
-
   return updatedWorkspace;
 }
 
@@ -696,23 +1098,101 @@ function resolveSprintPlan(workspace: UserWorkspace): SprintPlan | null {
   return getLiveBacklog(workspace).plan;
 }
 
+/**
+ * Contexto mínimo para operar sobre el plan de sprints.
+ *
+ * En el modelo canónico basta con `pipeline/meta`; sólo los proyectos pre-v4
+ * obligan a cargar el workspace completo para poder rematerializarlo.
+ */
+type SprintPlanContext = { projectId: string; plan: SprintPlan | null } & (
+  | { meta: PipelineMeta; legacyWorkspace: null }
+  | { meta: null; legacyWorkspace: UserWorkspace }
+);
+
+async function resolveSprintPlanContext(
+  uid: string,
+  clientProjectId?: string
+): Promise<SprintPlanContext> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  // Doc raíz (valida existencia/slot) y meta del pipeline en un solo round-trip.
+  const [rootSnap, meta] = await Promise.all([
+    target.snapshot ?? projectRef(uid, projectId).get(),
+    readPipelineMeta(uid, projectId),
+  ]);
+  assertProjectDocAccessible(rootSnap);
+  if (meta) {
+    return {
+      projectId,
+      meta,
+      legacyWorkspace: null,
+      plan: meta.plan ? normalizeSprintPlan(meta.plan) : null,
+    };
+  }
+
+  const legacyWorkspace = await getProjectWorkspace(uid, projectId);
+  return {
+    projectId,
+    meta: null,
+    legacyWorkspace,
+    plan: resolveSprintPlan(legacyWorkspace),
+  };
+}
+
+function requireSprintPlan(ctx: SprintPlanContext): SprintPlan {
+  if (!ctx.plan) {
+    throw new Error('No hay plan de sprints en el workspace.');
+  }
+  return ctx.plan;
+}
+
+/** Persiste el plan: una escritura en el modelo canónico, rematerialización en legacy. */
+async function applySprintPlan(
+  uid: string,
+  ctx: SprintPlanContext,
+  plan: SprintPlan,
+  options?: { sprintFilter?: string }
+): Promise<void> {
+  if (ctx.plan) {
+    assertCompletedSprintsUnchanged(ctx.plan, plan);
+  }
+  const normalizedPlan = normalizeSprintPlan(plan);
+
+  if (!ctx.meta) {
+    const updated = withUpdatedSprintPlan(ctx.legacyWorkspace, normalizedPlan);
+    await persistBacklogMutation(uid, ctx.projectId, ctx.legacyWorkspace, updated);
+    if (options?.sprintFilter !== undefined && updated.execution?.initializedAt) {
+      await updateExecutionSprintFilter(uid, options.sprintFilter);
+    }
+    return;
+  }
+
+  await persistSprintPlanOnly(uid, ctx.projectId, normalizedPlan, options);
+}
+
+export async function updateSprintPlanAcrossWorkspace(
+  uid: string,
+  plan: SprintPlan,
+  clientProjectId?: string
+): Promise<UserWorkspace> {
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
+  await applySprintPlan(uid, ctx, plan);
+  return createEmptyWorkspace();
+}
+
 export async function createSprintAcrossWorkspace(
   uid: string,
   input?: { goal?: string }
 ): Promise<{ workspace: UserWorkspace; sprintId: string; sprintGoal: string }> {
-  const { workspace } = await getWorkspaceData(uid);
-  const plan = resolveSprintPlan(workspace);
-  if (!plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
-  }
-  const updatedPlan = addSprintToPlan(plan, input?.goal);
+  const ctx = await resolveSprintPlanContext(uid);
+  const updatedPlan = addSprintToPlan(requireSprintPlan(ctx), input?.goal);
   const created = updatedPlan.sprints.at(-1);
   if (!created) {
     throw new Error('No se pudo crear el sprint.');
   }
-  const nextWorkspace = await updateSprintPlanAcrossWorkspace(uid, updatedPlan);
+  await applySprintPlan(uid, ctx, updatedPlan);
   return {
-    workspace: nextWorkspace,
+    workspace: createEmptyWorkspace(),
     sprintId: created.id,
     sprintGoal: created.sprintGoal,
   };
@@ -722,13 +1202,9 @@ export async function deleteSprintAcrossWorkspace(
   uid: string,
   sprintId: string
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const plan = resolveSprintPlan(workspace);
-  if (!plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
-  }
-  const normalized = normalizeSprintPlan(plan);
-  const sprint = normalized.sprints.find((item) => item.id === sprintId);
+  const ctx = await resolveSprintPlanContext(uid);
+  const plan = requireSprintPlan(ctx);
+  const sprint = plan.sprints.find((item) => item.id === sprintId);
   if (!sprint) {
     throw new Error(`Sprint no encontrado: ${sprintId}`);
   }
@@ -737,11 +1213,12 @@ export async function deleteSprintAcrossWorkspace(
       `No se puede eliminar ${sprintId}: tiene ${sprint.storyIds.length} historia(s) asignada(s). Reasígnalas o déjalas sin sprint primero.`
     );
   }
-  const nextPlan = deleteEmptySprintFromPlan(normalized, sprintId);
+  const nextPlan = deleteEmptySprintFromPlan(plan, sprintId);
   if (!nextPlan) {
     throw new Error(`No se puede eliminar ${sprintId}: el sprint no está vacío.`);
   }
-  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
+  await applySprintPlan(uid, ctx, nextPlan);
+  return createEmptyWorkspace();
 }
 
 export async function updateSprintAcrossWorkspace(
@@ -749,12 +1226,8 @@ export async function updateSprintAcrossWorkspace(
   sprintId: string,
   updates: { goal?: string; dates?: SprintDatePatch }
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const plan = resolveSprintPlan(workspace);
-  if (!plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
-  }
-  let nextPlan = normalizeSprintPlan(plan);
+  const ctx = await resolveSprintPlanContext(uid);
+  let nextPlan = requireSprintPlan(ctx);
   const sprint = nextPlan.sprints.find((item) => item.id === sprintId);
   if (!sprint) {
     throw new Error(`Sprint no encontrado: ${sprintId}`);
@@ -765,81 +1238,80 @@ export async function updateSprintAcrossWorkspace(
   if (updates.dates && Object.keys(updates.dates).length > 0) {
     nextPlan = updateSprintDates(nextPlan, sprintId, updates.dates);
   }
-  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
+  await applySprintPlan(uid, ctx, nextPlan);
+  return createEmptyWorkspace();
 }
 
 export async function startSprintAcrossWorkspace(
   uid: string,
-  sprintId: string
+  sprintId: string,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const plan = resolveSprintPlan(workspace);
-  if (!plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
-  }
-  const nextPlan = startSprintInPlan(plan, sprintId);
-  let nextWorkspace = await updateSprintPlanAcrossWorkspace(uid, nextPlan);
-
-  if (nextWorkspace.execution?.initializedAt) {
-    nextWorkspace = await updateExecutionSprintFilter(uid, sprintId);
-  }
-  return nextWorkspace;
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
+  const nextPlan = startSprintInPlan(requireSprintPlan(ctx), sprintId);
+  // El filtro sólo se refleja si el tablero está inicializado, así que escribirlo
+  // siempre es inocuo y ahorra una lectura del doc raíz.
+  await applySprintPlan(uid, ctx, nextPlan, { sprintFilter: sprintId });
+  return getProjectWorkspace(uid, ctx.projectId);
 }
 
 export async function completeSprintAcrossWorkspace(
   uid: string,
   sprintId: string,
-  rollover: SprintCompleteRollover = 'backlog'
+  rollover: SprintCompleteRollover = 'backlog',
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const { workspace } = await getWorkspaceData(uid);
-  const plan = resolveSprintPlan(workspace);
-  if (!plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
-  }
-  const normalized = normalizeSprintPlan(plan);
-  const sprint = normalized.sprints.find((item) => item.id === sprintId);
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
+  const plan = requireSprintPlan(ctx);
+  const sprint = plan.sprints.find((item) => item.id === sprintId);
   if (!sprint) {
     throw new Error(`Sprint no encontrado: ${sprintId}`);
   }
 
-  const { estimations, estimationMode } = getLiveBacklog(workspace);
+  const { estimations, estimationMode } = ctx.meta
+    ? {
+        estimations: ctx.meta.estimations ?? {},
+        estimationMode: isEstimationMode(ctx.meta.estimationMode)
+          ? ctx.meta.estimationMode
+          : 'story_points',
+      }
+    : getLiveBacklog(ctx.legacyWorkspace);
+
   const storyPointsById: Record<string, number> = {};
   for (const storyId of sprint.storyIds) {
     storyPointsById[storyId] = getEffortValue(estimations[storyId], estimationMode);
   }
 
-  const incompleteStoryIds = sprint.storyIds.filter((storyId) => {
-    const status = workspace.execution?.stories[storyId]?.status ?? 'todo';
-    return status !== 'done';
-  });
+  const executions = ctx.meta
+    ? await readExecutionStories(uid, ctx.projectId, sprint.storyIds)
+    : ctx.legacyWorkspace.execution?.stories ?? {};
+
+  const incompleteStoryIds = sprint.storyIds.filter(
+    (storyId) => (executions[storyId]?.status ?? 'todo') !== 'done'
+  );
 
   const nextPlan = completeSprintInPlan(
-    normalized,
+    plan,
     sprintId,
     incompleteStoryIds,
     storyPointsById,
     rollover
   );
-  return updateSprintPlanAcrossWorkspace(uid, nextPlan);
+  await applySprintPlan(uid, ctx, nextPlan);
+  return getProjectWorkspace(uid, ctx.projectId);
 }
 
-export async function createUserStoryAcrossWorkspace(
-  uid: string,
-  input: CreateUserStoryInput
-): Promise<{ workspace: UserWorkspace; storyId: string }> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const live = getLiveBacklog(workspace);
-  if (!live.epics.some((epic) => epic.id === input.epicId)) {
-    throw new Error(`Épica no encontrada: ${input.epicId}`);
-  }
-
+/** Valida y normaliza los campos de un ítem nuevo (común a ambos caminos). */
+function buildStoryDraft(input: CreateUserStoryInput): {
+  type: WorkItemType;
+  severity?: BugSeverity;
+  stepsToReproduce?: string[];
+  acceptanceCriteria: string[];
+  technicalNotes?: string;
+} {
   const type = isWorkItemType(input.type) ? input.type : 'story';
   const severity =
-    type === 'bug'
-      ? isBugSeverity(input.severity)
-        ? input.severity
-        : 'medium'
-      : undefined;
+    type === 'bug' ? (isBugSeverity(input.severity) ? input.severity : 'medium') : undefined;
   const stepsToReproduce =
     type === 'bug'
       ? (input.stepsToReproduce ?? []).map((s) => s.trim()).filter(Boolean)
@@ -865,46 +1337,124 @@ export async function createUserStoryAcrossWorkspace(
     throw new Error(validationError);
   }
 
-  await assertCanCreateStory(uid, workspace, input.epicId);
-  const storyId = nextLiveWorkItemId(workspace, type);
-  const story = normalizeUserStory({
+  return { type, severity, stepsToReproduce, acceptanceCriteria, technicalNotes };
+}
+
+function buildStoryFromDraft(
+  input: CreateUserStoryInput,
+  storyId: string,
+  draft: ReturnType<typeof buildStoryDraft>
+): UserStory {
+  return normalizeUserStory({
     id: storyId,
-    type,
+    type: draft.type,
     title: input.title.trim(),
     description: input.description.trim(),
-    acceptanceCriteria,
-    ...(type === 'bug'
-      ? { severity: severity ?? 'medium', stepsToReproduce: stepsToReproduce ?? [] }
+    acceptanceCriteria: draft.acceptanceCriteria,
+    ...(draft.type === 'bug'
+      ? {
+          severity: draft.severity ?? 'medium',
+          stepsToReproduce: draft.stepsToReproduce ?? [],
+        }
       : {}),
-    ...(type === 'task' && technicalNotes ? { technicalNotes } : {}),
+    ...(draft.type === 'task' && draft.technicalNotes
+      ? { technicalNotes: draft.technicalNotes }
+      : {}),
     sourceWishIds: [],
     source: 'manual',
     isEdited: false,
     createdAt: Date.now(),
   });
+}
 
-  const typeLabel =
-    type === 'bug' ? 'Bug' : type === 'task' ? 'Task' : 'Historia';
-  const estimation = buildManualEstimation({
-    mode: live.estimationMode,
+function buildStoryEstimation(
+  input: CreateUserStoryInput,
+  type: WorkItemType,
+  mode: EstimationMode
+): StoryEstimation {
+  const typeLabel = type === 'bug' ? 'Bug' : type === 'task' ? 'Task' : 'Historia';
+  return buildManualEstimation({
+    mode,
     points: input.points,
     durationLabel: input.durationLabel,
     workItemType: type,
     justification: `${typeLabel} creado(a) manualmente desde el dashboard.`,
   });
-  const prioritization: StoryPrioritization | null = input.category
+}
+
+function buildStoryPrioritization(input: CreateUserStoryInput): StoryPrioritization | null {
+  return input.category
     ? {
         category: input.category,
         justification: 'Priorizacion creada manualmente desde el dashboard.',
         isModified: true,
       }
     : null;
+}
+
+export async function createUserStoryAcrossWorkspace(
+  uid: string,
+  input: CreateUserStoryInput,
+  clientProjectId?: string
+): Promise<{ workspace: UserWorkspace; storyId: string }> {
+  const draft = buildStoryDraft(input);
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+
+  // Una sola etapa de lecturas en paralelo; los límites del plan se validan
+  // antes de escribir, así que el gate puede viajar junto al resto.
+  const [ctx, epic, { storyIds }, userPlan] = await Promise.all([
+    resolveCanonicalBacklogContext(uid, projectId, target.snapshot ?? undefined),
+    readCanonicalEpic(uid, projectId, input.epicId),
+    readBacklogIds(uid, projectId),
+    resolveUserPlan(uid, target.userSnapshot ?? undefined),
+  ]);
+
+  if (ctx) {
+    if (!epic) {
+      throw new Error(`Épica no encontrada: ${input.epicId}`);
+    }
+    assertCanCreateStoryCounts(userPlan, storyIds.length, epic.storyIds.length);
+
+    const storyId = nextWorkItemIdFromIds(draft.type, storyIds);
+    const story = buildStoryFromDraft(input, storyId, draft);
+    const estimation = buildStoryEstimation(input, draft.type, ctx.estimationMode);
+    const prioritization = buildStoryPrioritization(input);
+    const plan = ctx.plan
+      ? addStoryToSprintPlan(ctx.plan, storyId, input.sprintId, getEffortValue(estimation, ctx.estimationMode))
+      : null;
+
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      stories: [{ ...story, epicId: input.epicId }],
+      epicStoryIdPatches: [
+        { epicId: input.epicId, addStoryIds: [storyId], markEdited: true },
+      ],
+      estimations: { [storyId]: estimation },
+      ...(prioritization ? { prioritizations: { [storyId]: prioritization } } : {}),
+      ...(plan ? { plan } : {}),
+      ...(ctx.executionInitialized
+        ? { executions: { [storyId]: createDefaultStoryExecution(storyIds.length) } }
+        : {}),
+    });
+
+    return { workspace: createEmptyWorkspace(), storyId };
+  }
+
+  const workspace = await getProjectWorkspace(uid, projectId);
+  const live = getLiveBacklog(workspace);
+  if (!live.epics.some((epic) => epic.id === input.epicId)) {
+    throw new Error(`Épica no encontrada: ${input.epicId}`);
+  }
+
+  await assertCanCreateStory(uid, workspace, input.epicId);
+  const storyId = nextLiveWorkItemId(workspace, draft.type);
+  const story = buildStoryFromDraft(input, storyId, draft);
   const updatedWorkspace = withCreatedUserStory(workspace, {
     story,
     epicId: input.epicId,
     sprintId: input.sprintId,
-    estimation,
-    prioritization,
+    estimation: buildStoryEstimation(input, draft.type, live.estimationMode),
+    prioritization: buildStoryPrioritization(input),
   });
 
   await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
@@ -914,9 +1464,37 @@ export async function createUserStoryAcrossWorkspace(
 
 export async function deleteUserStoryAcrossWorkspace(
   uid: string,
-  storyId: string
+  storyId: string,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const [ctx, stored] = await Promise.all([
+    resolveCanonicalBacklogContext(uid, projectId, target.snapshot ?? undefined),
+    readCanonicalStory(uid, projectId, storyId),
+  ]);
+
+  if (ctx) {
+    if (!stored) {
+      throw new Error(`Historia no encontrada: ${storyId}`);
+    }
+    assertStoryNotInCompletedSprint(ctx.plan, storyId, 'eliminar');
+
+    const effort = getEffortValue(ctx.meta.estimations?.[storyId], ctx.estimationMode);
+
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      deletedStoryIds: [storyId],
+      // arrayRemove evita leer la épica sólo para reescribir su lista de ids.
+      epicStoryIdPatches: [{ epicId: stored.epicId, removeStoryIds: [storyId] }],
+      removedMetaStoryIds: [storyId],
+      ...(ctx.plan ? { plan: removeStoryFromSprintPlan(ctx.plan, storyId, effort) } : {}),
+      ...(ctx.executionInitialized ? { deletedExecutionIds: [storyId] } : {}),
+    });
+
+    return createEmptyWorkspace();
+  }
+
+  const workspace = await getProjectWorkspace(uid, projectId);
   const live = getLiveBacklog(workspace);
   const exists = live.epics.some((epic) => epic.userStories.some((story) => story.id === storyId));
   if (!exists) {
@@ -930,9 +1508,39 @@ export async function deleteUserStoryAcrossWorkspace(
 
 export async function createEpicAcrossWorkspace(
   uid: string,
-  input: CreateEpicInput
+  input: CreateEpicInput,
+  clientProjectId?: string
 ): Promise<{ workspace: UserWorkspace; epicId: string }> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const [ctx, { epicIds }, userPlan] = await Promise.all([
+    resolveCanonicalBacklogContext(uid, projectId, target.snapshot ?? undefined),
+    readBacklogIds(uid, projectId),
+    resolveUserPlan(uid, target.userSnapshot ?? undefined),
+  ]);
+
+  if (ctx) {
+    assertCanCreateEpicCount(userPlan, epicIds.length);
+
+    const epicId = nextEpicIdFromIds(epicIds);
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      epics: [
+        {
+          id: epicId,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          source: 'manual',
+          isEdited: false,
+          createdAt: Date.now(),
+          storyIds: [],
+        },
+      ],
+    });
+
+    return { workspace: createEmptyWorkspace(), epicId };
+  }
+
+  const workspace = await getProjectWorkspace(uid, projectId);
   await assertCanCreateEpic(uid, workspace);
 
   const epic: Epic = {
@@ -953,31 +1561,82 @@ export async function createEpicAcrossWorkspace(
 export async function updateEpicAcrossWorkspace(
   uid: string,
   epicId: string,
-  updates: UpdateEpicInput
+  updates: UpdateEpicInput,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const exists = getLiveBacklog(workspace).epics.some((epic) => epic.id === epicId);
-  if (!exists) {
-    throw new Error(`Épica no encontrada: ${epicId}`);
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const [rootSnap, epic] = await Promise.all([
+    target.snapshot ?? projectRef(uid, projectId).get(),
+    readCanonicalEpic(uid, projectId, epicId),
+  ]);
+  assertProjectDocAccessible(rootSnap);
+  if (!epic) {
+    const workspace = await getProjectWorkspace(uid, projectId);
+    const exists = getLiveBacklog(workspace).epics.some((item) => item.id === epicId);
+    if (!exists) {
+      throw new Error(`Épica no encontrada: ${epicId}`);
+    }
+    const updatedWorkspace = withUpdatedEpic(workspace, epicId, updates);
+    await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
+    return updatedWorkspace;
   }
 
-  const updatedWorkspace = withUpdatedEpic(workspace, epicId, updates);
-  await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
-  return updatedWorkspace;
+  await persistCanonicalEpicPatch(uid, projectId, {
+    ...epic,
+    ...(updates.title !== undefined ? { title: updates.title.trim() } : {}),
+    ...(updates.description !== undefined ? { description: updates.description.trim() } : {}),
+    isEdited: true,
+  });
+  return createEmptyWorkspace();
 }
 
 export async function deleteEpicAcrossWorkspace(
   uid: string,
-  epicId: string
+  epicId: string,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const target = getLiveBacklog(workspace).epics.find((epic) => epic.id === epicId);
-  if (!target) {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const [ctx, epic] = await Promise.all([
+    resolveCanonicalBacklogContext(uid, projectId, target.snapshot ?? undefined),
+    readCanonicalEpic(uid, projectId, epicId),
+  ]);
+
+  if (ctx) {
+    if (!epic) {
+      throw new Error(`Épica no encontrada: ${epicId}`);
+    }
+    for (const storyId of epic.storyIds) {
+      assertStoryNotInCompletedSprint(ctx.plan, storyId, 'eliminar');
+    }
+
+    let plan = ctx.plan;
+    for (const storyId of epic.storyIds) {
+      if (!plan) break;
+      const effort = getEffortValue(ctx.meta.estimations?.[storyId], ctx.estimationMode);
+      plan = removeStoryFromSprintPlan(plan, storyId, effort);
+    }
+
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      deletedEpicIds: [epicId],
+      deletedStoryIds: epic.storyIds,
+      removedMetaStoryIds: epic.storyIds,
+      ...(plan ? { plan } : {}),
+      ...(ctx.executionInitialized ? { deletedExecutionIds: epic.storyIds } : {}),
+    });
+
+    return createEmptyWorkspace();
+  }
+
+  const workspace = await getProjectWorkspace(uid, projectId);
+  const live = getLiveBacklog(workspace);
+  const targetEpic = live.epics.find((epic) => epic.id === epicId);
+  if (!targetEpic) {
     throw new Error(`Épica no encontrada: ${epicId}`);
   }
-  const plan = getLiveBacklog(workspace).plan;
-  for (const story of target.userStories) {
-    assertStoryNotInCompletedSprint(plan, story.id, 'eliminar');
+  for (const story of targetEpic.userStories) {
+    assertStoryNotInCompletedSprint(live.plan, story.id, 'eliminar');
   }
 
   const updatedWorkspace = withDeletedEpic(workspace, epicId);
@@ -1223,6 +1882,7 @@ export async function saveLastAgent(uid: string, lastAgent: string): Promise<voi
 /** Reinicia el proyecto activo (conserva el proyecto, vacía el pipeline). */
 export async function resetWorkspace(uid: string): Promise<void> {
   const projectId = await activeProject(uid);
+  await deleteProjectSlices(uid, projectId);
   await saveProjectWorkspace(uid, projectId, {
     agent1: EMPTY_AGENT1,
     agent2: EMPTY_AGENT2,
@@ -1248,55 +1908,39 @@ export async function resetWorkspace(uid: string): Promise<void> {
   await projectDoc(uid, projectId).set({ lastAgent: '1' }, { merge: true });
 }
 
-/** Persiste el stack tecnológico del proyecto activo. */
+/**
+ * Persiste el stack tecnológico del proyecto activo.
+ *
+ * El stack vive en un único campo del doc raíz, así que no hace falta cargar ni
+ * rematerializar el backlog. Devuelve el stack ya normalizado.
+ */
 export async function saveStackAcrossWorkspace(
   uid: string,
-  stack: ProjectStack
-): Promise<UserWorkspace> {
-  const projectId = await activeProject(uid);
-  const workspace = await getProjectWorkspace(uid, projectId);
-  const merged = mergeStackUpdate(workspace.stack ?? undefined, {
+  stack: ProjectStack,
+  clientProjectId?: string
+): Promise<ProjectStack> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const rootSnap = target.snapshot ?? (await projectRef(uid, projectId).get());
+  const doc = assertProjectDocAccessible(rootSnap);
+  const current = doc.workspaceMeta?.stack ?? doc.workspace?.stack ?? null;
+  const merged = mergeStackUpdate(current ?? undefined, {
     ...stack,
     updatedAt: Date.now(),
   });
   const prepared = sanitize(prepareStackForFirestore(merged));
-  const nextWorkspace: UserWorkspace = { ...workspace, stack: prepared };
-  const progress = computePipelineProgress(nextWorkspace);
+  await persistStackOnly(uid, projectId, prepared);
 
-  // Reemplaza `workspace.stack` entero. `set({ merge: true })` fusiona mapas
-  // anidados y repondría capas vaciadas (p. ej. frontend sin tecnologías).
-  // En consola Firebase el campo aparece como workspace → stack; es la misma ruta
-  // que `workspace.stack` en código. Si existía un `stack` huérfano en la raíz
-  // del documento (legacy), se elimina para evitar confusión.
-  await projectDoc(uid, projectId).update({
-    'workspace.stack': prepared,
-    stack: FieldValue.delete(),
-    pipelineStep: progress.pipelineStep,
-    pipelineLabel: progress.pipelineLabel,
-    completionPercentage: progress.completionPercentage,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-
-  return getProjectWorkspace(uid, projectId);
+  return prepared;
 }
 
 /** Elimina el stack tecnológico del proyecto activo. */
-export async function clearStackAcrossWorkspace(uid: string): Promise<UserWorkspace> {
-  const projectId = await activeProject(uid);
-  const workspace = await getProjectWorkspace(uid, projectId);
-  const nextWorkspace: UserWorkspace = { ...workspace, stack: null };
-  const progress = computePipelineProgress(nextWorkspace);
-
-  await projectDoc(uid, projectId).update({
-    'workspace.stack': FieldValue.delete(),
-    stack: FieldValue.delete(),
-    pipelineStep: progress.pipelineStep,
-    pipelineLabel: progress.pipelineLabel,
-    completionPercentage: progress.completionPercentage,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-
-  return getProjectWorkspace(uid, projectId);
+export async function clearStackAcrossWorkspace(
+  uid: string,
+  clientProjectId?: string
+): Promise<void> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  await persistStackOnly(uid, target.projectId, null);
 }
 
 /** Lee el stack del workspace activo. */

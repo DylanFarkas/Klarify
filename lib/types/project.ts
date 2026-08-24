@@ -4,6 +4,7 @@
 
 import type { UserWorkspace } from '@/lib/types/workspace';
 import type { GithubExportRecord } from '@/lib/types/github-export';
+import type { WorkspaceMeta } from '@/lib/types/project-schema';
 
 export type ProjectStatus = 'active' | 'locked';
 
@@ -12,7 +13,10 @@ export interface ProjectDocument {
   status: ProjectStatus;
   createdAt: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
   updatedAt: FirebaseFirestore.Timestamp | FirebaseFirestore.FieldValue;
-  workspace: UserWorkspace;
+  /** Legacy v1–v2. Ausente a partir de schemaVersion 4. */
+  workspace?: UserWorkspace;
+  schemaVersion?: number;
+  workspaceMeta?: WorkspaceMeta;
   lastAgent?: string;
   githubExport?: GithubExportRecord;
   /** Denormalizados para listados sin normalizar el workspace completo */

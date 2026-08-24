@@ -41,8 +41,8 @@ export function AgentActivityLog({ entries, variant = 'default' }: AgentActivity
             : 'max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-muted/40 px-3.5 py-3',
         ].join(' ')}
       >
-        {phaseGroups.map((group) => (
-          <div key={group.phase.id} className={isLive ? 'flex min-h-0 flex-1 flex-col' : undefined}>
+        {phaseGroups.map((group, index) => (
+          <div key={`${group.phase.id}-${index}`} className={isLive ? 'flex min-h-0 flex-1 flex-col' : undefined}>
             <PhaseSection group={group} variant={variant} />
           </div>
         ))}

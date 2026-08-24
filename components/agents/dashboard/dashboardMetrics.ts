@@ -6,6 +6,7 @@ import type { SprintPlan } from '@/lib/types/agent-5';
 import { createEmptySprintPlan } from '@/lib/utils/sprint-plan-mutations';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
 import { getEffortValue, isStoryEstimated } from '@/lib/utils/estimation';
+import { getTranscriptSegmentCount } from '@/lib/artifacts/transcription-utils';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
@@ -399,7 +400,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		completionPercentage,
 		transcriptLanguage: transcript?.language ?? 'Sin datos',
 		transcriptDurationLabel: transcript ? formatDuration(transcript.duration) : '0 min',
-		transcriptSegmentCount: transcript?.segments.length ?? 0,
+		transcriptSegmentCount: getTranscriptSegmentCount(transcript),
 		contextIsSufficient,
 		framework,
 		priorityBuckets,

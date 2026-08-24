@@ -14,15 +14,15 @@ import { runHarnessTurn } from '@/lib/harness/runtime';
 import type { HarnessConfirmedAction } from '@/lib/harness/types';
 import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
-import { getWorkspaceData } from '@/lib/workspace-service';
 
 interface ChatBody {
   message?: string;
   confirmedAction?: HarnessConfirmedAction;
+  projectId?: string;
 }
 
-function assertPipelineReady(hasAgent6: boolean): void {
-  if (!hasAgent6) {
+function assertPipelineReady(ready: boolean): void {
+  if (!ready) {
     throw new Error(
       'Klark está disponible cuando el pipeline está completo (priorización aprobada).'
     );
@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as ChatBody;
     const message = typeof body.message === 'string' ? body.message : '';
     const confirmedAction = body.confirmedAction;
+    const bodyProjectId =
+      typeof body.projectId === 'string' && body.projectId.trim()
+        ? body.projectId.trim()
+        : null;
 
     if (!message.trim() && !confirmedAction) {
       return NextResponse.json({ error: 'Mensaje vacío' }, { status: 400 });
@@ -90,14 +94,16 @@ export async function POST(request: NextRequest) {
         // Feedback inmediato en el stream (antes de leer workspace / Gemini).
         send({ type: 'thought', text: 'Analizando petición…' });
 
-        const { workspace } = await getWorkspaceData(uid);
-        assertPipelineReady(Boolean(workspace.pipeline.agent6Input));
+        // Misma señal v4 que GET (no depender del blob legacy agent6Input).
+        const { pipelineReady, projectId } = await getHarnessHistory(uid, bodyProjectId);
+        assertPipelineReady(pipelineReady);
 
         const result = await runHarnessTurn(
           {
             uid,
             message: message.trim() || 'Confirmado',
             confirmedAction,
+            projectId,
           },
           (event) => send(event)
         );

@@ -10,19 +10,29 @@ import type { UserWorkspace } from '@/lib/types/workspace';
 function inferRegeneration(workspace: UserWorkspace, agent: RegenerationAgent): boolean {
   switch (agent) {
     case 'agent2':
-      return workspace.agent2.status === 'review' || workspace.agent2.epics.length > 0;
+      return (
+        workspace.agent2.status === 'review' ||
+        workspace.agent2.status === 'approved' ||
+        workspace.agent2.epics.length > 0
+      );
     case 'agent3':
       return (
         workspace.agent3.status === 'review' ||
+        workspace.agent3.status === 'approved' ||
         Object.keys(workspace.agent3.estimations).length > 0
       );
     case 'agent4':
       return (
         workspace.agent4.status === 'review' ||
+        workspace.agent4.status === 'approved' ||
         Object.keys(workspace.agent4.priorities).length > 0
       );
     case 'agent5':
-      return workspace.agent5.status === 'review' || Boolean(workspace.agent5.plan);
+      return (
+        workspace.agent5.status === 'review' ||
+        workspace.agent5.status === 'approved' ||
+        Boolean(workspace.agent5.plan)
+      );
     case 'stack':
       return (
         workspace.stack != null &&

@@ -50,6 +50,8 @@ export const DEMO_PROJECTS = [
 
 export const DEMO_ACTIVE_PROJECT = DEMO_PROJECTS[0];
 
+export type DemoBoardColumn = (typeof DEMO_BOARD_COLUMNS)[number]["id"];
+
 export const DEMO_STORIES = [
   {
     id: "HU-001",
@@ -58,7 +60,7 @@ export const DEMO_STORIES = [
     effort: "2h",
     priority: "Must",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-002",
@@ -67,7 +69,7 @@ export const DEMO_STORIES = [
     effort: "2h",
     priority: "Must",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-003",
@@ -76,7 +78,7 @@ export const DEMO_STORIES = [
     effort: "4h",
     priority: "Must",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-004",
@@ -85,7 +87,7 @@ export const DEMO_STORIES = [
     effort: "3h",
     priority: "Must",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-005",
@@ -94,7 +96,7 @@ export const DEMO_STORIES = [
     effort: "4h",
     priority: "Should",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-006",
@@ -103,7 +105,7 @@ export const DEMO_STORIES = [
     effort: "6h",
     priority: "Must",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
   {
     id: "HU-007",
@@ -112,7 +114,7 @@ export const DEMO_STORIES = [
     effort: "1d",
     priority: "Must",
     status: "TO-DO",
-    column: "in_progress" as const,
+    column: "in_progress" as DemoBoardColumn,
   },
   {
     id: "HU-008",
@@ -121,7 +123,7 @@ export const DEMO_STORIES = [
     effort: "4h",
     priority: "Could",
     status: "TO-DO",
-    column: "todo" as const,
+    column: "todo" as DemoBoardColumn,
   },
 ] as const;
 

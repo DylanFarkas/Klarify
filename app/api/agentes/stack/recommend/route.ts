@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         send({
           type: 'done',
           payload: {
-            stack: saved.stack ?? result.stack,
+            stack: saved ?? result.stack,
           } satisfies StackRecommendResponse,
         });
       } catch (error) {

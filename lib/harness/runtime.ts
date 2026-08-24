@@ -39,6 +39,8 @@ export interface RunHarnessTurnInput {
   uid: string;
   message: string;
   confirmedAction?: HarnessConfirmedAction;
+  /** Proyecto activo según el cliente (evita re-resolverlo). */
+  projectId?: string | null;
 }
 
 export interface RunHarnessTurnResult {
@@ -87,7 +89,7 @@ async function runProviderHarnessTurn(
     projectId,
     messages: history,
     toolOutcomes: previousOutcomes,
-  } = await getHarnessHistory(input.uid);
+  } = await getHarnessHistory(input.uid, input.projectId);
 
   let remaining: number | null = null;
   try {
@@ -156,7 +158,10 @@ async function runProviderHarnessTurn(
     }
   }
 
-  const { workspace } = await getWorkspaceData(input.uid);
+  const { workspace } = await getWorkspaceData(input.uid, {
+    scope: 'shell',
+    projectId: projectId,
+  });
   const framework = resolveWorkspaceFramework(workspace);
   const backlogIndex = buildBacklogIndex(workspace);
   const estimationMode = getLiveBacklog(workspace).estimationMode;

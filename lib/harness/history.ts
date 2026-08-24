@@ -18,11 +18,27 @@ interface HarnessChatDoc {
 
 interface ProjectHarnessSnapshot {
   harnessChat?: HarnessChatDoc;
+  /** Legacy v1–v3: el blob monolítico desaparece al migrar a schema v4. */
   workspace?: {
     pipeline?: {
       agent6Input?: unknown;
     };
   };
+  workspaceMeta?: {
+    agent4?: { status?: string };
+  };
+  pipelineStep?: number;
+}
+
+/**
+ * Klark se habilita al aprobar el Agente 4 (el 5 es opcional y hoy no se usa).
+ *
+ * Misma regla que `composeWorkspaceFromPhysical`: en schema v4 el campo legacy
+ * `workspace.pipeline.agent6Input` ya no existe, así que se deriva del doc raíz.
+ */
+export function resolvePipelineReady(data: ProjectHarnessSnapshot | undefined): boolean {
+  if (data?.workspace?.pipeline?.agent6Input) return true;
+  return data?.workspaceMeta?.agent4?.status === 'approved' && (data?.pipelineStep ?? 0) >= 6;
 }
 
 export async function getHarnessHistory(
@@ -54,7 +70,7 @@ export async function getHarnessHistory(
     projectId: activeId,
     messages,
     toolOutcomes,
-    pipelineReady: Boolean(data?.workspace?.pipeline?.agent6Input),
+    pipelineReady: resolvePipelineReady(data),
   };
 }
 
@@ -94,7 +110,7 @@ export async function clearHarnessHistory(
 
   const snap = await projectDoc(uid, activeId).get();
   const data = snap.data() as ProjectHarnessSnapshot | undefined;
-  const pipelineReady = Boolean(data?.workspace?.pipeline?.agent6Input);
+  const pipelineReady = resolvePipelineReady(data);
   if (!pipelineReady) {
     return { projectId: activeId, pipelineReady: false };
   }

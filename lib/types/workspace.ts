@@ -1,10 +1,12 @@
 /**
- * @fileoverview Tipos del workspace persistido en Firestore.
+ * @fileoverview Tipos del workspace en memoria.
  *
- * El workspace vive en `users/{uid}.workspace` y guarda el estado del
- * pipeline de agentes además del puente entre ellos. Es el reemplazo
- * de las claves de localStorage que antes mantenían este estado en el navegador.
+ * El contrato en runtime sigue siendo `UserWorkspace`. En Firestore (schema v4)
+ * el estado vive en `users/{uid}/projects/{id}` + subcolecciones (backlog,
+ * artifacts, pipelineHistory, execution). Un compositor hidrata este shape.
  */
+
+import type { WorkspaceScope } from '@/lib/types/project-schema';
 
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic } from '@/lib/types/agent-2';
@@ -106,6 +108,8 @@ export interface WorkspaceResponse {
   preferences: WorkspacePreferences;
   activeProjectId: string | null;
   plan: WorkspacePlanSnapshot;
+  scope?: WorkspaceScope;
+  agent?: string;
 }
 
 const EMPTY_AGENT3: Agent3State = {

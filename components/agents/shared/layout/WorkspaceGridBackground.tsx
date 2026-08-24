@@ -12,7 +12,7 @@ export function WorkspaceGridBackground() {
       <div className="workspace-grid__dots" />
       <WorkspaceShootingStars />
       <div className="" />
-      <div className="workspace-grid__noise" />
+      {/* <div className="workspace-grid__noise" /> */}
     </div>
   );
 }

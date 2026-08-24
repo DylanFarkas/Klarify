@@ -11,111 +11,33 @@ import type { PlanId } from '@/lib/plans/types';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { ProjectDocument, ProjectSlotsInfo, ProjectSummary, ProjectsListResponse } from '@/lib/types/project';
 import type { GithubExportRecord } from '@/lib/types/github-export';
+import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
 import { createEmptyWorkspace, type UserWorkspace } from '@/lib/types/workspace';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
-import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
-import { normalizeEpics } from '@/lib/utils/work-item-validation';
-
-const EMPTY_AGENT3 = {
-  input: null,
-  estimations: {},
-  status: 'idle' as const,
-  error: null,
-};
-
-const EMPTY_AGENT4 = {
-  input: null,
-  priorities: {},
-  framework: 'moscow' as const,
-  status: 'idle' as const,
-  error: null,
-};
-
-const EMPTY_AGENT5 = {
-  input: null,
-  plan: null,
-  status: 'idle' as const,
-  error: null,
-};
+import { normalizeWorkspace, workspaceMetaFromWorkspace } from '@/lib/project-schema';
+import {
+  deleteProjectSlices,
+  loadWorkspace,
+  persistWorkspace,
+  projectRef,
+  projectsColRef,
+  userDocRef,
+} from '@/lib/project-store';
 
 function userDoc(uid: string) {
-  return adminDb.collection('users').doc(uid);
+  return userDocRef(uid);
 }
 
 function projectsCol(uid: string) {
-  return userDoc(uid).collection('projects');
+  return projectsColRef(uid);
 }
 
 function projectDoc(uid: string, projectId: string) {
-  return projectsCol(uid).doc(projectId);
+  return projectRef(uid, projectId);
 }
 
 function generateProjectId(): string {
   return `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function normalizeAgentEpics<T extends { epics?: import('@/lib/types/agent-2').Epic[] } | null>(
-  value: T
-): T {
-  if (!value || !Array.isArray(value.epics)) return value;
-  return { ...value, epics: normalizeEpics(value.epics) };
-}
-
-function normalizeWorkspace(ws: Partial<UserWorkspace> | undefined): UserWorkspace {
-  const empty = createEmptyWorkspace();
-  if (!ws) return empty;
-
-  const agent2 = {
-    ...empty.agent2,
-    ...(ws.agent2 ?? {}),
-    epics: normalizeEpics(ws.agent2?.epics ?? empty.agent2.epics),
-  };
-
-  return {
-    agent1: { ...empty.agent1, ...(ws.agent1 ?? {}) },
-    agent2,
-    agent3: {
-      ...EMPTY_AGENT3,
-      ...(ws.agent3 ?? {}),
-      input: normalizeAgentEpics(ws.agent3?.input ?? null),
-      estimations: { ...EMPTY_AGENT3.estimations, ...(ws.agent3?.estimations ?? {}) },
-    },
-    agent4: {
-      ...EMPTY_AGENT4,
-      ...(ws.agent4 ?? {}),
-      input: normalizeAgentEpics(ws.agent4?.input ?? null),
-      priorities: { ...EMPTY_AGENT4.priorities, ...(ws.agent4?.priorities ?? {}) },
-    },
-    agent5: {
-      ...EMPTY_AGENT5,
-      ...(ws.agent5 ?? {}),
-      input: normalizeAgentEpics(ws.agent5?.input ?? null),
-      plan: ws.agent5?.plan ? normalizeSprintPlan(ws.agent5.plan) : null,
-    },
-    pipeline: {
-      agent2Input: ws.pipeline?.agent2Input ?? null,
-      agent3Input: normalizeAgentEpics(ws.pipeline?.agent3Input ?? null),
-      agent4Input: normalizeAgentEpics(ws.pipeline?.agent4Input ?? null),
-      agent5Input: normalizeAgentEpics(ws.pipeline?.agent5Input ?? null),
-      agent6Input: ws.pipeline?.agent6Input
-        ? {
-            ...ws.pipeline.agent6Input,
-            epics: normalizeEpics(ws.pipeline.agent6Input.epics ?? []),
-            plan: ws.pipeline.agent6Input.plan
-              ? normalizeSprintPlan(ws.pipeline.agent6Input.plan)
-              : ws.pipeline.agent6Input.plan,
-          }
-        : null,
-    },
-    execution: ws.execution ?? null,
-    stack:
-      ws.stack != null
-        ? {
-            ...ws.stack,
-            status: ws.stack.status === 'proposed' ? 'saved' : ws.stack.status,
-          }
-        : null,
-  };
 }
 
 function normalizeProjectStatus(raw: string | undefined): ProjectDocument['status'] {
@@ -289,13 +211,19 @@ export async function requireUnlockedProject(uid: string, projectId: string): Pr
 }
 
 /**
- * Carga el proyecto activo y su workspace en una sola lectura del documento.
- * Evita el doble get (resolver ID y luego volver a pedir el workspace).
+ * Resuelve el proyecto activo junto al snapshot de su documento.
+ *
+ * Devolver el snapshot evita que `loadWorkspace` vuelva a leer el mismo
+ * documento en cada petición. Es `null` cuando el proyecto acaba de migrarse.
  */
-export async function loadActiveProjectWorkspace(
+export async function resolveActiveProject(
   uid: string,
   preloadedUserSnapshot?: DocumentSnapshot
-): Promise<{ projectId: string; workspace: UserWorkspace } | null> {
+): Promise<{
+  projectId: string;
+  snapshot: DocumentSnapshot | null;
+  userSnapshot: DocumentSnapshot;
+} | null> {
   const userSnapshot = preloadedUserSnapshot ?? (await ensureUserAccount(uid));
   const preferredId =
     (userSnapshot.data()?.preferences as { activeProjectId?: string } | undefined)
@@ -304,11 +232,10 @@ export async function loadActiveProjectWorkspace(
   if (preferredId) {
     const doc = await projectDoc(uid, preferredId).get();
     if (doc.exists) {
-      const data = doc.data() as ProjectDocument;
-      const status = normalizeProjectStatus(data.status);
+      const status = normalizeProjectStatus((doc.data() as ProjectDocument).status);
       if (status === 'active') {
         assertProjectSlotAccessible(status);
-        return { projectId: preferredId, workspace: normalizeWorkspace(data.workspace) };
+        return { projectId: preferredId, snapshot: doc, userSnapshot };
       }
     }
   }
@@ -316,45 +243,55 @@ export async function loadActiveProjectWorkspace(
   const activeSnap = await projectsCol(uid).where('status', '==', 'active').limit(1).get();
   if (!activeSnap.empty) {
     const doc = activeSnap.docs[0];
-    const projectId = doc.id;
-    if (projectId !== preferredId) {
+    if (doc.id !== preferredId) {
       await userDoc(uid).set(
-        { preferences: { activeProjectId: projectId } },
+        { preferences: { activeProjectId: doc.id } },
         { merge: true }
       );
     }
-    const data = doc.data() as ProjectDocument;
-    assertProjectSlotAccessible(normalizeProjectStatus(data.status));
-    return { projectId, workspace: normalizeWorkspace(data.workspace) };
+    assertProjectSlotAccessible(normalizeProjectStatus((doc.data() as ProjectDocument).status));
+    return { projectId: doc.id, snapshot: doc, userSnapshot };
   }
 
   const anyProject = await projectsCol(uid).limit(1).get();
   if (anyProject.empty) {
     const migratedId = await migrateLegacyWorkspace(uid);
-    if (!migratedId) return null;
-    const migratedDoc = await projectDoc(uid, migratedId).get();
-    if (!migratedDoc.exists) return null;
-    const migratedData = migratedDoc.data() as ProjectDocument;
-    return {
-      projectId: migratedId,
-      workspace: normalizeWorkspace(migratedData.workspace),
-    };
+    return migratedId ? { projectId: migratedId, snapshot: null, userSnapshot } : null;
   }
 
   return null;
 }
 
 /**
- * Resuelve el proyecto activo con lecturas mínimas (sin sincronizar slots).
- * Usar en rutas calientes: GET/PATCH workspace, movimientos del tablero, etc.
- * Acepta snapshot de usuario precargado para evitar ensureUserAccount duplicado.
+ * Resuelve el ID del proyecto activo sin hidratar el workspace.
  */
 export async function readActiveProjectId(
   uid: string,
   preloadedUserSnapshot?: DocumentSnapshot
 ): Promise<string | null> {
-  const loaded = await loadActiveProjectWorkspace(uid, preloadedUserSnapshot);
-  return loaded?.projectId ?? null;
+  const resolved = await resolveActiveProject(uid, preloadedUserSnapshot);
+  return resolved?.projectId ?? null;
+}
+
+/**
+ * Carga el proyecto activo y su workspace (schema v4 + migración lazy).
+ */
+export async function loadActiveProjectWorkspace(
+  uid: string,
+  preloadedUserSnapshot?: DocumentSnapshot,
+  scope: import('@/lib/types/project-schema').WorkspaceScope = 'full',
+  pipelineAgent?: string
+): Promise<{ projectId: string; workspace: UserWorkspace } | null> {
+  const resolved = await resolveActiveProject(uid, preloadedUserSnapshot);
+  if (!resolved) return null;
+  const workspace = await loadWorkspace(
+    uid,
+    resolved.projectId,
+    scope,
+    pipelineAgent,
+    resolved.snapshot ?? undefined
+  );
+  return { projectId: resolved.projectId, workspace };
 }
 
 async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
@@ -377,9 +314,11 @@ async function migrateLegacyWorkspace(uid: string): Promise<string | null> {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     lastAgent: prefs?.lastAgent ?? '1',
-    workspace,
+    schemaVersion: SCHEMA_VERSION_CURRENT,
+    workspaceMeta: workspaceMetaFromWorkspace(workspace),
     ...progress,
   });
+  await persistWorkspace(uid, projectId, workspace);
 
   await userDoc(uid).set(
     {
@@ -410,15 +349,11 @@ export async function resolveActiveProjectId(uid: string): Promise<string> {
 
 export async function getProjectWorkspace(
   uid: string,
-  projectId: string
+  projectId: string,
+  scope: import('@/lib/types/project-schema').WorkspaceScope = 'shell',
+  pipelineAgent?: string
 ): Promise<UserWorkspace> {
-  const doc = await projectDoc(uid, projectId).get();
-  if (!doc.exists) {
-    throw new Error('PROJECT_NOT_FOUND');
-  }
-  const data = doc.data() as ProjectDocument;
-  assertProjectSlotAccessible(normalizeProjectStatus(data.status));
-  return normalizeWorkspace(data.workspace);
+  return loadWorkspace(uid, projectId, scope, pipelineAgent);
 }
 
 export async function listProjects(uid: string): Promise<
@@ -470,9 +405,11 @@ export async function createProject(uid: string, name: string): Promise<ProjectS
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     lastAgent: '1',
-    workspace: emptyWorkspace,
+    schemaVersion: SCHEMA_VERSION_CURRENT,
+    workspaceMeta: workspaceMetaFromWorkspace(emptyWorkspace),
     ...progress,
   });
+  await persistWorkspace(uid, projectId, emptyWorkspace);
 
   await syncProjectSlots(uid);
 
@@ -519,7 +456,7 @@ export async function switchProject(
 
   return {
     project: toSummary(projectId, data),
-    workspace: normalizeWorkspace(data.workspace),
+    workspace: await loadWorkspace(uid, projectId, 'full'),
     preferences: { lastAgent },
     plan,
   };
@@ -622,6 +559,7 @@ export async function deleteProject(uid: string, projectId: string): Promise<Pro
   const allProjects = await fetchAllProjects(uid);
   const isLastProject = allProjects.length === 1;
 
+  await deleteProjectSlices(uid, projectId);
   await projectDoc(uid, projectId).delete();
 
   if (isLastProject) {
@@ -669,13 +607,12 @@ export async function writeProjectWorkspace(
   workspacePatch: Record<string, unknown>
 ): Promise<void> {
   await requireUnlockedProject(uid, projectId);
-  await projectDoc(uid, projectId).set(
-    {
-      workspace: workspacePatch,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const current = await getProjectWorkspace(uid, projectId);
+  const merged = {
+    ...current,
+    ...workspacePatch,
+  } as UserWorkspace;
+  await persistWorkspace(uid, projectId, normalizeWorkspace(merged));
 }
 
 export async function mergeProjectWorkspace(
@@ -688,15 +625,8 @@ export async function mergeProjectWorkspace(
   const merged = {
     ...current,
     ...partialWorkspace,
-  };
-
-  await projectDoc(uid, projectId).set(
-    {
-      workspace: merged,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  } as UserWorkspace;
+  await persistWorkspace(uid, projectId, normalizeWorkspace(merged));
 }
 
 export async function patchProjectWorkspaceFields(

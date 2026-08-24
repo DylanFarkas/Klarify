@@ -119,6 +119,8 @@ export function HarnessChatPanel({
   const workspaceDirty = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadedForProjectRef = useRef<string | null>(null);
+  /** Generación de la carga actual: invalida respuestas de efectos cancelados (Strict Mode). */
+  const historyLoadGenRef = useRef(0);
 
   useEffect(() => {
     setRemaining(remainingMessages);
@@ -140,6 +142,8 @@ export function HarnessChatPanel({
   useEffect(() => {
     if (loadedForProjectRef.current && loadedForProjectRef.current !== activeProjectId) {
       loadedForProjectRef.current = null;
+      historyLoadGenRef.current += 1;
+      setIsLoadingHistory(false);
       setMessages([]);
       setTrace([]);
       setTraceLive(false);
@@ -152,14 +156,21 @@ export function HarnessChatPanel({
   }, [activeProjectId]);
 
   useEffect(() => {
-    if (!user || !enabled || !activeProjectId) return;
+    if (!user || !enabled || !activeProjectId) {
+      // Sin proyecto / pipeline: no dejar el spinner colgado de una carga previa.
+      if (!activeProjectId || !enabled) {
+        setIsLoadingHistory(false);
+      }
+      return;
+    }
     if (loadedForProjectRef.current === activeProjectId) return;
 
+    const loadGen = ++historyLoadGenRef.current;
     let cancelled = false;
+    setIsLoadingHistory(true);
+    setError(null);
 
     const loadHistory = async () => {
-      setIsLoadingHistory(true);
-      setError(null);
       try {
         const url = `/api/harness/chat?projectId=${encodeURIComponent(activeProjectId)}`;
         const response = await authFetch(url, user);
@@ -168,21 +179,24 @@ export function HarnessChatPanel({
           throw new Error(data?.error ?? 'No se pudo cargar el historial');
         }
         const data = (await response.json()) as { messages: HarnessChatMessage[] };
-        if (cancelled) return;
+        if (cancelled || historyLoadGenRef.current !== loadGen) return;
         setMessages(data.messages ?? []);
         loadedForProjectRef.current = activeProjectId;
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Error al cargar el historial');
-        }
+        if (cancelled || historyLoadGenRef.current !== loadGen) return;
+        setError(err instanceof Error ? err.message : 'Error al cargar el historial');
       } finally {
-        if (!cancelled) setIsLoadingHistory(false);
+        if (!cancelled && historyLoadGenRef.current === loadGen) {
+          setIsLoadingHistory(false);
+        }
       }
     };
 
     void loadHistory();
     return () => {
       cancelled = true;
+      // Permite que el siguiente efecto (Strict Mode / re-mount) vuelva a cargar.
+      // No tocamos isLoadingHistory aquí: el nuevo efecto lo pondrá en true de inmediato.
     };
   }, [user, enabled, activeProjectId]);
 
@@ -364,6 +378,7 @@ export function HarnessChatPanel({
           body: JSON.stringify({
             message: trimmed || 'Confirmado',
             ...(confirmedAction ? { confirmedAction } : {}),
+            ...(activeProjectId ? { projectId: activeProjectId } : {}),
           }),
         });
 
@@ -388,7 +403,7 @@ export function HarnessChatPanel({
         setIsSending(false);
       }
     },
-    [user, isSending, consumeStream]
+    [user, isSending, consumeStream, activeProjectId]
   );
 
   const clearChat = useCallback(async () => {

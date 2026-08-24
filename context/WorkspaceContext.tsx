@@ -48,10 +48,12 @@ import {
 } from '@/lib/utils/user-story-mutations';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
 import { buildManualEstimation } from '@/lib/utils/estimation';
+import { mergeScopedWorkspace, scopeFromPathname } from '@/lib/project-store/scope';
 
 const SAVE_DEBOUNCE_MS = 500;
 const BULK_REORDER_DEBOUNCE_MS = 400;
 const SPRINT_PLAN_DEBOUNCE_MS = 350;
+const SPRINT_FILTER_DEBOUNCE_MS = 250;
 
 export interface UpdateDashboardUserStoryOptions {
   epicId?: string;
@@ -151,7 +153,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null);
   const [plan, setPlan] = useState<WorkspacePlanSnapshot | null>(null);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectSlots, setProjectSlots] = useState<ProjectSlotsInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,18 +169,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const agent5Abort = useRef<AbortController | null>(null);
   const bulkReorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBulkReorder = useRef<
-    { storyId: string; status: KanbanStatus; columnOrder: number }[] | null
+    {
+      storyId: string;
+      status: KanbanStatus;
+      columnOrder: number;
+      previousStatus?: KanbanStatus;
+    }[] | null
   >(null);
   const sprintPlanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSprintPlan = useRef<SprintPlan | null>(null);
   const sprintPlanGeneration = useRef(0);
-  const storyExecutionGeneration = useRef(0);
   const lastPersistedAgent = useRef<string | null>(null);
   const lastFetchedRouteKey = useRef<string | null>(null);
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  const sprintFilterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintFilterRequestId = useRef(0);
+  const lastSentSprintFilter = useRef<string | null>(null);
   const bootstrapInFlight = useRef<Promise<void> | null>(null);
   /** lastAgent conocido del servidor (evita PATCH innecesario al montar). */
   const serverLastAgent = useRef<string | null>(null);
+  /**
+   * Proyecto activo accesible de forma síncrona: se manda en cada petición del
+   * workspace para que el servidor no tenga que resolverlo leyendo Firestore.
+   */
+  const activeProjectIdRef = useRef<string | null>(null);
+
+  const setActiveProjectId = useCallback((id: string | null) => {
+    activeProjectIdRef.current = id;
+    setActiveProjectIdState(id);
+  }, []);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
@@ -192,6 +212,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     bulkReorderTimer.current = null;
     if (sprintPlanTimer.current) clearTimeout(sprintPlanTimer.current);
     sprintPlanTimer.current = null;
+    if (sprintFilterTimer.current) clearTimeout(sprintFilterTimer.current);
+    sprintFilterTimer.current = null;
   }, []);
 
   const persistBulkReorder = useCallback(async () => {
@@ -209,6 +231,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({
         action: 'bulkUpdateStoryExecutions',
         payload: { updates: payload },
+        projectId: activeProjectIdRef.current ?? undefined,
       }),
     });
     if (!response.ok) {
@@ -233,6 +256,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({
         action: 'updateSprintPlan',
         payload: { plan },
+        projectId: activeProjectIdRef.current ?? undefined,
       }),
     });
 
@@ -251,11 +275,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setError(null);
     }
     try {
-      const response = await authFetch('/api/workspace', user);
+      const resolved = scopeFromPathname(pathnameRef.current);
+      const params = new URLSearchParams({ scope: resolved.scope });
+      if (resolved.agent) params.set('agent', resolved.agent);
+      if (activeProjectIdRef.current) params.set('projectId', activeProjectIdRef.current);
+      const response = await authFetch(`/api/workspace?${params.toString()}`, user);
       if (!response.ok) throw new Error('No se pudo cargar el workspace');
       const data = (await response.json()) as WorkspaceResponse;
       setWorkspace((prev) => {
-        const incoming = data.workspace;
+        const incoming = mergeScopedWorkspace(prev, data.workspace, data.scope ?? resolved.scope);
         const localStories = prev?.execution?.stories;
         const serverStories = incoming.execution?.stories;
         if (!localStories || !serverStories || !incoming.execution) return incoming;
@@ -387,6 +415,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setWorkspace(data.workspace);
         setPlan(data.plan);
         setActiveProjectId(data.activeProjectId);
+        lastFetchedRouteKey.current = (() => {
+          const resolved = scopeFromPathname(pathnameRef.current);
+          return `${resolved.scope}:${resolved.agent ?? ''}`;
+        })();
         if (data.preferences?.lastAgent) {
           serverLastAgent.current = data.preferences.lastAgent;
           lastPersistedAgent.current = data.preferences.lastAgent;
@@ -509,12 +541,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user || !pathname?.startsWith('/agentes')) return;
     if (pathname === '/agentes/proyectos') return;
 
-    const routeKey =
-      pathname.match(/^\/agentes\/(\d+)/)?.[1] ??
-      (pathname.startsWith('/agentes/board') ? 'board' : null) ??
-      (pathname.startsWith('/agentes/dashboard') ? 'dashboard' : null);
-
-    if (!routeKey) return;
+    const resolved = scopeFromPathname(pathname);
+    const routeKey = `${resolved.scope}:${resolved.agent ?? ''}`;
     if (lastFetchedRouteKey.current === routeKey) return;
     lastFetchedRouteKey.current = routeKey;
 
@@ -591,6 +619,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           JSON.stringify({
             action: 'bulkUpdateStoryExecutions',
             payload: { updates: payload },
+            projectId: activeProjectIdRef.current ?? undefined,
           })
         );
       }
@@ -606,6 +635,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           JSON.stringify({
             action: 'updateSprintPlan',
             payload: { plan },
+            projectId: activeProjectIdRef.current ?? undefined,
           })
         );
       }
@@ -719,7 +749,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, payload }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
       if (!response.ok) {
         let message = 'No se pudo actualizar el workspace';
@@ -743,7 +777,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, payload }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
       if (!response.ok) {
         throw new Error('No se pudo actualizar el workspace');
@@ -998,7 +1036,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, payload }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
       const data = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
       if (!response.ok) {
@@ -1176,45 +1218,58 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       storyId: string,
       patch: Partial<{ status: KanbanStatus; assigneeId: string | null; columnOrder: number }>
     ) => {
-      const requestId = ++storyExecutionGeneration.current;
+      let previous: { status?: KanbanStatus; assigneeId?: string | null } = {};
+
       setWorkspace((prev) => {
         if (!prev?.execution) return prev;
         const current = prev.execution.stories[storyId];
         if (!current) return prev;
+        previous = { status: current.status, assigneeId: current.assigneeId };
+
+        const now = Date.now();
+        let activity = current.activity ?? [];
+        if (patch.status !== undefined && patch.status !== current.status) {
+          activity = [
+            ...activity,
+            {
+              type: 'status_change' as const,
+              from: current.status,
+              to: patch.status,
+              at: now,
+            },
+          ].slice(-20);
+        }
+        if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
+          activity = [
+            ...activity,
+            {
+              type: 'assignee_change' as const,
+              from: current.assigneeId,
+              to: patch.assigneeId,
+              at: now,
+            },
+          ].slice(-20);
+        }
+
         return {
           ...prev,
           execution: {
             ...prev.execution,
             stories: {
               ...prev.execution.stories,
-              [storyId]: { ...current, ...patch, updatedAt: Date.now() },
+              [storyId]: { ...current, ...patch, updatedAt: now, activity },
             },
           },
         };
       });
 
-      const ws = await runActionWithWorkspace('updateStoryExecution', { storyId, patch });
-      if (!ws?.execution || requestId !== storyExecutionGeneration.current) return;
-
-      const serverStory = ws.execution.stories[storyId];
-      if (!serverStory) return;
-
-      setWorkspace((prev) => {
-        if (!prev?.execution) return prev;
-        const local = prev.execution.stories[storyId];
-        if (!local) return prev;
-        // Conservar layout/campos locales; solo traer activity del servidor.
-        if (local.activity === serverStory.activity) return prev;
-        return {
-          ...prev,
-          execution: {
-            ...prev.execution,
-            stories: {
-              ...prev.execution.stories,
-              [storyId]: { ...local, activity: serverStory.activity },
-            },
-          },
-        };
+      // No bloqueamos la UI: el tablero ya refleja el cambio optimista.
+      void runActionWithWorkspace('updateStoryExecution', {
+        storyId,
+        patch,
+        previous,
+      }).catch(() => {
+        /* el siguiente gesto reintentará / un fetch silent reconciliará */
       });
     },
     [runActionWithWorkspace]
@@ -1222,8 +1277,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const bulkReorderExecutions = useCallback(
     (updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]) => {
+      const withPrevious: {
+        storyId: string;
+        status: KanbanStatus;
+        columnOrder: number;
+        previousStatus?: KanbanStatus;
+      }[] = [];
+
       setWorkspace((prev) => {
         if (!prev?.execution) return prev;
+        withPrevious.length = 0;
         const stories = { ...prev.execution.stories };
         const now = Date.now();
         for (const update of updates) {
@@ -1236,17 +1299,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               updatedAt: now,
               activity: [],
             });
+          withPrevious.push({
+            ...update,
+            previousStatus: current.status,
+          });
+          let activity = current.activity ?? [];
+          if (update.status !== current.status) {
+            activity = [
+              ...activity,
+              {
+                type: 'status_change' as const,
+                from: current.status,
+                to: update.status,
+                at: now,
+              },
+            ].slice(-20);
+          }
           stories[update.storyId] = {
             ...current,
             status: update.status,
             columnOrder: update.columnOrder,
             updatedAt: now,
+            activity,
           };
         }
         return { ...prev, execution: { ...prev.execution, stories } };
       });
 
-      pendingBulkReorder.current = updates;
+      pendingBulkReorder.current = withPrevious;
       if (bulkReorderTimer.current) clearTimeout(bulkReorderTimer.current);
       bulkReorderTimer.current = setTimeout(() => {
         void persistBulkReorder().catch(() => {
@@ -1259,16 +1339,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const updateExecutionSprintFilter = useCallback(
     async (sprintFilter: string | 'all') => {
+      if (lastSentSprintFilter.current === sprintFilter) {
+        setWorkspace((prev) =>
+          prev?.execution
+            ? { ...prev, execution: { ...prev.execution, sprintFilter } }
+            : prev
+        );
+        return;
+      }
+
       const requestId = ++sprintFilterRequestId.current;
+      lastSentSprintFilter.current = sprintFilter;
       setWorkspace((prev) =>
         prev?.execution
           ? { ...prev, execution: { ...prev.execution, sprintFilter } }
           : prev
       );
-      const ws = await runActionWithWorkspace('updateExecutionSprintFilter', { sprintFilter });
-      if (ws && requestId === sprintFilterRequestId.current) {
-        setWorkspace(ws);
-      }
+
+      if (sprintFilterTimer.current) clearTimeout(sprintFilterTimer.current);
+      sprintFilterTimer.current = setTimeout(() => {
+        void runActionWithWorkspace('updateExecutionSprintFilter', { sprintFilter })
+          .then((ws) => {
+            if (ws && requestId === sprintFilterRequestId.current) {
+              setWorkspace(ws);
+            }
+          })
+          .catch(() => {
+            if (lastSentSprintFilter.current === sprintFilter) {
+              lastSentSprintFilter.current = null;
+            }
+          });
+      }, SPRINT_FILTER_DEBOUNCE_MS);
     },
     [runActionWithWorkspace]
   );
@@ -1282,32 +1383,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const saveStack = useCallback(
     async (stack: ProjectStack) => {
       if (!user) return;
-      const result = await postWorkspaceAction<{ workspace?: UserWorkspace }>(
+      const result = await postWorkspaceAction<{ stack?: ProjectStack }>(
         'saveStack',
         { ...stack, status: 'saved' },
         'No se pudo guardar el stack'
       );
-      if (result.workspace) {
-        setWorkspace(result.workspace);
-      } else {
-        setWorkspace((prev) => (prev ? { ...prev, stack } : prev));
-      }
+      const saved = result.stack ?? stack;
+      setWorkspace((prev) => (prev ? { ...prev, stack: saved } : prev));
     },
     [postWorkspaceAction, user]
   );
 
   const clearStack = useCallback(async () => {
     if (!user) return;
-    const result = await postWorkspaceAction<{ workspace?: UserWorkspace }>(
-      'clearStack',
-      {},
-      'No se pudo limpiar el stack'
-    );
-    if (result.workspace) {
-      setWorkspace(result.workspace);
-    } else {
-      setWorkspace((prev) => (prev ? { ...prev, stack: null } : prev));
-    }
+    await postWorkspaceAction('clearStack', {}, 'No se pudo limpiar el stack');
+    setWorkspace((prev) => (prev ? { ...prev, stack: null } : prev));
   }, [postWorkspaceAction, user]);
 
   const resetSession = useCallback(async () => {

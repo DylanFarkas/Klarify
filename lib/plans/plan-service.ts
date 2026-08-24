@@ -22,6 +22,11 @@ import type {
   UserUsage,
 } from '@/lib/plans/types';
 import type { ProjectStatus } from '@/lib/types/project';
+import {
+  getCachedUserPlan,
+  invalidateUserPlan,
+  setCachedUserPlan,
+} from '@/lib/server/runtime-cache';
 
 function userDoc(uid: string) {
   return adminDb.collection('users').doc(uid);
@@ -92,6 +97,11 @@ export async function resolveUserPlan(
   uid: string,
   preloadedSnapshot?: DocumentSnapshot
 ): Promise<PlanSnapshot> {
+  if (!preloadedSnapshot) {
+    const cached = getCachedUserPlan(uid);
+    if (cached) return cached;
+  }
+
   const snapshot = preloadedSnapshot ?? (await ensureUserAccount(uid));
   const data = snapshot.data();
   const subscription = normalizeSubscription(
@@ -101,15 +111,18 @@ export async function resolveUserPlan(
   const effectivePlanId = getEffectivePlanId(subscription);
 
   if (data?.usage && (data.usage as UserUsage).periodKey !== usage.periodKey) {
+    invalidateUserPlan(uid);
     await userDoc(uid).set({ usage }, { merge: true });
   }
 
-  return {
+  const plan: PlanSnapshot = {
     id: effectivePlanId,
     limits: getPlanLimits(effectivePlanId),
     usage,
     subscription,
   };
+  setCachedUserPlan(uid, plan);
+  return plan;
 }
 
 export async function getActiveProjectId(uid: string): Promise<string | null> {
@@ -196,6 +209,7 @@ export async function checkAndIncrementRegeneration(
     },
     { merge: true }
   );
+  invalidateUserPlan(uid);
 
   const remaining =
     policy.mode === 'monthly'
@@ -239,6 +253,7 @@ export async function checkAndIncrementHarnessMessage(
     },
     { merge: true }
   );
+  invalidateUserPlan(uid);
 
   return { remaining: Math.max(0, limit - harnessMessages) };
 }

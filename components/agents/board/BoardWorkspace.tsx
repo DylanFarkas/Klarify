@@ -65,6 +65,7 @@ export function BoardWorkspace() {
         : saved;
 
     setFilters((prev) => ({ ...prev, sprintFilter: nextFilter }));
+    // Solo persiste si realmente hay que corregir el valor guardado.
     if (nextFilter !== saved) {
       void updateExecutionSprintFilter(nextFilter);
     }
@@ -76,6 +77,7 @@ export function BoardWorkspace() {
     const filteredStories = resolveBoardData(workspace, filters).stories;
     if (allStories.length > 0 && filteredStories.length === 0) {
       const fallback = activeSprint?.id ?? 'all';
+      if (filters.sprintFilter === fallback) return;
       setFilters((prev) => ({ ...prev, sprintFilter: fallback }));
       void updateExecutionSprintFilter(fallback);
     }

@@ -39,6 +39,15 @@ export function generateEpicId(existing: Epic[] = []): string {
   );
 }
 
+/** Variantes sobre ids sueltos, para no materializar los ítems completos. */
+export function nextEpicIdFromIds(existingIds: string[]): string {
+  return nextIdForPrefix(EPIC_ID_PREFIX, existingIds);
+}
+
+export function nextWorkItemIdFromIds(type: WorkItemType, existingIds: string[]): string {
+  return nextIdForPrefix(workItemIdPrefix(type), existingIds);
+}
+
 /** Genera el siguiente HU-XXX a partir de ítems existentes (solo cuenta prefijo HU). */
 export function generateUserStoryId(existing: UserStory[] = []): string {
   return generateWorkItemId('story', existing);

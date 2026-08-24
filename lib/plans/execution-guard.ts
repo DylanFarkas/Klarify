@@ -2,11 +2,16 @@
  * @fileoverview Guardia server-side para el tablero de ejecución.
  */
 
+import type { DocumentSnapshot } from 'firebase-admin/firestore';
+
 import { resolveUserPlan } from '@/lib/plans/plan-service';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
 
-export async function assertExecutionBoardAllowed(uid: string): Promise<void> {
-  const plan = await resolveUserPlan(uid);
+export async function assertExecutionBoardAllowed(
+  uid: string,
+  preloadedUserSnapshot?: DocumentSnapshot
+): Promise<void> {
+  const plan = await resolveUserPlan(uid, preloadedUserSnapshot);
   if (!plan.limits.executionBoard) {
     throw new PlanLimitError(
       'El tablero de ejecución está disponible en los planes Starter y Pro.',
