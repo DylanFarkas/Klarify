@@ -8,7 +8,7 @@ import { DemoWorkspaceFrame } from "./DemoWorkspaceFrame";
 const ROTATION_MS = 11000;
 
 export function WorkspaceProductDemo() {
-  const [activeView, setActiveView] = useState<DemoView>("projects");
+  const [activeView, setActiveView] = useState<DemoView>("backlog");
   const [klarkOpen, setKlarkOpen] = useState(false);
   const [paused, setPaused] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
