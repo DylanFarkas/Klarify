@@ -62,11 +62,8 @@ export function DashboardSummaryStrip({
 		: null;
 
 	return (
-		<section
-			className="rounded-xl border border-border bg-surface"
-			aria-label="Resumen del proyecto"
-		>
-			<div className="grid gap-0 sm:grid-cols-3">
+		<section className="border-b border-border/60 pb-5" aria-label="Resumen del proyecto">
+			<div className="grid gap-5 sm:grid-cols-3 sm:gap-0">
 				<SummaryBlock label="Sprint activo">
 					{activeSprint ? (
 						<>
@@ -82,9 +79,10 @@ export function DashboardSummaryStrip({
 							<p className="mt-1 text-[11px] text-subtle">
 								{doneCount}/{stories.length} hechas
 								{' · '}
-								{formatEffortTotal(doneSp, metrics.estimationMode)}/{formatEffortTotal(committedSp, metrics.estimationMode)}
+								{formatEffortTotal(doneSp, metrics.estimationMode)}/
+								{formatEffortTotal(committedSp, metrics.estimationMode)}
 							</p>
-							<div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
+							<div className="mt-2.5 h-1 overflow-hidden rounded-full bg-border/60">
 								<div
 									className="h-full rounded-full bg-foreground/70 transition-[width] duration-300"
 									style={{ width: `${progress}%` }}
@@ -101,7 +99,7 @@ export function DashboardSummaryStrip({
 					)}
 				</SummaryBlock>
 
-				<SummaryBlock label="Backlog" bordered>
+				<SummaryBlock label="Backlog" divided>
 					<p className="text-[13px] tabular-nums text-foreground">
 						<span className="text-muted">Sin sprint</span> {metrics.unassignedStoryCount}
 						<span className="mx-1.5 text-subtle">·</span>
@@ -123,7 +121,7 @@ export function DashboardSummaryStrip({
 					</div>
 				</SummaryBlock>
 
-				<SummaryBlock label="Ejecución" bordered>
+				<SummaryBlock label="Ejecución" divided>
 					{activeSprint ? (
 						<>
 							<div className="flex items-center justify-between gap-3">
@@ -175,11 +173,8 @@ export function DashboardSummaryStrip({
 function PipelineCoverageStrip({ metrics }: { metrics: DashboardMetrics }) {
 	const sprintCoverageLabel = metrics.hasPlan ? `${metrics.planningCoverage}%` : '—';
 	return (
-		<section
-			className="rounded-xl border border-border bg-surface"
-			aria-label="Resumen del pipeline"
-		>
-			<div className="grid gap-0 sm:grid-cols-3">
+		<section className="border-b border-border/60 pb-5" aria-label="Resumen del pipeline">
+			<div className="grid gap-5 sm:grid-cols-3 sm:gap-0">
 				<SummaryBlock label="Cobertura">
 					<p className="text-[13px] tabular-nums text-foreground">
 						<span className="text-muted">Est.</span> {metrics.estimationCoverage}%
@@ -194,7 +189,7 @@ function PipelineCoverageStrip({ metrics }: { metrics: DashboardMetrics }) {
 						{metrics.prioritizedStoryCount}/{metrics.storyCount} priorizadas
 					</p>
 				</SummaryBlock>
-				<SummaryBlock label="Prioridad" bordered>
+				<SummaryBlock label="Prioridad" divided>
 					<p className="text-[13px] tabular-nums text-foreground">
 						<span className="text-muted">Alta</span> {metrics.priorityBuckets.alta.count}
 						<span className="mx-1.5 text-subtle">·</span>
@@ -203,7 +198,7 @@ function PipelineCoverageStrip({ metrics }: { metrics: DashboardMetrics }) {
 						<span className="text-muted">Baja</span> {metrics.priorityBuckets.baja.count}
 					</p>
 				</SummaryBlock>
-				<SummaryBlock label="Ejecución" bordered>
+				<SummaryBlock label="Ejecución" divided>
 					<p className="text-[13px] text-muted">Disponible al desbloquear el dashboard.</p>
 				</SummaryBlock>
 			</div>
@@ -218,20 +213,20 @@ function truncateInline(text: string, max: number): string {
 function SummaryBlock({
 	label,
 	children,
-	bordered = false,
+	divided = false,
 }: {
 	label: string;
 	children: ReactNode;
-	bordered?: boolean;
+	divided?: boolean;
 }) {
 	return (
 		<div
 			className={[
-				'px-4 py-3.5 md:px-5',
-				bordered ? 'border-t border-border sm:border-t-0 sm:border-l' : '',
+				'sm:px-5 first:sm:pl-0 last:sm:pr-0',
+				divided ? 'border-t border-border/40 pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5' : '',
 			].join(' ')}
 		>
-			<p className="text-[11px] text-subtle">{label}</p>
+			<p className="text-[11px] font-medium text-subtle">{label}</p>
 			<div className="mt-1.5">{children}</div>
 		</div>
 	);

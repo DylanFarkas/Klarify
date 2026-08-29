@@ -3,16 +3,13 @@
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { BoardWorkspace } from '@/components/agents/board/BoardWorkspace';
 import { BoardUpgradeGate } from '@/components/agents/board/BoardUpgradeGate';
+import { DashboardLoadingState } from '@/components/agents/dashboard/DashboardLoadingState';
 
 export default function BoardPage() {
   const { isLoading, plan } = useWorkspace();
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-sm text-muted">Cargando tablero…</p>
-      </div>
-    );
+    return <DashboardLoadingState variant="board" />;
   }
 
   if (!plan?.limits.executionBoard) {

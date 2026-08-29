@@ -37,7 +37,7 @@ export function DashboardContent({
 	workspace,
 }: DashboardContentProps) {
 	return (
-		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 md:gap-7">
+		<div className="flex w-full flex-col gap-5 px-6 pt-3 pb-5 md:gap-6">
 			<DashboardHero
 				projectName={projectName}
 				hasContent={hasContent}
@@ -66,7 +66,7 @@ export function DashboardContent({
 					<DashboardEpicProgress metrics={metrics} />
 
 					{projectId ? (
-						<section className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5">
+						<section className="flex flex-col gap-3 border-t border-border/60 pt-5">
 							<div className="flex flex-wrap items-start justify-between gap-3">
 								<div className="min-w-0">
 									<h2 className="text-[15px] font-semibold tracking-tight text-foreground">

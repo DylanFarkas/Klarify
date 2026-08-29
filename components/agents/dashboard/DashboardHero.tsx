@@ -24,30 +24,35 @@ export function DashboardHero({
 	];
 
 	return (
-		<header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+		<header className="flex min-h-10 flex-col justify-center gap-2 border-b border-border/60 py-1.5 sm:flex-row sm:items-center sm:justify-between">
 			<div className="min-w-0">
-				<h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+				<h1 className="text-[50px] font-semibold tracking-tight text-foreground">
 					Dashboard
 				</h1>
-				<p className="mt-1 text-sm text-muted">{projectName}</p>
-				{hasContent ? (
-					<p className="mt-2 text-[12px] tabular-nums text-subtle">{metaParts.join(' · ')}</p>
-				) : (
-					<p className="mt-2 text-[12px] text-subtle">Sin datos todavía</p>
-				)}
+				<p className="mt-0.5 truncate text-[12px] text-muted">
+					{projectName}
+					{hasContent ? (
+						<>
+							{' · '}
+							<span className="tabular-nums text-subtle">{metaParts.join(' · ')}</span>
+						</>
+					) : (
+						<> · Sin datos todavía</>
+					)}
+				</p>
 			</div>
 
 			<div className="flex shrink-0 flex-wrap items-center gap-2">
 				<Link
 					href={metrics.nextAction.href}
-					className="inline-flex items-center rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+					className="inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
 				>
 					{metrics.nextAction.label}
 				</Link>
 				{metrics.hasPlan && executionBoardEnabled ? (
 					<Link
 						href="/agentes/board"
-						className="inline-flex items-center rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+						className="inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 					>
 						Ir al tablero
 					</Link>

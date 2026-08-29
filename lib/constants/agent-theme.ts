@@ -109,9 +109,9 @@ export function readPersistedKlarifyAccent(): KlarifyAccent {
   }
 }
 
-/** Script inline para aplicar el tema (y acento de Klarify) antes de la hidratación (anti-FOUC) */
+/** Script inline para aplicar el tema (y acento de Klarify) antes del primer paint (anti-FOUC) */
 export function getAgentThemeBootstrapScript(): string {
   const valid = AGENT_THEMES.map((t) => t.id);
   const validAccents = KLARIFY_ACCENTS.map((a) => a.id);
-  return `(function(){try{var t=localStorage.getItem('${STORAGE_KEY_AGENT_THEME}');var valid=${JSON.stringify(valid)};var theme;if(t==='carbon'){theme='klarify';}else if(t&&valid.indexOf(t)!==-1){theme=t;}else{theme='${DEFAULT_AGENT_THEME}';}document.documentElement.setAttribute('data-agent-theme',theme);if(theme==='klarify'){var a=localStorage.getItem('${STORAGE_KEY_KLARIFY_ACCENT}');var validA=${JSON.stringify(validAccents)};var accent=a&&validA.indexOf(a)!==-1?a:'${DEFAULT_KLARIFY_ACCENT}';document.documentElement.setAttribute('data-klarify-accent',accent);}else{document.documentElement.removeAttribute('data-klarify-accent');}document.documentElement.removeAttribute('data-carbon-accent');}catch(e){document.documentElement.setAttribute('data-agent-theme','${DEFAULT_AGENT_THEME}');document.documentElement.removeAttribute('data-klarify-accent');document.documentElement.removeAttribute('data-carbon-accent');}})();`;
+  return `(function(){function inWorkspace(){var p=location.pathname;return p==='/agentes'||p.indexOf('/agentes/')===0;}function apply(theme,accent){var r=document.documentElement;r.setAttribute('data-agent-theme',theme);r.style.colorScheme=theme==='light'?'light':'dark';if(theme==='klarify'){r.setAttribute('data-klarify-accent',accent);}else{r.removeAttribute('data-klarify-accent');}r.removeAttribute('data-carbon-accent');}try{if(!inWorkspace())return;var t=localStorage.getItem('${STORAGE_KEY_AGENT_THEME}');var valid=${JSON.stringify(valid)};var theme;if(t==='carbon'){theme='klarify';}else if(t&&valid.indexOf(t)!==-1){theme=t;}else{theme='${DEFAULT_AGENT_THEME}';}var accent='${DEFAULT_KLARIFY_ACCENT}';if(theme==='klarify'){var a=localStorage.getItem('${STORAGE_KEY_KLARIFY_ACCENT}');var validA=${JSON.stringify(validAccents)};if(a&&validA.indexOf(a)!==-1)accent=a;}apply(theme,accent);}catch(e){try{if(inWorkspace())apply('${DEFAULT_AGENT_THEME}','${DEFAULT_KLARIFY_ACCENT}');}catch(_){}}})();`;
 }

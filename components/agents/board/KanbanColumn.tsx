@@ -52,31 +52,29 @@ export function KanbanColumn({
   return (
     <div
       className={[
-        'flex min-h-105 w-70 shrink-0 flex-col rounded-xl border border-border bg-surface',
-        isOver ? 'border-border-strong' : '',
+        'flex min-h-105 w-70 shrink-0 flex-col rounded-xl border-border/50 bg-background/40',
+        isOver ? 'border-border-strong bg-surface' : '',
       ].join(' ')}
     >
-      <header className="border-b border-border px-4 py-3 bg-surface-muted rounded-t-xl">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${COLUMN_DOT[status]}`}
-              aria-hidden
-            />
-            <h3 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
-              {label}
-            </h3>
-          </div>
+      <header className="flex items-center justify-between gap-2 px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${COLUMN_DOT[status]}`}
+            aria-hidden
+          />
+          <h3 className="truncate text-[13px] font-semibold tracking-tight text-foreground">
+            {label}
+          </h3>
           <span className="tabular-nums text-[11px] text-subtle">{stats.count}</span>
         </div>
-        <p className="mt-0.5 pl-3.5 text-[11px] text-subtle">
+        <p className="shrink-0 text-[11px] text-subtle">
           {formatEffortTotal(stats.points, projectEstimationMode)}
         </p>
       </header>
 
       <div
         ref={setNodeRef}
-        className="flex min-h-80 flex-1 flex-col gap-2 overflow-y-auto p-3"
+        className="flex min-h-80 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4"
       >
         <SortableContext items={storyIds} strategy={verticalListSortingStrategy}>
           {storyIds.map((storyId) => {

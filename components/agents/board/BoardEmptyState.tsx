@@ -19,7 +19,7 @@ export function BoardEmptyState({ reason }: BoardEmptyStateProps) {
             />
           </svg>
         </div>
-        <h3 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">
+        <h3 className="mt-5 text-[50px] font-semibold tracking-tight text-foreground">
           Pipeline incompleto
         </h3>
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">

@@ -21,7 +21,7 @@ export function AgentAuthGuard({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex h-full min-h-0 items-center justify-center bg-background text-foreground">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     );

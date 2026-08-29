@@ -1,6 +1,9 @@
 /** Clave de localStorage para preferencias generales del workspace */
 export const STORAGE_KEY_WORKSPACE_SETTINGS = 'klarify-workspace-settings';
 
+/** Clave de localStorage para el rail de iconos del sidebar */
+export const STORAGE_KEY_SIDEBAR_COLLAPSED = 'klarify-sidebar-collapsed';
+
 export interface WorkspaceGeneralSettings {
   /** Muestra el razonamiento del modelo inteligente mientras procesa */
   showModelReasoning: boolean;
@@ -26,5 +29,15 @@ export function readPersistedWorkspaceSettings(): WorkspaceGeneralSettings {
     };
   } catch {
     return DEFAULT_WORKSPACE_SETTINGS;
+  }
+}
+
+export function readPersistedSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return localStorage.getItem(STORAGE_KEY_SIDEBAR_COLLAPSED) === 'true';
+  } catch {
+    return false;
   }
 }

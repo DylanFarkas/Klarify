@@ -29,7 +29,7 @@ export default function BacklogPage() {
 	} = useWorkspace();
 
 	if (isLoading || !workspace) {
-		return <DashboardLoadingState />;
+		return <DashboardLoadingState variant="backlog" />;
 	}
 
 	const metrics = buildDashboardMetrics(workspace);

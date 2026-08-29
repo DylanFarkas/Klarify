@@ -35,7 +35,6 @@ import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/Clarifying
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
-import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { notifySuccess } from '@/lib/notifications/toast';
 
@@ -453,53 +452,47 @@ export default function Agent1Page() {
   if (isLoading || !isHydrated || isRedirecting) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
       </div>
     );
   }
 
-  const showReviewStats = state.status === 'review' && state.wishes.length > 0;
   const isReview = state.status === 'review';
+  const wishCount = state.wishes.length;
+  const answeredQuestions = state.discovery?.questions?.length ?? 0;
 
   return (
     <div
       className={[
-        'mx-auto flex w-full flex-col gap-7',
+        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col gap-6 px-6 pt-3 pb-5',
         isReview ? 'max-w-5xl' : 'max-w-3xl',
       ].join(' ')}
     >
-      <AgentPageHero
-        step={1}
-        variant="capture"
-        title="Ingesta de Contexto"
-        description="Comparte tu idea o la transcripción de una reunión. Analizamos el contexto, te hacemos unas preguntas rápidas si hace falta, y extraemos los requerimientos listos para revisar."
-        stats={
-          showReviewStats ? (
-            <>
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
-                }
-                value={state.wishes.length}
-                label={`deseo${state.wishes.length !== 1 ? 's' : ''} extraído${state.wishes.length !== 1 ? 's' : ''}`}
-              />
-              {state.discovery?.questions && state.discovery.questions.length > 0 && (
-                <AgentStat
-                  icon={
-                    <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                    </svg>
-                  }
-                  value={state.discovery.questions.length}
-                  label="preguntas respondidas"
-                />
-              )}
-            </>
-          ) : undefined
-        }
-      />
+      <header className="border-b border-border/60 pb-3">
+        <p className="text-[12px] text-subtle">Paso 1/6 · Captura</p>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+          Ingesta de Contexto
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm text-muted">
+          Comparte tu idea o la transcripción de una reunión. Analizamos el contexto, te hacemos
+          unas preguntas rápidas si hace falta, y extraemos los requerimientos listos para revisar.
+        </p>
+        {isReview && wishCount > 0 ? (
+          <p className="mt-2 text-[12px] text-muted">
+            <span className="tabular-nums text-foreground">{wishCount}</span>
+            {' '}
+            {wishCount === 1 ? 'deseo extraído' : 'deseos extraídos'}
+            {answeredQuestions > 0 ? (
+              <>
+                {' · '}
+                <span className="tabular-nums text-foreground">{answeredQuestions}</span>
+                {' '}
+                {answeredQuestions === 1 ? 'pregunta respondida' : 'preguntas respondidas'}
+              </>
+            ) : null}
+          </p>
+        ) : null}
+      </header>
 
       {/* Upload */}
       {(state.status === 'idle' ||
@@ -516,18 +509,18 @@ export default function Agent1Page() {
       {/* Edición de transcripción */}
       {state.status === 'editing_transcription' && (
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="text-[15px] font-semibold text-foreground">
+          <div className="border-b border-border/60 px-4 py-3.5 md:px-5">
+            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
               {state.transcription?.fullText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
             </h2>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-[13px] text-muted">
               {state.transcription?.fullText
                 ? 'Corrige la transcripción si hace falta. Luego analizamos el contexto y te guiamos con preguntas puntuales si es necesario.'
                 : 'Describe tu proyecto o pega apuntes de una reunión. Cuando estés listo, analizamos el contexto.'}
             </p>
           </div>
 
-          <div className="flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-4 px-4 py-4 md:px-5 md:py-5">
             <textarea
               className="min-h-55 w-full resize-y rounded-lg border border-input-border bg-input p-4 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
               placeholder="Ejemplo: Quiero una app para vender zapatos online con catálogo, carrito y pagos..."
@@ -550,17 +543,17 @@ export default function Agent1Page() {
               </div>
             )}
 
-            <div className="flex flex-col-reverse justify-end gap-2.5 sm:flex-row">
+            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
               <button
                 onClick={handleReset}
-                className="cursor-pointer rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="cursor-pointer rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 Descartar y volver
               </button>
               <button
                 onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
                 disabled={!state.transcription?.fullText?.trim()}
-                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-text disabled:opacity-40"
               >
                 Analizar contexto
               </button>
@@ -585,20 +578,17 @@ export default function Agent1Page() {
       {/* Review */}
       {state.status === 'review' && (
         <>
-          {state.file && (
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-sm">
-                {state.file.name.endsWith('.mp3') || state.file.name.endsWith('.wav') ? '🎵' : '📄'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{state.file.name}</p>
-                <p className="text-xs text-muted">Procesado</p>
-              </div>
-              <span className="shrink-0 text-xs font-medium text-success">Listo</span>
+          {state.file ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+              <span className="font-medium text-foreground">{state.file.name}</span>
+              <span className="text-subtle" aria-hidden>
+                ·
+              </span>
+              <span className="text-success">Procesado</span>
             </div>
-          )}
+          ) : null}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)] lg:gap-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)]">
             <TranscriptionPanel
               transcription={state.transcription}
               discovery={state.discovery}
@@ -614,24 +604,22 @@ export default function Agent1Page() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-surface px-4 py-3">
-            <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-              <p className="hidden text-sm text-subtle sm:block">
-                Revisa los deseos antes de continuar al backlog.
-              </p>
-              <div className="flex w-full flex-col-reverse items-center gap-2.5 sm:w-auto sm:flex-row">
-                <button
-                  onClick={handleReset}
-                  className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground sm:w-auto"
-                >
-                  Empezar de nuevo
-                </button>
-                <ApproveButton
-                  onClick={handleApprove}
-                  disabled={state.wishes.length === 0 || isApproving}
-                  label="Aprobar deseos y continuar"
-                />
-              </div>
+          <div className="flex flex-col items-stretch justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
+            <p className="text-[13px] text-subtle">
+              Revisa los deseos antes de continuar al backlog.
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <button
+                onClick={handleReset}
+                className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              >
+                Empezar de nuevo
+              </button>
+              <ApproveButton
+                onClick={handleApprove}
+                disabled={state.wishes.length === 0 || isApproving}
+                label="Aprobar deseos y continuar"
+              />
             </div>
           </div>
         </>

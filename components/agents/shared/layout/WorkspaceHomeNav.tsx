@@ -5,13 +5,22 @@ import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { getProjectEntryPath } from '@/lib/utils/project-progress';
+import {
+  SIDEBAR_ICON_CLASS,
+  sidebarCollapsibleClass,
+  sidebarCollapsibleInnerClass,
+  sidebarGroupLabelClass,
+  sidebarIconSlotClass,
+  sidebarLabelClass,
+  sidebarNavItemClass,
+} from './sidebar-styles';
 
 const NAV_ITEMS = [
   {
     href: '/agentes/proyectos',
     label: 'Proyectos',
     icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -24,7 +33,7 @@ const NAV_ITEMS = [
     href: '/manual',
     label: 'Guía de uso',
     icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -34,15 +43,6 @@ const NAV_ITEMS = [
     ),
   },
 ] as const;
-
-function navClass(isActive: boolean): string {
-  return [
-    'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
-    isActive
-      ? 'bg-elevated font-medium text-foreground'
-      : 'text-muted hover:bg-surface-hover hover:text-foreground',
-  ].join(' ');
-}
 
 export function WorkspaceHomeNav() {
   const pathname = usePathname();
@@ -64,80 +64,93 @@ export function WorkspaceHomeNav() {
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Navegación del workspace">
+      <p className={sidebarGroupLabelClass}>Workspace</p>
+
       {NAV_ITEMS.map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={navClass(isActive)}
+            title={item.label}
+            className={sidebarNavItemClass(isActive)}
             aria-current={isActive ? 'page' : undefined}
           >
-            {item.icon}
-            <span className="truncate">{item.label}</span>
+            <span className={sidebarIconSlotClass}>{item.icon}</span>
+            <span className={sidebarLabelClass}>{item.label}</span>
           </Link>
         );
       })}
 
       {activeProject ? (
         <>
-          <div className="mb-1.5 mt-5 flex items-center justify-between px-2.5">
-            <p className="text-xs font-medium text-subtle">Proyecto activo</p>
-          </div>
+          <p className={`${sidebarGroupLabelClass} mt-2`}>Proyecto activo</p>
 
           {continueHref ? (
-            <Link href={continueHref} className={navClass(false)}>
-              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-              </svg>
-              <span className="min-w-0 truncate">Continuar</span>
+            <Link href={continueHref} title="Continuar" className={sidebarNavItemClass(false)}>
+              <span className={sidebarIconSlotClass}>
+                <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                </svg>
+              </span>
+              <span className={sidebarLabelClass}>Continuar</span>
             </Link>
           ) : null}
 
           {showDashboard ? (
             <Link
               href="/agentes/dashboard"
-              className={navClass(pathname === '/agentes/dashboard')}
+              title="Dashboard"
+              className={sidebarNavItemClass(pathname === '/agentes/dashboard')}
               aria-current={pathname === '/agentes/dashboard' ? 'page' : undefined}
             >
-              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-                />
-              </svg>
-              <span>Dashboard</span>
+              <span className={sidebarIconSlotClass}>
+                <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
+                  />
+                </svg>
+              </span>
+              <span className={sidebarLabelClass}>Dashboard</span>
             </Link>
           ) : null}
 
           {showBoard ? (
             <Link
               href="/agentes/board"
-              className={navClass(pathname === '/agentes/board')}
+              title="Tablero"
+              className={sidebarNavItemClass(pathname === '/agentes/board')}
               aria-current={pathname === '/agentes/board' ? 'page' : undefined}
             >
-              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 4.5v15m6-15v15M4.5 9.75h15M4.5 14.25h15"
-                />
-              </svg>
-              <span>Tablero</span>
+              <span className={sidebarIconSlotClass}>
+                <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 4.5v15m6-15v15M4.5 9.75h15M4.5 14.25h15"
+                  />
+                </svg>
+              </span>
+              <span className={sidebarLabelClass}>Tablero</span>
             </Link>
           ) : null}
 
-          <div className="mt-2 rounded-lg px-2.5 py-2.5">
-            <p className="truncate text-[13px] font-medium text-foreground">{activeProject.name}</p>
-            <p className="mt-0.5 text-xs text-subtle">
-              {activeProject.pipelineLabel} · {activeProject.completionPercentage}%
-            </p>
-            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-border">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${activeProject.completionPercentage}%` }}
-              />
+          <div className={`mt-1 ${sidebarCollapsibleClass}`}>
+            <div className={sidebarCollapsibleInnerClass}>
+              <div className="px-2 py-1.5">
+                <p className="truncate text-sm font-medium text-foreground">{activeProject.name}</p>
+                <p className="mt-0.5 text-xs text-subtle">
+                  {activeProject.pipelineLabel} · {activeProject.completionPercentage}%
+                </p>
+                <div className="mt-2 h-1 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${activeProject.completionPercentage}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </>

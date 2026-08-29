@@ -40,7 +40,9 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     return (
       <div
         className={[
-          'rounded-lg border border-border bg-elevated px-2 py-2 text-xs text-muted',
+          compact
+            ? 'flex h-8 items-center px-2 text-xs text-muted'
+            : 'rounded-lg border border-border bg-elevated px-2 py-2 text-xs text-muted',
           className,
         ]
           .filter(Boolean)
@@ -55,7 +57,9 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
     return (
       <div
         className={[
-          'rounded-lg border border-border bg-elevated px-2.5 py-2 text-[11px] text-muted',
+          compact
+            ? 'flex h-8 items-center px-2 text-[11px] text-muted'
+            : 'rounded-lg border border-border bg-elevated px-2.5 py-2 text-[11px] text-muted',
           className,
         ]
           .filter(Boolean)
@@ -87,6 +91,9 @@ export function AiModelPicker({ className = '', compact = false }: AiModelPicker
         options={options}
         placeholder="Modelo"
         disabled={saving || options.length === 0}
+        variant={compact ? 'ghost' : 'default'}
+        placement={compact ? 'top' : 'auto'}
+        aria-label="Modelo de IA"
       />
 
       {error ? (

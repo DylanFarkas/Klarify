@@ -184,7 +184,7 @@ export default function Agent3Page() {
   return (
     <div
       className={[
-        'mx-auto flex w-full flex-col gap-7',
+        'mx-auto flex w-full flex-col gap-7 px-6 pt-3 pb-5',
         showReviewStats || hasInput ? 'max-w-5xl' : 'max-w-3xl',
       ].join(' ')}
     >

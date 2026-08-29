@@ -12,13 +12,14 @@ interface DetailModalProps {
   eyebrow?: string;
   children: ReactNode;
   /** Ancho máximo del panel */
-  maxWidth?: 'md' | 'lg' | 'xl';
+  maxWidth?: 'md' | 'lg' | 'xl' | '2xl';
 }
 
 const MAX_WIDTH: Record<NonNullable<DetailModalProps['maxWidth']>, string> = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-3xl',
+  '2xl': 'max-w-5xl',
 };
 
 export function DetailModal({
@@ -108,7 +109,7 @@ export function DetailModal({
           closing ? 'detail-modal-panel-out' : 'detail-modal-panel-in',
         ].join(' ')}
       >
-        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-2xl border border-border/70 bg-surface shadow-2xl sm:rounded-2xl">
+        <div className="relative flex max-h-[min(92vh,860px)] flex-col overflow-hidden rounded-t-2xl border border-border/70 bg-surface shadow-2xl sm:rounded-2xl">
           <header className="relative shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <button
               ref={closeBtnRef}
@@ -146,7 +147,7 @@ export function DetailModal({
                 id="detail-modal-title"
                 className={[
                   'font-semibold tracking-tight text-foreground',
-                  'text-xl sm:text-2xl sm:leading-tight',
+                  'text-lg sm:text-[30px] sm:leading-tight',
                   eyebrow || subtitle ? 'mt-1' : '',
                 ].join(' ')}
               >

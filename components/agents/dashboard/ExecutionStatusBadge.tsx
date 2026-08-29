@@ -28,12 +28,20 @@ export function ExecutionStatusBadge({ status }: { status: KanbanStatus }) {
   );
 }
 
+const STATUS_DOT_CLASS: Record<KanbanStatus, string> = {
+  todo: 'bg-slate-400',
+  in_progress: 'bg-blue-500',
+  code_review: 'bg-amber-500',
+  done: 'bg-emerald-500',
+};
+
 interface ExecutionStatusSelectProps {
   status: KanbanStatus;
   onChange: (status: KanbanStatus) => void;
   disabled?: boolean;
   'aria-label'?: string;
   className?: string;
+  variant?: 'pill' | 'ghost';
 }
 
 export function ExecutionStatusSelect({
@@ -42,7 +50,9 @@ export function ExecutionStatusSelect({
   disabled = false,
   'aria-label': ariaLabel,
   className = '',
+  variant = 'pill',
 }: ExecutionStatusSelectProps) {
+  const isGhost = variant === 'ghost';
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [listStyle, setListStyle] = useState({ top: 0, left: 0, minWidth: 0 });
@@ -134,14 +144,21 @@ export function ExecutionStatusSelect({
                     isSelected ? 'bg-surface-hover' : 'hover:bg-surface-hover/70',
                   ].join(' ')}
                 >
-                  <span
-                    className={[
-                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                      EXECUTION_STATUS_STYLES[column.id],
-                    ].join(' ')}
-                  >
-                    {column.label}
-                  </span>
+                  {isGhost ? (
+                    <span className="flex items-center gap-2 text-sm text-foreground">
+                      <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT_CLASS[column.id]}`} />
+                      {column.label}
+                    </span>
+                  ) : (
+                    <span
+                      className={[
+                        'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                        EXECUTION_STATUS_STYLES[column.id],
+                      ].join(' ')}
+                    >
+                      {column.label}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -165,26 +182,44 @@ export function ExecutionStatusSelect({
           setOpen((current) => !current);
         }}
         className={[
-          'inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap transition-opacity',
-          EXECUTION_STATUS_STYLES[status],
+          'inline-flex cursor-pointer items-center whitespace-nowrap transition-colors',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          open ? 'ring-1 ring-border-strong/60' : 'hover:opacity-90',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong',
+          isGhost
+            ? [
+                'h-8 w-full gap-2 rounded-md px-2 text-sm text-foreground hover:bg-surface-hover',
+                open ? 'bg-surface-hover' : '',
+              ].join(' ')
+            : [
+                'gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                EXECUTION_STATUS_STYLES[status],
+                open ? 'ring-1 ring-border-strong/60' : 'hover:opacity-90',
+              ].join(' '),
         ].join(' ')}
       >
-        <span>{statusLabel(status)}</span>
-        <svg
-          className={[
-            'h-3 w-3 shrink-0 opacity-70 transition-transform',
-            open ? 'rotate-180' : '',
-          ].join(' ')}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-        </svg>
+        {isGhost ? (
+          <>
+            <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT_CLASS[status]}`} />
+            <span className="min-w-0 flex-1 truncate text-left">{statusLabel(status)}</span>
+          </>
+        ) : (
+          <>
+            <span>{statusLabel(status)}</span>
+            <svg
+              className={[
+                'h-3 w-3 shrink-0 opacity-70 transition-transform',
+                open ? 'rotate-180' : '',
+              ].join(' ')}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </>
+        )}
       </button>
       {list}
     </div>

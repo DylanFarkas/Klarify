@@ -210,7 +210,7 @@ export function Navbar() {
               <>
                 <button
                   onClick={goToMyAgent}
-                  className="hidden text-sm font-bold text-[#4d8fff] hover:underline sm:inline"
+                  className="hidden text-sm font-bold text-[#4d8fff] hover:underline sm:inline cursor-pointer"
                 >
                   Volver al workspace
                 </button>

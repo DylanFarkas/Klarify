@@ -88,7 +88,7 @@ export function ProjectExportPanel({
                     ? `Descargar ${format.label}`
                     : 'Genera al menos un backlog antes de exportar'
                 }
-                className="cursor-pointer rounded-lg border border-border px-3 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="cursor-pointer rounded-md bg-surface-muted px-3 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isLoading ? '…' : `${format.label} ${format.extension}`}
               </button>

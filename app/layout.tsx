@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Google_Sans_Flex } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import { AgentThemeScript } from "@/components/agents/shared/theme/AgentThemeScript";
 import "./globals.css";
 
 const googleSansFlex = Google_Sans_Flex({
@@ -25,6 +26,9 @@ export default function RootLayout({
       className={`${googleSansFlex.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <AgentThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           {children}

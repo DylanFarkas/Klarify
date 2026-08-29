@@ -7,10 +7,16 @@ import {
 import type { BugSeverity, WorkItemType } from '@/lib/types/agent-2';
 import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
 
-const TYPE_BADGE_CLASS: Record<WorkItemType, string> = {
-  story: 'bg-elevated text-muted',
-  bug: 'bg-red-500/10 text-red-600 dark:text-red-400',
-  task: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
+const TYPE_DOT_CLASS: Record<WorkItemType, string> = {
+  story: 'bg-primary',
+  bug: 'bg-red-500',
+  task: 'bg-sky-500',
+};
+
+const TYPE_PILL_CLASS: Record<WorkItemType, string> = {
+  story: 'bg-primary/12 text-primary dark:bg-primary/18',
+  bug: 'bg-red-500/12 text-red-700 dark:bg-red-500/18 dark:text-red-400',
+  task: 'bg-sky-500/12 text-sky-700 dark:bg-sky-500/18 dark:text-sky-400',
 };
 
 export function WorkItemTypeBadge({
@@ -24,14 +30,40 @@ export function WorkItemTypeBadge({
   return (
     <span
       className={[
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-        TYPE_BADGE_CLASS[resolved],
+        'inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold',
+        TYPE_PILL_CLASS[resolved],
         className,
       ]
         .filter(Boolean)
         .join(' ')}
     >
       {WORK_ITEM_TYPE_LABELS[resolved]}
+    </span>
+  );
+}
+
+/** ID con color del tipo (sin label de Historia/Bug/Task). */
+export function WorkItemIdLabel({
+  id,
+  type,
+  className = '',
+}: {
+  id: string;
+  type?: WorkItemType | null;
+  className?: string;
+}) {
+  const resolved = resolveWorkItemType({ type: type ?? undefined });
+  return (
+    <span
+      className={[
+        'inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium',
+        TYPE_PILL_CLASS[resolved],
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {id}
     </span>
   );
 }

@@ -343,9 +343,9 @@ export function StackTechPicker({
                           type="button"
                           onClick={() => toggleTech(tech)}
                           className={[
-                            'flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                            'flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors',
                             selected
-                              ? 'bg-surface-hover text-foreground'
+                              ? 'bg-elevated text-foreground'
                               : 'hover:bg-surface-hover/60',
                           ].join(' ')}
                         >
@@ -385,9 +385,9 @@ export function StackTechPicker({
                       <button
                         type="button"
                         onClick={() => onAddCustom(query.trim(), customTargetLayer)}
-                        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-hover/60"
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-surface-hover/60"
                       >
-                        <span className="flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-subtle">
+                        <span className="flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-md bg-surface-muted text-subtle">
                           +
                         </span>
                         <span className="min-w-0 flex-1">
@@ -458,11 +458,11 @@ function LayerNavItem({
       type="button"
       onClick={onClick}
       className={[
-        'relative flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors',
+        'relative flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition-colors',
         'shrink-0 sm:w-full',
         active
-          ? 'bg-surface-hover text-foreground shadow-sm'
-          : 'text-subtle hover:bg-surface-hover/60 hover:text-foreground',
+          ? 'bg-elevated font-medium text-foreground'
+          : 'text-subtle hover:bg-surface-hover hover:text-foreground',
       ].join(' ')}
     >
       <span className={['shrink-0', active ? 'opacity-100' : 'opacity-70'].join(' ')}>{icon}</span>

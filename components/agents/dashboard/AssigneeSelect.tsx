@@ -42,6 +42,7 @@ interface AssigneeSelectProps {
 	disabled?: boolean;
 	'aria-label'?: string;
 	className?: string;
+	variant?: 'icon' | 'row';
 }
 
 export function AssigneeSelect({
@@ -51,7 +52,9 @@ export function AssigneeSelect({
 	disabled = false,
 	'aria-label': ariaLabel,
 	className = '',
+	variant = 'icon',
 }: AssigneeSelectProps) {
+	const isRow = variant === 'row';
 	const [open, setOpen] = useState(false);
 	const [mounted, setMounted] = useState(false);
 	const [listStyle, setListStyle] = useState({ top: 0, left: 0, minWidth: 0 });
@@ -197,13 +200,26 @@ export function AssigneeSelect({
 					setOpen((current) => !current);
 				}}
 				className={[
-					'inline-flex cursor-pointer items-center justify-center rounded-full transition-opacity',
+					'inline-flex cursor-pointer items-center transition-colors',
 					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong',
 					'disabled:cursor-not-allowed disabled:opacity-50',
-					open ? 'ring-1 ring-border-strong/60' : 'hover:opacity-90',
+					isRow
+						? [
+								'h-8 w-full gap-2 rounded-md px-2 hover:bg-surface-hover',
+								open ? 'bg-surface-hover' : '',
+							].join(' ')
+						: [
+								'justify-center rounded-full',
+								open ? 'ring-1 ring-border-strong/60' : 'hover:opacity-90',
+							].join(' '),
 				].join(' ')}
 			>
-				<AssigneeAvatar member={assignee} />
+				<AssigneeAvatar member={assignee} size={isRow ? 'sm' : 'md'} />
+				{isRow ? (
+					<span className="min-w-0 truncate text-sm text-foreground">
+						{assignee?.displayName ?? 'Sin asignar'}
+					</span>
+				) : null}
 			</button>
 			{list}
 		</div>

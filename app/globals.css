@@ -7,6 +7,7 @@
   --color-surface-muted: var(--surface-muted);
   --color-surface-hover: var(--surface-hover);
   --color-foreground: var(--foreground);
+  --color-foreground-contrast: var(--foreground-contrast);
   --color-muted: var(--foreground-muted);
   --color-muted-foreground: var(--foreground-muted);
   --color-subtle: var(--foreground-subtle);
@@ -1015,6 +1016,43 @@ html[data-agent-theme="light"] .workspace-grid__star::after,
 @keyframes shimmerPulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.7; }
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@layer utilities {
+  .skeleton-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-hover) 92%, transparent) 0%,
+      color-mix(in srgb, var(--border-strong) 55%, var(--surface-hover)) 45%,
+      color-mix(in srgb, var(--surface-hover) 92%, transparent) 90%
+    );
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+
+  .skeleton-enter {
+    animation: skeletonEnter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes skeletonEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes checkmarkDraw {

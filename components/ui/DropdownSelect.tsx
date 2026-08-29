@@ -22,26 +22,55 @@ interface DropdownSelectProps {
   className?: string;
   /** Compact trigger for dense tables / inline editors. */
   size?: 'default' | 'compact';
+  /** Ghost: fila tipo sidebar sin borde. */
+  variant?: 'default' | 'ghost';
+  /** Prefer opening above the trigger (sidebar footer) or auto-flip by viewport space. */
+  placement?: 'auto' | 'top' | 'bottom';
   'aria-label'?: string;
 }
 
-function computeListStyle(triggerRect: DOMRect) {
+interface ListStyle {
+  left: number;
+  width: number;
+  maxHeight: number;
+  top?: number;
+  bottom?: number;
+}
+
+function computeListStyle(
+  triggerRect: DOMRect,
+  placement: 'auto' | 'top' | 'bottom' = 'auto'
+): ListStyle {
   const left = Math.min(
     Math.max(VIEWPORT_PADDING, triggerRect.left),
     window.innerWidth - VIEWPORT_PADDING - triggerRect.width
   );
-  const top = triggerRect.bottom + LIST_GAP;
-  const availableBelow = Math.max(
-    120,
-    window.innerHeight - top - VIEWPORT_PADDING
-  );
-  const maxHeight = Math.min(DEFAULT_MAX_HEIGHT, availableBelow);
+  const width = triggerRect.width;
 
+  const spaceBelow = window.innerHeight - triggerRect.bottom - VIEWPORT_PADDING - LIST_GAP;
+  const spaceAbove = triggerRect.top - VIEWPORT_PADDING - LIST_GAP;
+
+  let openUp = placement === 'top';
+  if (placement === 'auto') {
+    openUp = spaceBelow < DEFAULT_MAX_HEIGHT && spaceAbove > spaceBelow;
+  }
+
+  if (openUp) {
+    const maxHeight = Math.min(DEFAULT_MAX_HEIGHT, Math.max(120, spaceAbove));
+    return {
+      left,
+      width,
+      maxHeight,
+      bottom: window.innerHeight - triggerRect.top + LIST_GAP,
+    };
+  }
+
+  const maxHeight = Math.min(DEFAULT_MAX_HEIGHT, Math.max(120, spaceBelow));
   return {
-    top,
     left,
-    width: triggerRect.width,
+    width,
     maxHeight,
+    top: triggerRect.bottom + LIST_GAP,
   };
 }
 
@@ -54,16 +83,19 @@ export function DropdownSelect({
   disabled = false,
   className = '',
   size = 'default',
+  variant = 'default',
+  placement = 'auto',
   'aria-label': ariaLabel,
 }: DropdownSelectProps) {
   const isCompact = size === 'compact';
+  const isGhost = variant === 'ghost';
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [listStyle, setListStyle] = useState({
-    top: 0,
+  const [listStyle, setListStyle] = useState<ListStyle>({
     left: 0,
     width: 0,
     maxHeight: DEFAULT_MAX_HEIGHT,
+    top: 0,
   });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -74,8 +106,8 @@ export function DropdownSelect({
   const updatePosition = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setListStyle(computeListStyle(rect));
-  }, []);
+    setListStyle(computeListStyle(rect, placement));
+  }, [placement]);
 
   useEffect(() => {
     setMounted(true);
@@ -123,9 +155,10 @@ export function DropdownSelect({
             ref={listRef}
             id={listboxId}
             role="listbox"
-            className="fixed z-300 overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl animate-[fadeIn_0.15s_ease-out]"
+            className="fixed z-9999 overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl animate-[fadeIn_0.15s_ease-out]"
             style={{
               top: listStyle.top,
+              bottom: listStyle.bottom,
               left: listStyle.left,
               width: listStyle.width,
               maxHeight: listStyle.maxHeight,
@@ -177,24 +210,35 @@ export function DropdownSelect({
         aria-controls={open ? listboxId : undefined}
         onClick={() => {
           if (disabled) return;
+          if (!open) {
+            updatePosition();
+          }
           setOpen((current) => !current);
         }}
         className={[
           'flex w-full cursor-pointer items-center justify-between text-left transition-colors',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          isCompact
-            ? 'gap-1 rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold'
-            : 'gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm',
-          open ? 'border-border-strong' : 'hover:border-border',
-          selectedLabel ? 'text-foreground' : 'text-muted',
+          isGhost
+            ? [
+                'group h-8 gap-2 rounded-md px-2 text-sm hover:bg-surface-hover hover:text-foreground',
+                open || selectedLabel ? 'text-foreground' : 'text-muted',
+                open ? 'bg-surface-hover' : '',
+              ].join(' ')
+            : [
+                isCompact
+                  ? 'gap-1 rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold'
+                  : 'gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm',
+                open ? 'border-border-strong' : 'hover:border-border',
+                selectedLabel ? 'text-foreground' : 'text-muted',
+              ].join(' '),
         ].join(' ')}
       >
         <span className="min-w-0 truncate">{selectedLabel ?? placeholder}</span>
         <svg
           className={[
-            'shrink-0 text-subtle transition-transform',
-            isCompact ? 'h-3 w-3' : 'h-4 w-4',
-            open ? 'rotate-180' : '',
+            'shrink-0 transition-transform',
+            isGhost ? 'h-3.5 w-3.5 text-subtle opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100' : isCompact ? 'h-3.5 w-3.5 text-subtle' : 'h-4 w-4 text-subtle',
+            open ? 'rotate-180 opacity-100' : '',
           ].join(' ')}
           fill="none"
           viewBox="0 0 24 24"

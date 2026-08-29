@@ -27,7 +27,7 @@ function TechChip({
 }) {
   const label = getStackItemLabel(item, (id) => getTechById(id));
   return (
-    <span className="group/chip inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-muted px-2 py-1 text-[13px] font-medium text-foreground">
+    <span className="group/chip inline-flex items-center gap-1.5 rounded-md bg-surface-muted px-2 py-1 text-[13px] font-medium text-foreground">
       <StackTechIcon item={item} size={18} />
       <span className="truncate">{label}</span>
       {item.isPrimary ? (
@@ -37,7 +37,7 @@ function TechChip({
         <button
           type="button"
           onClick={onRemove}
-          className="ml-0.5 shrink-0 rounded p-0.5 text-subtle opacity-100 transition-colors hover:bg-danger/10 hover:text-danger sm:opacity-0 sm:group-hover/chip:opacity-100 cursor-pointer"
+          className="ml-0.5 shrink-0 cursor-pointer rounded p-0.5 text-subtle opacity-100 transition-colors hover:bg-danger/10 hover:text-danger sm:opacity-0 sm:group-hover/chip:opacity-100"
           aria-label={`Quitar ${label}`}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -60,9 +60,9 @@ export function StackBoard({
   );
 
   return (
-    <div className="rounded-xl border border-border bg-surface animate-[fadeIn_0.3s_ease-out]">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-5">
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
+    <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease-out]">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-4">
+        <div className="flex flex-wrap gap-x-10 gap-y-3">
           <div>
             <p className="text-[11px] font-medium text-subtle">Producto</p>
             <p className="mt-0.5 font-mono text-[15px] font-semibold tracking-tight text-foreground">
@@ -80,20 +80,20 @@ export function StackBoard({
           <button
             type="button"
             onClick={onEditMeta}
-            className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
+            className="shrink-0 cursor-pointer rounded-md bg-surface-muted px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             Editar producto
           </button>
         ) : null}
       </div>
 
-      <div className="divide-y divide-border">
+      <div className="flex flex-col">
         {visibleLayers.map((layer) => {
           const items = stack.layers[layer] ?? [];
           return (
             <div
               key={layer}
-              className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-4 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:px-5"
+              className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-4 border-b border-border/50 py-3 last:border-b-0 sm:grid-cols-[8rem_minmax(0,1fr)]"
             >
               <p className="pt-0.5 text-xs font-medium text-subtle">{STACK_LAYER_LABELS[layer]}</p>
               <div className="flex flex-wrap gap-1.5">
@@ -114,7 +114,7 @@ export function StackBoard({
       </div>
 
       {stack.warnings && stack.warnings.length > 0 ? (
-        <div className="border-t border-amber-500/25 bg-amber-500/5 px-4 py-3.5 sm:px-5">
+        <div className="border-t border-border/60 pt-4">
           <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">Compatibilidad</p>
           <ul className="mt-1.5 space-y-1">
             {stack.warnings.map((w) => (
@@ -133,16 +133,16 @@ export function StackBoard({
       ) : null}
 
       {stack.rationale ? (
-        <div className="border-t border-border px-4 py-3.5 sm:px-5">
+        <div className="border-t border-border/60 pt-4">
           <p className="text-[11px] font-medium text-subtle">Justificación</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted whitespace-pre-wrap">
+          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-muted">
             {stack.rationale}
           </p>
         </div>
       ) : null}
 
       {stack.sources && stack.sources.length > 0 ? (
-        <div className="border-t border-border px-4 py-3.5 sm:px-5">
+        <div className="border-t border-border/60 pt-4">
           <p className="text-[11px] font-medium text-subtle">Fuentes</p>
           <ul className="mt-1.5 space-y-1">
             {stack.sources.slice(0, 6).map((s) => (

@@ -58,36 +58,36 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       className={[
-        'group rounded-lg border border-border bg-surface p-3 transition-colors',
-        'hover:bg-surface-hover/40',
+        'group rounded-lg bg-surface p-4 transition-colors',
+        'hover:border-border hover:bg-surface-hover/30',
         isDragging ? 'border-border-strong' : '',
       ].join(' ')}
     >
       <div className="flex items-start gap-2">
         {item.sprintLocked ? (
           <span
-            className="flex h-7 w-5 shrink-0 items-center justify-center self-start text-subtle"
+            className="flex h-6 w-4 shrink-0 items-center justify-center self-start text-subtle"
             title="Sprint cerrado"
             aria-hidden
           />
         ) : (
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded-md text-subtle hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
-          aria-label="Arrastrar historia"
-        >
-          <svg className="block h-4.5 w-2.5" fill="currentColor" viewBox="0 0 10 18" aria-hidden>
-            <circle cx="2.5" cy="2.5" r="1.5" />
-            <circle cx="7.5" cy="2.5" r="1.5" />
-            <circle cx="2.5" cy="9" r="1.5" />
-            <circle cx="7.5" cy="9" r="1.5" />
-            <circle cx="2.5" cy="15.5" r="1.5" />
-            <circle cx="7.5" cy="15.5" r="1.5" />
-          </svg>
-        </button>
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            className="flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center self-start rounded text-subtle/50 hover:bg-surface-hover hover:text-muted active:cursor-grabbing"
+            aria-label="Arrastrar historia"
+          >
+            <svg className="block h-3.5 w-2" fill="currentColor" viewBox="0 0 10 18" aria-hidden>
+              <circle cx="2.5" cy="2.5" r="1.5" />
+              <circle cx="7.5" cy="2.5" r="1.5" />
+              <circle cx="2.5" cy="9" r="1.5" />
+              <circle cx="7.5" cy="9" r="1.5" />
+              <circle cx="2.5" cy="15.5" r="1.5" />
+              <circle cx="7.5" cy="15.5" r="1.5" />
+            </svg>
+          </button>
         )}
 
         <button
@@ -95,8 +95,8 @@ export function KanbanCard({
           onClick={() => onOpen(item.story.id)}
           className="min-w-0 flex-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
         >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-mono text-[10px] font-medium text-subtle">{item.story.id}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-medium text-subtle">{item.story.id}</span>
             <WorkItemTypeBadge type={item.story.type} />
             {item.sprintNumber !== null && (
               <span className="text-[10px] text-subtle">S{item.sprintNumber}</span>
@@ -108,25 +108,27 @@ export function KanbanCard({
               compact
             />
           </div>
-          <p className="mt-1 line-clamp-2 cursor-pointer text-[13px] font-medium text-foreground">
+          <p className="mt-2.5 line-clamp-2 cursor-pointer text-[13px] font-medium leading-snug text-foreground">
             {item.story.title}
           </p>
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-subtle">{item.epicTitle}</p>
+          <p className="mt-1 line-clamp-1 text-[11px] text-subtle">{item.epicTitle}</p>
         </button>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {isStoryEstimated(item.estimation, item.estimationMode) && (
-            <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted">
+            <span className="rounded-lg border border-border/60 px-1.5 py-0.5 text-[10px] font-medium text-subtle">
               {formatEstimation(item.estimation, item.estimationMode)}
             </span>
           )}
           {priorityLabel && (
-            <span
-              className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white"
-              style={{ backgroundColor: priorityColor }}
-            >
+            <span className="inline-flex items-center text-xs text-foreground font-medium">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: priorityColor }}
+                aria-hidden
+              />
               {priorityLabel}
             </span>
           )}
@@ -141,7 +143,7 @@ export function KanbanCard({
             {memberInitials(assignee.displayName)}
           </span>
         ) : (
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-muted text-[9px] font-bold text-muted">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-surface-muted text-[9px] font-bold text-subtle">
             ?
           </span>
         )}

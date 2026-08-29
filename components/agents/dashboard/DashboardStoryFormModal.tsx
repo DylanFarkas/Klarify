@@ -4,10 +4,6 @@ import { useEffect, useState } from 'react';
 import { AcceptanceCriteriaEditor } from '@/components/agents/agent-2/AcceptanceCriteriaEditor';
 import { CategorySelect } from '@/components/agents/agent-4/CategorySelect';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
-import {
-  WorkItemTypeBadge,
-  workItemTypeLabel,
-} from '@/components/agents/shared/WorkItemTypeBadge';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import {
   BUG_SEVERITY_LABELS,
@@ -17,19 +13,13 @@ import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
 import type { EstimationMode } from '@/lib/types/agent-3';
 import { defaultDurationLabel, tryParseDurationLabel } from '@/lib/utils/estimation';
-import type {
-  CreateDashboardUserStoryInput,
-  UpdateDashboardUserStoryOptions,
-} from '@/context/WorkspaceContext';
-import type { BugSeverity, Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
+import type { BugSeverity, Epic, WorkItemType } from '@/lib/types/agent-2';
 import type {
   FrameworkCategory,
   PrioritizationFramework,
   StoryPrioritization,
 } from '@/lib/types/agent-4';
-import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
-import type { DashboardSprintStoryRow } from './dashboardMetrics';
 
 const ALLOWED_STORY_POINTS = FIBONACCI_SCALE;
 
@@ -204,225 +194,6 @@ export function DashboardCreateStoryModal({
           ].join(' ')}
         >
           {isSaving ? 'Creando…' : `Crear ${typeLabel.toLowerCase()}`}
-        </button>
-      </div>
-    </DetailModal>
-  );
-}
-
-interface DashboardEditStoryModalProps {
-  open: boolean;
-  onClose: () => void;
-  row: DashboardSprintStoryRow;
-  epics: Epic[];
-  framework: PrioritizationFramework | null;
-  sprintOptions: SprintOption[];
-  sprintAssignmentLocked?: boolean;
-  estimationMode?: EstimationMode;
-  onSave: (
-    updates: Partial<UserStory>,
-    estimationUpdates?: Partial<StoryEstimation>,
-    options?: UpdateDashboardUserStoryOptions,
-    prioritizationUpdates?: Partial<StoryPrioritization>
-  ) => Promise<void>;
-}
-
-export function DashboardEditStoryModal({
-  open,
-  onClose,
-  row,
-  epics,
-  framework,
-  sprintOptions,
-  sprintAssignmentLocked = false,
-  estimationMode = 'story_points',
-  onSave,
-}: DashboardEditStoryModalProps) {
-  const workItemType = resolveWorkItemType(row.story);
-  const [title, setTitle] = useState(row.story.title);
-  const [description, setDescription] = useState(row.story.description);
-  const [criteria, setCriteria] = useState(row.story.acceptanceCriteria);
-  const [severity, setSeverity] = useState<BugSeverity>(
-    row.story.severity ?? 'medium'
-  );
-  const [steps, setSteps] = useState(row.story.stepsToReproduce ?? []);
-  const [technicalNotes, setTechnicalNotes] = useState(
-    row.story.technicalNotes ?? ''
-  );
-  const [epicId, setEpicId] = useState(row.epicId);
-  const [sprintId, setSprintId] = useState(row.sprintId ?? '');
-  const initialPoints = row.estimation?.points ?? 1;
-  const [points, setPoints] = useState(
-    String(isAllowedStoryPoint(initialPoints) ? initialPoints : 1)
-  );
-  const [durationLabel, setDurationLabel] = useState(
-    row.estimation?.durationLabel ?? defaultDurationLabel(workItemType)
-  );
-  const [category, setCategory] = useState<FrameworkCategory | ''>(
-    row.prioritization?.category ?? ''
-  );
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setTitle(row.story.title);
-    setDescription(row.story.description);
-    setCriteria(row.story.acceptanceCriteria);
-    setSeverity(row.story.severity ?? 'medium');
-    setSteps(row.story.stepsToReproduce ?? []);
-    setTechnicalNotes(row.story.technicalNotes ?? '');
-    setEpicId(row.epicId);
-    setSprintId(row.sprintId ?? '');
-    const pts = row.estimation?.points ?? 1;
-    setPoints(String(isAllowedStoryPoint(pts) ? pts : 1));
-    setDurationLabel(row.estimation?.durationLabel ?? defaultDurationLabel(workItemType));
-    setCategory(row.prioritization?.category ?? '');
-    setIsSaving(false);
-  }, [open, row]);
-
-  const parsedPoints = Number(points);
-  const isInvalidPoints =
-    estimationMode === 'story_points' && !isAllowedStoryPoint(parsedPoints);
-  const isInvalidDuration =
-    estimationMode === 'time' && !tryParseDurationLabel(durationLabel);
-  const storyCriteriaOk =
-    workItemType !== 'story' || criteria.some((c) => c.trim());
-  const bugStepsOk =
-    workItemType !== 'bug' || steps.some((s) => s.trim());
-  const isSaveDisabled =
-    !title.trim() ||
-    !description.trim() ||
-    !epicId ||
-    isInvalidPoints ||
-    isInvalidDuration ||
-    !storyCriteriaOk ||
-    !bugStepsOk ||
-    isSaving;
-  const hasEpicChange = epicId !== row.epicId;
-  const hasSprintChange =
-    !sprintAssignmentLocked && (sprintId || null) !== row.sprintId;
-  const hasPriorityChange = framework
-    ? category !== (row.prioritization?.category ?? '')
-    : false;
-
-  return (
-    <DetailModal
-      open={open}
-      onClose={onClose}
-      eyebrow={`Editar ${workItemTypeLabel(workItemType).toLowerCase()}`}
-      subtitle={row.story.id}
-      title={row.story.title}
-      maxWidth="xl"
-    >
-      <div className="mb-4">
-        <WorkItemTypeBadge type={workItemType} />
-      </div>
-
-      <StoryFormFields
-        epics={epics}
-        framework={framework}
-        sprintOptions={sprintOptions}
-        sprintDisabled={sprintAssignmentLocked}
-        workItemType={workItemType}
-        typeEditable={false}
-        epicId={epicId}
-        sprintId={sprintId}
-        title={title}
-        description={description}
-        criteria={criteria}
-        severity={severity}
-        steps={steps}
-        technicalNotes={technicalNotes}
-        points={points}
-        durationLabel={durationLabel}
-        estimationMode={estimationMode}
-        category={category}
-        onEpicIdChange={setEpicId}
-        onSprintIdChange={setSprintId}
-        onTitleChange={setTitle}
-        onDescriptionChange={setDescription}
-        onCriteriaChange={setCriteria}
-        onSeverityChange={setSeverity}
-        onStepsChange={setSteps}
-        onTechnicalNotesChange={setTechnicalNotes}
-        onPointsChange={setPoints}
-        onDurationChange={setDurationLabel}
-        onCategoryChange={setCategory}
-      />
-
-      <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          disabled={isSaveDisabled}
-          onClick={async () => {
-            if (isSaveDisabled) return;
-            setIsSaving(true);
-            try {
-              const updates: Partial<UserStory> = {
-                title: title.trim(),
-                description: description.trim(),
-                acceptanceCriteria: criteria,
-              };
-              if (workItemType === 'bug') {
-                updates.severity = severity;
-                updates.stepsToReproduce = steps;
-              }
-              if (workItemType === 'task') {
-                updates.technicalNotes = technicalNotes.trim();
-              }
-              await onSave(
-                updates,
-                {
-                  ...(estimationMode === 'time'
-                    ? {
-                        points: 0,
-                        durationLabel,
-                        justification:
-                          row.estimation?.justification ||
-                          'Estimacion ajustada manualmente desde el dashboard.',
-                        isModified: true,
-                      }
-                    : {
-                        points: parsedPoints,
-                        justification:
-                          row.estimation?.justification ||
-                          'Estimacion ajustada manualmente desde el dashboard.',
-                        isModified: true,
-                      }),
-                },
-                {
-                  ...(hasEpicChange ? { epicId } : {}),
-                  ...(hasSprintChange ? { sprintId: sprintId || null } : {}),
-                },
-                framework && hasPriorityChange && category
-                  ? {
-                      category,
-                      justification:
-                        row.prioritization?.justification ||
-                        'Priorizacion ajustada manualmente desde el dashboard.',
-                      isModified: true,
-                    }
-                  : undefined
-              );
-            } finally {
-              setIsSaving(false);
-            }
-          }}
-          className={[
-            'cursor-pointer rounded-lg px-3.5 py-2 text-sm font-medium transition-opacity',
-            isSaveDisabled
-              ? 'cursor-not-allowed bg-disabled text-disabled-text opacity-40'
-              : 'bg-foreground text-background hover:opacity-90',
-          ].join(' ')}
-        >
-          {isSaving ? 'Guardando…' : 'Guardar cambios'}
         </button>
       </div>
     </DetailModal>

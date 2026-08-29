@@ -18,6 +18,8 @@ interface CategorySelectProps {
   onChange: (category: FrameworkCategory) => void;
   disabled?: boolean;
   className?: string;
+  size?: 'default' | 'compact';
+  variant?: 'default' | 'ghost';
 }
 
 export function CategorySelect({
@@ -26,6 +28,8 @@ export function CategorySelect({
   onChange,
   disabled,
   className,
+  size,
+  variant,
 }: CategorySelectProps) {
   const categories = getFrameworkCategories(framework);
   const labels = getFrameworkLabels(framework);
@@ -41,6 +45,8 @@ export function CategorySelect({
       placeholder="—"
       disabled={disabled}
       className={className ?? 'w-44'}
+      size={size}
+      variant={variant}
     />
   );
 }

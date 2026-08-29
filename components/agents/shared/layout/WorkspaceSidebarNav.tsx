@@ -10,6 +10,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import {
+  SIDEBAR_ICON_CLASS,
+  sidebarGroupLabelClass,
+  sidebarIconSlotClass,
+  sidebarLabelClass,
+  sidebarNavItemClass,
+} from './sidebar-styles';
 
 const DESTINATIONS = [
   {
@@ -18,7 +25,7 @@ const DESTINATIONS = [
     description: 'Sprint activo, historial y métricas del proyecto.',
     requiresBoard: false,
     icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -33,26 +40,11 @@ const DESTINATIONS = [
     description: 'Historias, épicas y planificación de sprints.',
     requiresBoard: false,
     icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm0 5.25h.007v.008H3.75v-.008zm0 5.25h.007v.008H3.75v-.008z"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: '/agentes/stack',
-    label: 'Stack',
-    description: 'Arquitectura y tecnologías del proyecto.',
-    requiresBoard: false,
-    icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
         />
       </svg>
     ),
@@ -63,11 +55,26 @@ const DESTINATIONS = [
     description: 'Kanban de ejecución y equipo del sprint.',
     requiresBoard: true,
     icon: (
-      <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M9 4.5v15m6-15v15M4.5 9.75h15M4.5 14.25h15"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: '/agentes/stack',
+    label: 'Stack',
+    description: 'Arquitectura y tecnologías del proyecto.',
+    requiresBoard: false,
+    icon: (
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
         />
       </svg>
     ),
@@ -83,7 +90,7 @@ export function WorkspaceSidebarNav() {
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Vistas del proyecto">
-      <p className="mb-2 px-2.5 text-xs font-medium text-subtle">Workspace</p>
+      <p className={sidebarGroupLabelClass}>Workspace</p>
 
       {items.map((item) => {
         const isActive = pathname === item.href;
@@ -92,21 +99,12 @@ export function WorkspaceSidebarNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={[
-              'grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-lg px-2.5 py-2 transition-colors',
-              isActive
-                ? 'bg-elevated text-foreground'
-                : 'text-muted hover:bg-surface-hover hover:text-foreground',
-            ].join(' ')}
+            title={item.label}
+            className={sidebarNavItemClass(isActive)}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span className={isActive ? 'text-primary' : 'text-current'}>{item.icon}</span>
-            <span className={['truncate text-sm leading-5', isActive ? 'font-medium' : ''].join(' ')}>
-              {item.label}
-            </span>
-            {/* {isActive ? (
-              <span className="col-start-2 text-xs leading-snug text-subtle">{item.description}</span>
-            ) : null} */}
+            <span className={sidebarIconSlotClass}>{item.icon}</span>
+            <span className={sidebarLabelClass}>{item.label}</span>
           </Link>
         );
       })}

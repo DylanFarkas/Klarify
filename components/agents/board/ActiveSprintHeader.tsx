@@ -6,6 +6,8 @@ interface ActiveSprintHeaderProps {
   sprint: PlannedSprint;
   stories: BoardStory[];
   capacitySp?: number;
+  /** Flat layout without card chrome (dashboard / Circle-style). */
+  flat?: boolean;
 }
 
 function daysRemaining(endDate: string): number | null {
@@ -20,6 +22,7 @@ export function ActiveSprintHeader({
   sprint,
   stories,
   capacitySp,
+  flat = false,
 }: ActiveSprintHeaderProps) {
   const doneCount = stories.filter((s) => s.execution.status === 'done').length;
   const committedSp = stories.reduce((sum, s) => sum + s.points, 0);
@@ -33,7 +36,11 @@ export function ActiveSprintHeader({
 
   return (
     <section
-      className="rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5"
+      className={
+        flat
+          ? 'border-b border-border/60 pb-4'
+          : 'rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5'
+      }
       aria-label={`Sprint ${sprint.number} activo`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -42,7 +49,13 @@ export function ActiveSprintHeader({
             <p className="text-[13px] font-semibold text-foreground">
               Sprint {sprint.number}
             </p>
-            <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+            <span
+              className={
+                flat
+                  ? 'rounded-md bg-emerald-400/10 px-1.5 py-px text-[10px] font-medium text-emerald-700 dark:text-emerald-300'
+                  : 'rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300'
+              }
+            >
               Activo
             </span>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
@@ -21,6 +21,9 @@ interface DashboardSprintPlanProps {
 	members: ProjectMember[];
 	estimationMode?: EstimationMode;
 	executionBoardEnabled?: boolean;
+	/** Título de página (misma fila que buscar / épicas / nuevo). */
+	title?: string;
+	subtitle?: ReactNode;
 	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
 	onDeleteStory: (storyId: string) => Promise<void>;
 	onEditStory: (
@@ -65,6 +68,8 @@ export function DashboardSprintPlan({
 	members,
 	executionBoardEnabled = false,
 	estimationMode = 'story_points',
+	title,
+	subtitle,
 	onCreateStory,
 	onDeleteStory,
 	onEditStory,
@@ -81,8 +86,6 @@ export function DashboardSprintPlan({
 	const [isManagingEpics, setIsManagingEpics] = useState(false);
 	const [editingEpicId, setEditingEpicId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
-	const sprintCount = plan?.sprints.length ?? 0;
-	const backlogCount = unassignedRows.length;
 
 	const filteredRows = useMemo(
 		() => rows.filter((row) => matchesStorySearch(row, searchQuery)),
@@ -108,24 +111,25 @@ export function DashboardSprintPlan({
 	};
 
 	return (
-		<section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface">
-			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3.5 md:px-5">
-				<div className="min-w-0 flex-1">
-					<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
-						Backlog y sprints
-					</h2>
-					<p className="mt-1 text-[12px] text-muted">
-						Crea sprints, arrastra HU desde el backlog y edítalas en cualquier momento.
-						{' · '}
-						<span className="tabular-nums text-subtle">
-							{sprintCount} sprint{sprintCount !== 1 ? 's' : ''}
-							{' · '}
-							{backlogCount} en backlog
-						</span>
-					</p>
-				</div>
+		<section className="flex min-w-0 flex-col overflow-hidden">
+			<div
+				className={[
+					'flex flex-wrap items-center justify-between gap-x-3 gap-y-2',
+					title ? 'border-b border-border/60 pb-3' : 'pb-3',
+				].join(' ')}
+			>
+				{title ? (
+					<div className="min-w-0 flex flex-col justify-center gap-0.5">
+						<h1 className="truncate text-[50px] font-semibold tracking-tight text-foreground">
+							{title}
+						</h1>
+						{subtitle ? (
+							<p className="truncate text-[12px] text-muted">{subtitle}</p>
+						) : null}
+					</div>
+				) : null}
 
-				<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+				<div className="flex flex-wrap items-center justify-end gap-2">
 					<label className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
 						<span className="sr-only">Buscar historias</span>
 						<svg

@@ -74,12 +74,12 @@ export function StoryExecutionDrawer({
       title={item.story.title}
       subtitle={item.story.id}
       eyebrow={item.epicTitle}
-      maxWidth="xl"
+      maxWidth="2xl"
     >
       <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-surface p-4">
-          <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Ejecución</h3>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-border/60 bg-surface-muted/30 p-3.5">
+          <h3 className="text-[11px] font-medium uppercase tracking-[0.12em] text-subtle">Ejecución</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="story-status" className="text-[11px] font-medium text-subtle">
                 Estado
@@ -89,7 +89,7 @@ export function StoryExecutionDrawer({
                 value={item.execution.status}
                 onChange={(e) => onStatusChange(item.story.id, e.target.value as KanbanStatus)}
                 disabled={item.sprintLocked}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {KANBAN_COLUMNS.map((col) => (
                   <option key={col.id} value={col.id}>
@@ -112,7 +112,7 @@ export function StoryExecutionDrawer({
                   onAssigneeChange(item.story.id, e.target.value ? e.target.value : null)
                 }
                 disabled={item.sprintLocked}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Sin asignar</option>
                 {members.map((m) => (
@@ -141,10 +141,10 @@ export function StoryExecutionDrawer({
 
         {activity.length > 0 && (
           <section>
-            <h3 className="mb-2 text-[15px] font-semibold tracking-tight text-foreground">
+            <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-subtle">
               Actividad reciente
             </h3>
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
               {activity.map((entry, i) => (
                 <li
                   key={`${entry.at}-${i}`}

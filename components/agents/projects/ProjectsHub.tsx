@@ -330,7 +330,7 @@ export function ProjectsHub({ initialProjects }: ProjectsHubProps) {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-6 pt-3 pb-5">
       <header className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Proyectos</h1>
         <p className="text-sm leading-relaxed text-muted">

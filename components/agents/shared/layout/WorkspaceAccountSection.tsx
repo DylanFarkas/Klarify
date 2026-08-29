@@ -3,6 +3,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { getPlanDisplayName } from '@/lib/plans/plan-display';
+import { SIDEBAR_DURATION, SIDEBAR_EASE, sidebarIconTileClass, sidebarLabelClass } from './sidebar-styles';
 
 export function WorkspaceAccountSection() {
   const { user, signOut, loading } = useAuth();
@@ -15,29 +16,39 @@ export function WorkspaceAccountSection() {
   const planId = plan?.id ?? 'free';
 
   return (
-    <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-muted text-xs font-semibold text-foreground">
+    <div
+      className={[
+        'grid min-h-8 w-full grid-cols-[1.5rem_minmax(0,1fr)] items-center justify-center gap-x-2 overflow-hidden rounded-md px-2 py-1.5',
+        `transition-[grid-template-columns,gap,padding] ${SIDEBAR_DURATION} ${SIDEBAR_EASE} motion-reduce:transition-none`,
+        'group-data-[collapsed=true]/sidebar:grid-cols-[1.5rem_0fr]',
+        'group-data-[collapsed=true]/sidebar:gap-x-0',
+        'group-data-[collapsed=true]/sidebar:px-0',
+      ].join(' ')}
+    >
+      <div className={`${sidebarIconTileClass} rounded-full`} title={displayName}>
         {initial}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
-        <p className="truncate text-xs text-subtle">Plan {getPlanDisplayName(planId)}</p>
+      <div className={`${sidebarLabelClass} flex items-center gap-2`}>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-tight text-foreground">{displayName}</p>
+          <p className="truncate text-[11px] leading-tight text-subtle">Plan {getPlanDisplayName(planId)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          title="Cerrar sesión"
+          className="shrink-0 cursor-pointer rounded-md p-1 text-subtle hover:bg-surface-hover hover:text-foreground"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+            />
+          </svg>
+          <span className="sr-only">Cerrar sesión</span>
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        title="Cerrar sesión"
-        className="shrink-0 cursor-pointer rounded-md p-1.5 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
-          />
-        </svg>
-        <span className="sr-only">Cerrar sesión</span>
-      </button>
     </div>
   );
 }

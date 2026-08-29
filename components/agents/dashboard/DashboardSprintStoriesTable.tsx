@@ -4,44 +4,31 @@ import {
 	DndContext,
 	DragOverlay,
 	PointerSensor,
-	useDraggable,
-	useDroppable,
 	useSensor,
 	useSensors,
 	type DragEndEvent,
 	type DragStartEvent,
 } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DependencyBadge } from '@/components/agents/agent-5/DependencyBadge';
 import { SprintEditModal } from '@/components/agents/agent-5/SprintEditModal';
-import { StartSprintModal } from './StartSprintModal';
+import { BacklogStoriesSection } from '@/components/agents/backlog/BacklogStoriesSection';
+import {
+	partitionSprintGroups,
+	splitSprintGroups,
+} from '@/components/agents/backlog/sprint-plan-groups';
+import { SprintPlanSection } from '@/components/agents/backlog/SprintPlanSection';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
-import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
-import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
-import { DropdownSelect } from '@/components/ui/DropdownSelect';
-import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
-import { getFrameworkShortLabels, getFrameworkCategories } from '@/lib/constants/agent-4';
-import { SPRINT_COLORS } from '@/lib/constants/agent-5';
 import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
-import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
-import {
-	formatEffortTotal,
-	formatEstimation,
-	getEffortValue,
-} from '@/lib/utils/estimation';
-import type {
-	FrameworkCategory,
-	PrioritizationFramework,
-	StoryPrioritization,
-} from '@/lib/types/agent-4';
+import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { PlannedSprint, SprintDatePatch, SprintPlan } from '@/lib/types/agent-5';
 import { getSprintStatus } from '@/lib/types/agent-5';
-import type { ProjectMember, KanbanStatus } from '@/lib/types/execution';
-import { formatDateRangeEs } from '@/lib/utils/dates';
+import type { KanbanStatus, ProjectMember } from '@/lib/types/execution';
+import { getEffortValue } from '@/lib/utils/estimation';
+import { getSprintOptionsForPlan } from '@/lib/utils/backlog-story-navigation';
 import {
 	addSprintToPlan,
 	deleteEmptySprintAtIndex,
@@ -53,15 +40,12 @@ import {
 	updateSprintDates,
 	updateSprintGoal,
 } from '@/lib/utils/sprint-plan-mutations';
-import type { DashboardSprintStoryRow } from './dashboardMetrics';
-import {
-	DashboardCreateStoryModal,
-	DashboardEditStoryModal,
-} from './DashboardStoryFormModal';
-import { ExecutionStatusBadge, ExecutionStatusSelect } from './ExecutionStatusBadge';
-import { AssigneeAvatarStatic, AssigneeSelect } from './AssigneeSelect';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import type { DashboardSprintStoryRow } from './dashboardMetrics';
+import { DashboardCreateStoryModal } from './DashboardStoryFormModal';
+import { ExecutionStatusBadge } from './ExecutionStatusBadge';
+import { StartSprintModal } from './StartSprintModal';
 
 interface DashboardSprintStoriesTableProps {
 	epics: Epic[];
@@ -92,12 +76,9 @@ interface DashboardSprintStoriesTableProps {
 	) => Promise<void>;
 	onManageEpic?: (epicId: string) => void;
 	estimationMode?: EstimationMode;
-	/** When true, skips the outer section chrome (used inside DashboardSprintPlan). */
 	embedded?: boolean;
-	/** Controlled create-panel open state (used when embedded). */
 	isCreating?: boolean;
 	onCreatingChange?: (open: boolean) => void;
-	/** When searching, hide sprint/backlog groups with no matching stories. */
 	hideEmptyGroups?: boolean;
 }
 
@@ -107,14 +88,6 @@ function parseDragId(id: string): { type: 'story' | 'sprint'; value: string } | 
 		return { type, value: type === 'sprint' && value === 'unassigned' ? 'unassigned' : value };
 	}
 	return null;
-}
-
-function getCapacityColor(velocity: number, capacity: number): string {
-	const ratio = velocity / capacity;
-	if (ratio <= 0.5) return 'bg-emerald-500';
-	if (ratio <= 0.75) return 'bg-amber-500';
-	if (ratio <= 1.0) return 'bg-orange-500';
-	return 'bg-red-500';
 }
 
 export function DashboardSprintStoriesTable({
@@ -144,7 +117,6 @@ export function DashboardSprintStoriesTable({
 }: DashboardSprintStoriesTableProps) {
 	const confirm = useConfirm();
 	const [detailRow, setDetailRow] = useState<DashboardSprintStoryRow | null>(null);
-	const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
 	const [internalCreating, setInternalCreating] = useState(false);
 	const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
 	const [depsExpanded, setDepsExpanded] = useState(false);
@@ -169,32 +141,32 @@ export function DashboardSprintStoriesTable({
 	const repairAttempted = useRef(false);
 	const canManagePlan = Boolean(safePlan && onUpdateSprintPlan);
 
-	const hasNextPlannedAfter = useCallback(
-		(sprint: PlannedSprint) => {
-			if (!safePlan) return false;
-			const idx = safePlan.sprints.findIndex((s) => s.id === sprint.id);
-			if (idx < 0) return false;
-			return safePlan.sprints.slice(idx + 1).some((s) => getSprintStatus(s) === 'planned');
-		},
-		[safePlan]
+	const { backlogGroup, sprintGroups } = useMemo(
+		() => splitSprintGroups(safePlan, rows, unassignedRows, estimationMode, hideEmptyGroups),
+		[safePlan, rows, unassignedRows, estimationMode, hideEmptyGroups]
 	);
 
-	useEffect(() => {
-		if (!safePlan || !onUpdateSprintPlan || repairAttempted.current) return;
-		if (!hasDuplicateSprintIds(plan!) && !hasSprintLabelMismatches(plan!)) return;
-		repairAttempted.current = true;
-		onUpdateSprintPlan(safePlan);
-	}, [plan, safePlan, onUpdateSprintPlan]);
+	const { activeAndPlanned, completed } = useMemo(
+		() => partitionSprintGroups(sprintGroups),
+		[sprintGroups]
+	);
 
-	const sprintOptions = useMemo(() => getSprintOptions(safePlan, rows), [safePlan, rows]);
-	const groups = useMemo(() => {
-		const all = buildSprintGroups(safePlan, rows, unassignedRows, estimationMode);
-		if (!hideEmptyGroups) return all;
-		return all.filter((group) => group.rows.length > 0);
-	}, [safePlan, rows, unassignedRows, hideEmptyGroups, estimationMode]);
+	const sprintOptions = useMemo(
+		() => getSprintOptionsForPlan(safePlan, rows),
+		[safePlan, rows]
+	);
+
+	const allBacklogRows = useMemo(
+		() => (safePlan ? unassignedRows : rows.filter((r) => !r.sprintId)),
+		[safePlan, unassignedRows, rows]
+	);
+
 	const hasContent =
-		groups.some((g) => g.rows.length > 0) ||
+		backlogGroup.rows.length > 0 ||
+		activeAndPlanned.length > 0 ||
+		completed.length > 0 ||
 		(!hideEmptyGroups && Boolean(safePlan?.sprints.length));
+
 	const storyMap = useMemo(() => {
 		const map: Record<string, string> = {};
 		for (const row of [...rows, ...unassignedRows]) {
@@ -213,6 +185,23 @@ export function DashboardSprintStoriesTable({
 		},
 		[onUpdateSprintPlan]
 	);
+
+	const hasNextPlannedAfter = useCallback(
+		(sprint: PlannedSprint) => {
+			if (!safePlan) return false;
+			const idx = safePlan.sprints.findIndex((s) => s.id === sprint.id);
+			if (idx < 0) return false;
+			return safePlan.sprints.slice(idx + 1).some((s) => getSprintStatus(s) === 'planned');
+		},
+		[safePlan]
+	);
+
+	useEffect(() => {
+		if (!safePlan || !onUpdateSprintPlan || repairAttempted.current) return;
+		if (!hasDuplicateSprintIds(plan!) && !hasSprintLabelMismatches(plan!)) return;
+		repairAttempted.current = true;
+		onUpdateSprintPlan(safePlan);
+	}, [plan, safePlan, onUpdateSprintPlan]);
 
 	const handleCreateStory = useCallback(
 		async (input: CreateDashboardUserStoryInput) => {
@@ -293,14 +282,41 @@ export function DashboardSprintStoriesTable({
 		(storyId: string, fromSprintId: string | null, toSprintId: string | null) => {
 			const current = planRef.current;
 			if (!current || !onUpdateSprintPlan) return;
+			if (fromSprintId === toSprintId) return;
 			const storyEffort = getEffortValue(estimations[storyId], estimationMode);
 			try {
 				persistPlan(moveStoryInPlan(current, storyId, fromSprintId, toSprintId, storyEffort));
+				notifySuccess('Historia movida');
 			} catch (err) {
 				notifyError(
 					err instanceof SprintLifecycleError
 						? err.message
 						: errorMessage(err, 'No se pudo mover la historia')
+				);
+			}
+		},
+		[estimations, estimationMode, onUpdateSprintPlan, persistPlan]
+	);
+
+	const handleBulkAssign = useCallback(
+		(sprintId: string, storyIds: string[]) => {
+			const current = planRef.current;
+			if (!current || !onUpdateSprintPlan || storyIds.length === 0) return;
+			let nextPlan = current;
+			try {
+				for (const storyId of storyIds) {
+					const storyEffort = getEffortValue(estimations[storyId], estimationMode);
+					nextPlan = moveStoryInPlan(nextPlan, storyId, null, sprintId, storyEffort);
+				}
+				persistPlan(nextPlan);
+				notifySuccess(
+					`${storyIds.length} historia${storyIds.length !== 1 ? 's' : ''} asignada${storyIds.length !== 1 ? 's' : ''}`
+				);
+			} catch (err) {
+				notifyError(
+					err instanceof SprintLifecycleError
+						? err.message
+						: errorMessage(err, 'No se pudieron asignar las historias')
 				);
 			}
 		},
@@ -351,11 +367,7 @@ export function DashboardSprintStoriesTable({
 	);
 
 	const handleStartSprint = useCallback(
-		async (input: {
-			sprintId: string;
-			goal: string;
-			dates: SprintDatePatch;
-		}) => {
+		async (input: { sprintId: string; goal: string; dates: SprintDatePatch }) => {
 			if (!onStartSprint || lifecycleBusy) return;
 			const current = planRef.current;
 			if (!current) return;
@@ -431,38 +443,19 @@ export function DashboardSprintStoriesTable({
 		? [...rows, ...unassignedRows].find((r) => r.story.id === activeStoryId)?.story.title
 		: null;
 
-	const editingRow = useMemo(
-		() =>
-			editingStoryId
-				? [...rows, ...unassignedRows].find((row) => row.story.id === editingStoryId) ?? null
-				: null,
-		[editingStoryId, rows, unassignedRows]
-	);
-	const editingSprintLocked = Boolean(
-		editingRow?.sprintId &&
-			safePlan?.sprints.some(
-				(sprint) => sprint.id === editingRow.sprintId && getSprintStatus(sprint) === 'completed'
-			)
-	);
-	const editSprintOptions = useMemo(() => {
-		if (!editingRow?.sprintId || sprintOptions.some((option) => option.id === editingRow.sprintId)) {
-			return sprintOptions;
-		}
-		return [
-			...sprintOptions,
-			{
-				id: editingRow.sprintId,
-				label: editingRow.sprintNumber
-					? `Sprint ${editingRow.sprintNumber}`
-					: editingRow.sprintId,
-			},
-		];
-	}, [editingRow, sprintOptions]);
+	const statusHandlers =
+		canEditStatus && onUpdateStoryStatus
+			? handleUpdateStoryStatus
+			: undefined;
+	const assigneeHandlers =
+		canEditStatus && onUpdateStoryAssignee
+			? handleUpdateStoryAssignee
+			: undefined;
 
 	const dependenciesBanner =
 		safePlan && safePlan.dependencies.length > 0 ? (
 			<div className="border-b border-border px-6 pt-5">
-				<div className="rounded-xl border mb-4 border-amber-400/20 bg-amber-400/5">
+				<div className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/5">
 					<button
 						type="button"
 						onClick={() => setDepsExpanded(!depsExpanded)}
@@ -491,7 +484,7 @@ export function DashboardSprintStoriesTable({
 						</div>
 						<span className="text-[10px] text-amber-600/80">{depsExpanded ? 'Ocultar' : 'Ver'}</span>
 					</button>
-					{depsExpanded && (
+					{depsExpanded ? (
 						<div className="flex flex-wrap gap-1 border-t border-amber-400/15 px-4 py-2.5">
 							{safePlan.dependencies.map((dep) => (
 								<DependencyBadge
@@ -503,91 +496,64 @@ export function DashboardSprintStoriesTable({
 								/>
 							))}
 						</div>
-					)}
+					) : null}
 				</div>
 			</div>
 		) : null;
 
-	const tableBody = hasContent ? (
-		<div className="@container min-w-0">
-			<table className="w-full table-fixed border-collapse text-left">
-				<thead className="border-b border-border bg-surface-muted/60">
-					<tr className="text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">
-						<th className="hidden w-24 px-3 py-3 @3xl:table-cell @3xl:px-4">ID</th>
-						<th className="min-w-0 px-3 py-3 @lg:px-4">HU</th>
-						<th className="hidden w-[16%] px-3 py-3 @2xl:table-cell @2xl:px-4">Epica</th>
-						<th
-							className={
-								estimationMode === 'time'
-									? 'w-20 px-2 py-3 @lg:w-24 @lg:px-3'
-									: 'w-16 px-2 py-3 @lg:w-22 @lg:px-3'
-							}
-						>
-							{estimationMode === 'time' ? 'Tiempo' : 'SP'}
-						</th>
-						<th className="w-28 px-2 py-3 @xl:w-32 @xl:px-3">Prioridad</th>
-						<th className="hidden w-36 px-2 py-3 @xl:table-cell @xl:px-3">Estado</th>
-						<th className="hidden w-14 px-2 py-3 @2xl:table-cell @2xl:px-3">Asignado</th>
-						<th className="w-23 px-2 py-3 text-right @lg:w-27 @lg:px-3">Acciones</th>
-					</tr>
-				</thead>
-				<tbody>
-					{groups.map((group) => {
-						const status = group.sprint ? getSprintStatus(group.sprint) : null;
-						return (
-							<SprintGroupRows
-								key={group.key}
-								framework={framework}
-								group={group}
-								canManagePlan={canManagePlan}
-								capacitySp={safePlan?.config.sprintCapacitySp ?? 20}
-								estimationMode={estimationMode}
-								memberById={memberById}
-								members={members}
-								lifecycleBusy={lifecycleBusy}
-								onDeleteStory={handleDeleteStory}
-								onEditStory={handleEditStory}
-								onUpdateStoryStatus={
-									canEditStatus && onUpdateStoryStatus
-										? handleUpdateStoryStatus
-										: undefined
-								}
-								onUpdateStoryAssignee={
-									canEditStatus && onUpdateStoryAssignee
-										? handleUpdateStoryAssignee
-										: undefined
-								}
-								onOpenDetail={setDetailRow}
-								onStartEdit={setEditingStoryId}
-								onEditSprint={
-									group.sprint
-										? () => setEditingSprint(group.sprint)
-										: undefined
-								}
-								onDeleteSprint={
-									group.sprintIndex != null &&
-									group.sprint?.storyIds.length === 0 &&
-									status !== 'completed'
-										? () => handleDeleteSprint(group.sprintIndex!)
-										: undefined
-								}
-								onStartSprint={
-									group.sprint && status === 'planned' && onStartSprint
-										? () => setStartingSprint(group.sprint)
-										: undefined
-								}
-								onCompleteSprint={
-									group.sprint && status === 'active' && onCompleteSprint
-										? () => setCompletingSprint(group.sprint)
-										: undefined
-								}
-								onManageEpic={onManageEpic}
-							/>
-						);
-					})}
-				</tbody>
-			</table>
-		</div>
+	const zonesBody = hasContent ? (
+		<>
+			{(backlogGroup.rows.length > 0 || !hideEmptyGroups) ? (
+				<BacklogStoriesSection
+					group={backlogGroup}
+					framework={framework}
+					estimationMode={estimationMode}
+					plan={safePlan}
+					sprintOptions={sprintOptions}
+					canManagePlan={canManagePlan}
+					memberById={memberById}
+					members={members}
+					onDeleteStory={handleDeleteStory}
+					onEditStory={handleEditStory}
+					onUpdateStoryStatus={statusHandlers}
+					onUpdateStoryAssignee={assigneeHandlers}
+					onMoveStory={canManagePlan ? handleMoveStory : undefined}
+					onOpenDetail={setDetailRow}
+					onManageEpic={onManageEpic}
+				/>
+			) : null}
+
+			{safePlan ? (
+				<SprintPlanSection
+					sprintGroups={activeAndPlanned}
+					completedGroups={completed}
+					framework={framework}
+					estimationMode={estimationMode}
+					plan={safePlan}
+					sprintOptions={sprintOptions}
+					capacitySp={safePlan.config.sprintCapacitySp ?? 20}
+					canManagePlan={canManagePlan}
+					lifecycleBusy={lifecycleBusy}
+					backlogRows={allBacklogRows}
+					hideEmptyGroups={hideEmptyGroups}
+					memberById={memberById}
+					members={members}
+					onAddSprint={handleAddSprint}
+					onDeleteStory={handleDeleteStory}
+					onEditStory={handleEditStory}
+					onUpdateStoryStatus={statusHandlers}
+					onUpdateStoryAssignee={assigneeHandlers}
+					onMoveStory={canManagePlan ? handleMoveStory : undefined}
+					onBulkAssign={canManagePlan ? handleBulkAssign : undefined}
+					onOpenDetail={setDetailRow}
+					onEditSprint={(group) => group.sprint && setEditingSprint(group.sprint)}
+					onDeleteSprint={handleDeleteSprint}
+					onStartSprint={(group) => group.sprint && onStartSprint && setStartingSprint(group.sprint)}
+					onCompleteSprint={(group) => group.sprint && onCompleteSprint && setCompletingSprint(group.sprint)}
+					onManageEpic={onManageEpic}
+				/>
+			) : null}
+		</>
 	) : (
 		<div className="px-6 py-10">
 			<div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-8 text-center">
@@ -601,14 +567,12 @@ export function DashboardSprintStoriesTable({
 				) : (
 					<>
 						<p className="text-sm font-semibold text-foreground">
-							{canManagePlan
-								? 'Crea tu primer sprint'
-								: 'Todavía no hay sprints para mostrar.'}
+							{canManagePlan ? 'Crea tu primer sprint' : 'Todavía no hay sprints para mostrar.'}
 						</p>
 						<p className="mt-2 text-sm text-muted">
 							{canManagePlan
-								? 'Todas las historias están en el backlog. Crea un sprint y arrastra las HU que quieras incluir.'
-								: 'Cuando haya un plan de sprints, esta tabla mostrará las HU organizadas.'}
+								? 'Todas las historias están en el backlog. Crea un sprint y asigna HU con el selector Sprint.'
+								: 'Cuando haya un plan de sprints, verás las HU organizadas aquí.'}
 						</p>
 						{canManagePlan && safePlan ? (
 							<button
@@ -628,35 +592,11 @@ export function DashboardSprintStoriesTable({
 		</div>
 	);
 
-	const addSprintButton =
-		canManagePlan && safePlan && !hideEmptyGroups ? (
-			<div className="px-6 py-4">
-				<button
-					type="button"
-					onClick={() => handleAddSprint()}
-					className={[
-						'flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border',
-						'px-5 py-4 text-sm font-medium',
-						safePlan.sprints.length === 0
-							? 'border-primary/40 bg-primary/5 text-foreground hover:bg-primary/10'
-							: 'text-muted hover:border-primary hover:bg-primary/5 hover:text-foreground',
-						'cursor-pointer transition-colors',
-					].join(' ')}
-				>
-					<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-						<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-					</svg>
-					{safePlan.sprints.length === 0 ? 'Crear sprint' : 'Nuevo sprint'}
-				</button>
-			</div>
-		) : null;
-
 	const tableContent = (
 		<>
 			{dependenciesBanner}
 			<DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-				{tableBody}
-				{addSprintButton}
+				{zonesBody}
 				<DragOverlay>
 					{activeStoryTitle ? (
 						<div className="rounded-lg border border-border bg-surface px-4 py-2 shadow-sm">
@@ -666,27 +606,23 @@ export function DashboardSprintStoriesTable({
 				</DragOverlay>
 			</DndContext>
 
-			{editingSprint && safePlan && (
+			{editingSprint && safePlan ? (
 				<SprintEditModal
 					open={Boolean(editingSprint)}
 					onClose={() => setEditingSprint(null)}
-					sprint={
-						safePlan.sprints.find((s) => s.id === editingSprint.id) ?? editingSprint
-					}
+					sprint={safePlan.sprints.find((s) => s.id === editingSprint.id) ?? editingSprint}
 					sprintIndex={safePlan.sprints.findIndex((s) => s.id === editingSprint.id)}
 					allSprints={safePlan.sprints}
 					defaultDurationWeeks={safePlan.config.sprintDurationWeeks}
 					onGoalChange={(goal) => handleGoalChange(editingSprint.id, goal)}
 					onDatesChange={(patch) => handleDatesChange(editingSprint.id, patch)}
 				/>
-			)}
+			) : null}
 
 			{startingSprint && safePlan ? (
 				<StartSprintModal
 					open={Boolean(startingSprint)}
-					sprint={
-						safePlan.sprints.find((s) => s.id === startingSprint.id) ?? startingSprint
-					}
+					sprint={safePlan.sprints.find((s) => s.id === startingSprint.id) ?? startingSprint}
 					plan={safePlan}
 					busy={lifecycleBusy}
 					onClose={() => {
@@ -723,39 +659,15 @@ export function DashboardSprintStoriesTable({
 				}}
 			/>
 
-			{editingRow ? (
-				<DashboardEditStoryModal
-					open={Boolean(editingRow)}
-					onClose={() => setEditingStoryId(null)}
-					row={editingRow}
-					epics={epics}
-					framework={framework}
-					sprintOptions={editSprintOptions}
-					sprintAssignmentLocked={editingSprintLocked}
-					estimationMode={estimationMode}
-					onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
-						const savePromise = handleEditStory(
-							editingRow.story.id,
-							updates,
-							estimationUpdates,
-							options,
-							prioritizationUpdates
-						);
-						setEditingStoryId(null);
-						await savePromise;
-					}}
-				/>
-			) : null}
-
 			<DetailModal
 				open={Boolean(detailRow)}
 				onClose={() => setDetailRow(null)}
 				title={detailRow?.story.title ?? ''}
 				subtitle={detailRow?.story.id}
 				eyebrow={detailRow?.sprintNumber ? `Sprint ${detailRow.sprintNumber}` : 'Historia de usuario'}
-				maxWidth="xl"
+				maxWidth="2xl"
 			>
-				{detailRow && (
+				{detailRow ? (
 					<>
 						<div className="mb-4">
 							<ExecutionStatusBadge status={detailRow.executionStatus} />
@@ -769,7 +681,7 @@ export function DashboardSprintStoriesTable({
 							framework={framework ?? undefined}
 						/>
 					</>
-				)}
+				) : null}
 			</DetailModal>
 		</>
 	);
@@ -785,7 +697,7 @@ export function DashboardSprintStoriesTable({
 					<p className="text-[11px] font-bold uppercase tracking-[0.16em] text-subtle">Plan de sprints</p>
 					<h2 className="mt-2 text-xl font-bold text-foreground">Sprints e historias de usuario</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-						Ajusta sprints e historias en un solo lugar. Arrastra HU entre sprints o edita su contenido.
+						Backlog arriba, sprints abajo. Asigna HU con el selector Sprint o arrastrándolas.
 					</p>
 				</div>
 				<div className="flex flex-wrap items-start gap-3">
@@ -811,721 +723,6 @@ export function DashboardSprintStoriesTable({
 			</div>
 			{tableContent}
 		</section>
-	);
-}
-
-interface SprintRowsGroup {
-	key: string;
-	label: string;
-	meta: string;
-	rows: DashboardSprintStoryRow[];
-	sprint: PlannedSprint | null;
-	sprintIndex: number | null;
-	colorClass: string;
-	isUnassigned: boolean;
-	velocitySp: number;
-}
-
-interface SprintOption {
-	id: string;
-	label: string;
-}
-
-function buildSprintGroups(
-	plan: SprintPlan | null,
-	rows: DashboardSprintStoryRow[],
-	unassignedRows: DashboardSprintStoryRow[],
-	estimationMode: EstimationMode
-): SprintRowsGroup[] {
-	const rowsBySprint = new Map<string, DashboardSprintStoryRow[]>();
-	rows.forEach((row) => {
-		if (!row.sprintId) return;
-		const list = rowsBySprint.get(row.sprintId) ?? [];
-		list.push(row);
-		rowsBySprint.set(row.sprintId, list);
-	});
-
-	const groups: SprintRowsGroup[] = [];
-
-	if (plan) {
-		plan.sprints.forEach((sprint, idx) => {
-			groups.push({
-				key: sprint.id,
-				label: `Sprint ${sprint.number}`,
-				meta: [
-					sprint.sprintGoal,
-					formatDateRangeEs(sprint.startDate, sprint.endDate),
-				]
-					.filter(Boolean)
-					.join(' · '),
-				rows: rowsBySprint.get(sprint.id) ?? [],
-				sprint,
-				sprintIndex: idx,
-				colorClass: SPRINT_COLORS[idx % SPRINT_COLORS.length],
-				isUnassigned: false,
-				velocitySp: sprint.velocitySp,
-			});
-		});
-	} else {
-		const fallback = groupRowsBySprint(rows);
-		fallback.forEach((group) => {
-			groups.push({
-				...group,
-				sprint: null,
-				sprintIndex: null,
-				colorClass: 'border-l-border',
-				isUnassigned: group.key === 'unassigned',
-				velocitySp: group.rows.reduce(
-					(sum, r) => sum + getEffortValue(r.estimation, estimationMode),
-					0
-				),
-			});
-		});
-	}
-
-	const unresolvedUnassigned =
-		plan != null
-			? unassignedRows
-			: rows.filter((r) => !r.sprintId);
-
-	if (plan || unresolvedUnassigned.length > 0) {
-		groups.unshift({
-			key: 'unassigned',
-			label: 'Backlog',
-			meta: 'Suelta historias aquí o arrástralas a un sprint',
-			rows: plan ? unassignedRows : unresolvedUnassigned,
-			sprint: null,
-			sprintIndex: null,
-			colorClass: 'border-l-border',
-			isUnassigned: true,
-			velocitySp: (plan ? unassignedRows : unresolvedUnassigned).reduce(
-				(sum, r) => sum + getEffortValue(r.estimation, estimationMode),
-				0
-			),
-		});
-	}
-
-	return groups;
-}
-
-function groupRowsBySprint(rows: DashboardSprintStoryRow[]): Omit<
-	SprintRowsGroup,
-	'sprint' | 'sprintIndex' | 'colorClass' | 'isUnassigned' | 'velocitySp'
->[] {
-	const groups = new Map<
-		string,
-		Omit<SprintRowsGroup, 'sprint' | 'sprintIndex' | 'colorClass' | 'isUnassigned' | 'velocitySp'>
-	>();
-
-	rows.forEach((row) => {
-		const key = row.sprintId ?? 'unassigned';
-		const existing = groups.get(key);
-		if (existing) {
-			existing.rows.push(row);
-			return;
-		}
-
-		groups.set(key, {
-			key,
-			label: row.sprintNumber ? `Sprint ${row.sprintNumber}` : 'Sin sprint',
-			meta: [row.sprintGoal, formatDateRange(row.startDate, row.endDate)].filter(Boolean).join(' / '),
-			rows: [row],
-		});
-	});
-
-	return Array.from(groups.values());
-}
-
-function getSprintOptions(plan: SprintPlan | null, rows: DashboardSprintStoryRow[]): SprintOption[] {
-	const options = new Map<string, SprintOption>();
-	const closedIds = new Set(
-		(plan?.sprints ?? [])
-			.filter((sprint) => getSprintStatus(sprint) === 'completed')
-			.map((sprint) => sprint.id)
-	);
-
-	plan?.sprints.forEach((sprint) => {
-		if (closedIds.has(sprint.id)) return;
-		options.set(sprint.id, {
-			id: sprint.id,
-			label: `Sprint ${sprint.number}`,
-		});
-	});
-
-	rows.forEach((row) => {
-		if (!row.sprintId || !row.sprintNumber || closedIds.has(row.sprintId)) return;
-		options.set(row.sprintId, {
-			id: row.sprintId,
-			label: `Sprint ${row.sprintNumber}`,
-		});
-	});
-
-	return Array.from(options.values());
-}
-
-function SprintGroupRows({
-	framework,
-	group,
-	canManagePlan,
-	capacitySp,
-	estimationMode,
-	memberById,
-	members,
-	lifecycleBusy,
-	onDeleteStory,
-	onEditStory,
-	onUpdateStoryStatus,
-	onUpdateStoryAssignee,
-	onOpenDetail,
-	onStartEdit,
-	onEditSprint,
-	onDeleteSprint,
-	onStartSprint,
-	onCompleteSprint,
-	onManageEpic,
-}: {
-	framework: PrioritizationFramework | null;
-	group: SprintRowsGroup;
-	canManagePlan: boolean;
-	capacitySp: number;
-	estimationMode: EstimationMode;
-	memberById: Map<string, ProjectMember>;
-	members: ProjectMember[];
-	lifecycleBusy: boolean;
-	onDeleteStory: (storyId: string) => Promise<void>;
-	onEditStory: (
-		storyId: string,
-		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions,
-		prioritizationUpdates?: Partial<StoryPrioritization>
-	) => Promise<void>;
-	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
-	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
-	onOpenDetail: (row: DashboardSprintStoryRow) => void;
-	onStartEdit: (storyId: string) => void;
-	onEditSprint?: () => void;
-	onDeleteSprint?: () => void;
-	onStartSprint?: () => void;
-	onCompleteSprint?: () => void;
-	onManageEpic?: (epicId: string) => void;
-}) {
-	const dropDisabled =
-		!canManagePlan || (group.sprint ? getSprintStatus(group.sprint) === 'completed' : false);
-	const dropId = group.isUnassigned ? 'sprint:unassigned' : `sprint:${group.key}`;
-	const { setNodeRef, isOver } = useDroppable({
-		id: dropId,
-		data: { sprintId: group.isUnassigned ? null : group.key },
-		disabled: dropDisabled,
-	});
-
-	const showCapacity = estimationMode === 'story_points' && !group.isUnassigned;
-	const capacityPct = showCapacity ? Math.round((group.velocitySp / capacitySp) * 100) : 0;
-	const isOverCapacity = showCapacity && group.velocitySp > capacitySp;
-	const status = group.sprint ? getSprintStatus(group.sprint) : null;
-
-	return (
-		<>
-			<tr
-				ref={!dropDisabled ? setNodeRef : undefined}
-				className={[
-					'border-b border-border bg-surface-hover/50',
-					group.colorClass,
-					'border-l-4',
-					isOver ? 'bg-primary/10 ring-2 ring-inset ring-primary/20' : '',
-				].join(' ')}
-			>
-				<td colSpan={8} className="px-3 py-3 @lg:px-6">
-					<div className="flex flex-wrap items-center gap-2 @lg:gap-3">
-						<div className="min-w-0 flex-1">
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="text-sm font-bold text-foreground">{group.label}</span>
-								{status ? <SprintStatusBadge status={status} /> : null}
-							</div>
-							{group.sprint && onEditSprint ? (
-								<button
-									type="button"
-									onClick={onEditSprint}
-									className="mt-0.5 block max-w-full cursor-pointer truncate text-left text-xs text-muted transition-colors hover:text-primary @2xl:max-w-2xl"
-									title="Editar sprint"
-								>
-									{group.meta}
-								</button>
-							) : (
-								<span className="mt-0.5 block truncate text-xs text-muted">{group.meta}</span>
-							)}
-						</div>
-
-						{showCapacity && (
-							<div
-								className="h-2 w-14 shrink-0 overflow-hidden rounded-full bg-surface-muted @md:w-20 @xl:w-24"
-								title={`${group.velocitySp}/${capacitySp} SP`}
-							>
-								<div
-									className={`h-full rounded-full transition-all ${getCapacityColor(group.velocitySp, capacitySp)} ${isOverCapacity ? 'ring-1 ring-amber-400/40' : ''}`}
-									style={{ width: `${Math.min(capacityPct, 100)}%` }}
-								/>
-							</div>
-						)}
-
-						<span className="shrink-0 rounded-full border border-border bg-surface px-2 py-1 text-[11px] font-bold text-foreground @lg:px-2.5 @lg:text-xs">
-							{group.rows.length} HU · {formatEffortTotal(group.velocitySp, estimationMode)}
-						</span>
-
-						{onStartSprint ? (
-							<button
-								type="button"
-								onClick={onStartSprint}
-								disabled={lifecycleBusy}
-								className="cursor-pointer rounded-lg border border-border bg-foreground px-2.5 py-1 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-							>
-								Iniciar
-							</button>
-						) : null}
-
-						{onCompleteSprint ? (
-							<button
-								type="button"
-								onClick={onCompleteSprint}
-								disabled={lifecycleBusy}
-								className="cursor-pointer rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-							>
-								Cerrar
-							</button>
-						) : null}
-
-						{onDeleteSprint && (
-							<button
-								type="button"
-								onClick={onDeleteSprint}
-								className="cursor-pointer rounded-lg px-1.5 py-1 text-muted transition-colors hover:text-danger"
-								title="Eliminar sprint vacío"
-								aria-label="Eliminar sprint vacío"
-							>
-								<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-									<path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							</button>
-						)}
-					</div>
-				</td>
-			</tr>
-			{group.rows.length === 0 ? (
-				<tr className={isOver ? 'bg-primary/5' : ''}>
-					<td colSpan={8} className="px-3 py-6 text-center text-xs text-muted @lg:px-6">
-						{canManagePlan
-							? group.isUnassigned
-								? 'Suelta historias aquí para desasignarlas'
-								: status === 'completed'
-									? 'Sprint cerrado.'
-									: 'Sin historias, arrastra aquí para asignar.'
-							: 'Sin historias asignadas.'}
-					</td>
-				</tr>
-			) : (
-				group.rows.map((row) => (
-					<StoryRow
-						key={row.id}
-						framework={framework}
-						estimationMode={estimationMode}
-						row={row}
-						assignee={
-							row.assigneeId ? memberById.get(row.assigneeId) ?? null : null
-						}
-						members={members}
-						canDrag={canManagePlan && status !== 'completed'}
-						locked={status === 'completed'}
-						onDelete={async () => onDeleteStory(row.story.id)}
-						onEditStory={onEditStory}
-						onUpdateStoryStatus={onUpdateStoryStatus}
-						onUpdateStoryAssignee={onUpdateStoryAssignee}
-						onOpenDetail={() => onOpenDetail(row)}
-						onStartEdit={() => onStartEdit(row.story.id)}
-						onManageEpic={onManageEpic}
-					/>
-				))
-			)}
-		</>
-	);
-}
-
-function StoryRow({
-	framework,
-	estimationMode,
-	row,
-	assignee,
-	members,
-	canDrag,
-	locked = false,
-	onDelete,
-	onEditStory,
-	onUpdateStoryStatus,
-	onUpdateStoryAssignee,
-	onOpenDetail,
-	onStartEdit,
-	onManageEpic,
-}: {
-	framework: PrioritizationFramework | null;
-	estimationMode: EstimationMode;
-	row: DashboardSprintStoryRow;
-	assignee: ProjectMember | null;
-	members: ProjectMember[];
-	canDrag: boolean;
-	locked?: boolean;
-	onDelete: () => Promise<void>;
-	onEditStory: (
-		storyId: string,
-		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions,
-		prioritizationUpdates?: Partial<StoryPrioritization>
-	) => Promise<void>;
-	onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
-	onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
-	onOpenDetail: () => void;
-	onStartEdit: () => void;
-	onManageEpic?: (epicId: string) => void;
-}) {
-	const confirm = useConfirm();
-	const [isDeleting, setIsDeleting] = useState(false);
-	const [isSavingField, setIsSavingField] = useState<
-		'points' | 'priority' | 'status' | 'assignee' | null
-	>(null);
-	const dragId = `story:${row.story.id}`;
-	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-		id: dragId,
-		data: { storyId: row.story.id, sprintId: row.sprintId },
-		disabled: !canDrag,
-	});
-
-	const style = transform
-		? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.5 : 1 }
-		: isDragging
-			? { opacity: 0.5 }
-			: undefined;
-
-	const currentPoints = row.estimation?.points ?? 0;
-	const pointsOptions = useMemo(() => {
-		const scale = FIBONACCI_SCALE.map((value) => ({
-			value: String(value),
-			label: String(value),
-		}));
-		if (currentPoints > 0 && !FIBONACCI_SCALE.includes(currentPoints as (typeof FIBONACCI_SCALE)[number])) {
-			return [{ value: String(currentPoints), label: String(currentPoints) }, ...scale];
-		}
-		return scale;
-	}, [currentPoints]);
-
-	const priorityOptions = useMemo(() => {
-		if (!framework) return [];
-		const labels = getFrameworkShortLabels(framework);
-		return getFrameworkCategories(framework).map((category) => ({
-			value: category,
-			label: labels[category] ?? category,
-		}));
-	}, [framework]);
-
-	const handleDurationChange = async (label: string, minutes: number) => {
-		if (minutes === (row.estimation?.durationMinutes ?? 0) || isSavingField) return;
-		setIsSavingField('points');
-		try {
-			await onEditStory(row.story.id, {}, {
-				points: 0,
-				durationMinutes: minutes,
-				durationLabel: label,
-				justification:
-					row.estimation?.justification ||
-					'Estimacion ajustada manualmente desde el dashboard.',
-				isModified: true,
-			});
-		} finally {
-			setIsSavingField(null);
-		}
-	};
-
-	const handlePointsChange = async (nextValue: string) => {
-		const nextPoints = Number(nextValue);
-		if (!Number.isFinite(nextPoints) || nextPoints === currentPoints || isSavingField) return;
-		setIsSavingField('points');
-		try {
-			await onEditStory(row.story.id, {}, {
-				points: nextPoints,
-				justification:
-					row.estimation?.justification ||
-					'Estimacion ajustada manualmente desde el dashboard.',
-				isModified: true,
-			});
-		} finally {
-			setIsSavingField(null);
-		}
-	};
-
-	const handlePriorityChange = async (nextValue: string) => {
-		if (!framework || isSavingField) return;
-		const nextCategory = nextValue as FrameworkCategory;
-		if (nextCategory === row.prioritization?.category) return;
-		setIsSavingField('priority');
-		try {
-			await onEditStory(
-				row.story.id,
-				{},
-				undefined,
-				undefined,
-				{
-					category: nextCategory,
-					justification:
-						row.prioritization?.justification ||
-						'Priorizacion ajustada manualmente desde el dashboard.',
-					isModified: true,
-				}
-			);
-		} finally {
-			setIsSavingField(null);
-		}
-	};
-
-	const handleStatusChange = async (nextStatus: KanbanStatus) => {
-		if (!onUpdateStoryStatus || isSavingField) return;
-		if (nextStatus === row.executionStatus) return;
-		setIsSavingField('status');
-		try {
-			await onUpdateStoryStatus(row.story.id, nextStatus);
-		} finally {
-			setIsSavingField(null);
-		}
-	};
-
-	const handleAssigneeChange = async (nextAssigneeId: string | null) => {
-		if (!onUpdateStoryAssignee || isSavingField) return;
-		if (nextAssigneeId === (assignee?.id ?? null)) return;
-		setIsSavingField('assignee');
-		try {
-			await onUpdateStoryAssignee(row.story.id, nextAssigneeId);
-		} finally {
-			setIsSavingField(null);
-		}
-	};
-
-	const fieldsDisabled = locked || isSavingField !== null;
-
-	const statusControl =
-		onUpdateStoryStatus && !locked ? (
-		<ExecutionStatusSelect
-			status={row.executionStatus}
-			onChange={handleStatusChange}
-			disabled={isSavingField !== null}
-			aria-label={`Estado de ${row.story.id}`}
-		/>
-	) : (
-		<ExecutionStatusBadge status={row.executionStatus} />
-	);
-
-	const assigneeControl =
-		onUpdateStoryAssignee && !locked ? (
-		<AssigneeSelect
-			assignee={assignee}
-			members={members}
-			onChange={handleAssigneeChange}
-			disabled={isSavingField !== null}
-			aria-label={`Responsable de ${row.story.id}`}
-		/>
-	) : (
-		<AssigneeAvatarStatic assignee={assignee} />
-	);
-
-	return (
-		<tr
-			ref={canDrag ? setNodeRef : undefined}
-			style={style}
-			className={[
-				'border-b border-border/70 transition-colors hover:bg-surface-hover/40',
-				isDragging ? 'bg-surface-muted/50' : '',
-			].join(' ')}
-		>
-			<td className="hidden px-3 py-3 align-top @3xl:table-cell @3xl:px-4 @3xl:py-4">
-				<div className="flex flex-col items-start gap-1">
-					<span className="font-mono text-xs font-bold text-muted">{row.story.id}</span>
-					<WorkItemTypeBadge type={row.story.type} />
-				</div>
-			</td>
-			<td className="min-w-0 px-3 py-3 align-top @lg:px-4 @lg:py-4">
-				<div className="flex items-start gap-2">
-					{canDrag ? (
-						<button
-							type="button"
-							className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-muted/50 transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
-							aria-label="Arrastrar ítem"
-							{...listeners}
-							{...attributes}
-						>
-							<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-								<path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
-							</svg>
-						</button>
-					) : null}
-					<div className="min-w-0 flex-1">
-						<div className="mb-0.5 flex flex-wrap items-center gap-1.5 @3xl:hidden">
-							<span className="font-mono text-[11px] font-bold text-muted">
-								{row.story.id}
-							</span>
-							<WorkItemTypeBadge type={row.story.type} />
-						</div>
-						<p className="line-clamp-2 text-sm font-semibold text-foreground" title={row.story.title}>
-							{row.story.title}
-						</p>
-						{onManageEpic ? (
-							<button
-								type="button"
-								onClick={() => onManageEpic(row.epicId)}
-								className="mt-1 block max-w-full cursor-pointer truncate text-left text-xs text-muted transition-colors hover:text-foreground @2xl:hidden"
-								title="Gestionar épica"
-							>
-								{row.epicTitle}
-							</button>
-						) : (
-							<p className="mt-1 truncate text-xs text-muted @2xl:hidden" title={row.epicTitle}>
-								{row.epicTitle}
-							</p>
-						)}
-						<div className="mt-1.5 flex flex-wrap items-center gap-2 @2xl:hidden">
-							<span className="@xl:hidden">{statusControl}</span>
-							{assigneeControl}
-						</div>
-					</div>
-				</div>
-			</td>
-			<td className="hidden min-w-0 px-3 py-3 align-top text-sm text-muted @2xl:table-cell @2xl:px-4 @2xl:py-4">
-				{onManageEpic ? (
-					<button
-						type="button"
-						onClick={() => onManageEpic(row.epicId)}
-						className="line-clamp-2 cursor-pointer text-left transition-colors hover:text-foreground"
-						title="Gestionar épica"
-					>
-						{row.epicTitle}
-					</button>
-				) : (
-					<span className="line-clamp-2" title={row.epicTitle}>
-						{row.epicTitle}
-					</span>
-				)}
-			</td>
-			<td className="overflow-hidden px-2 py-3 align-top @lg:px-3 @lg:py-4">
-				{estimationMode === 'time' ? (
-					<TimeDurationInput
-						id={`dash-duration-${row.story.id}`}
-						value={row.estimation?.durationLabel ?? ''}
-						disabled={fieldsDisabled}
-						onCommit={handleDurationChange}
-						size="compact"
-						className="min-w-0"
-					/>
-				) : (
-					<DropdownSelect
-						value={currentPoints > 0 ? String(currentPoints) : ''}
-						onChange={handlePointsChange}
-						options={pointsOptions}
-						placeholder="—"
-						disabled={fieldsDisabled}
-						size="compact"
-						className="w-14 @lg:w-16"
-						aria-label={`Story points de ${row.story.id}`}
-					/>
-				)}
-			</td>
-			<td className="min-w-0 px-2 py-3 align-top @xl:px-3 @xl:py-4">
-				{framework ? (
-					<DropdownSelect
-						value={row.prioritization?.category ?? ''}
-						onChange={handlePriorityChange}
-						options={priorityOptions}
-						placeholder="—"
-						disabled={fieldsDisabled}
-						size="compact"
-						className="w-full min-w-0"
-						aria-label={`Prioridad de ${row.story.id}`}
-					/>
-				) : (
-					<span className="text-xs text-muted">N/D</span>
-				)}
-			</td>
-			<td className="hidden overflow-hidden px-2 py-3 align-top @xl:table-cell @xl:px-3 @xl:py-4">
-				{statusControl}
-			</td>
-			<td className="hidden px-2 py-3 align-top @2xl:table-cell @2xl:px-3 @2xl:py-4">
-				{assigneeControl}
-			</td>
-			<td className="px-2 py-3 align-top @lg:px-3 @lg:py-4">
-				<div className="flex justify-end gap-0.5 @lg:gap-1.5">
-					<ViewDetailsButton onClick={onOpenDetail} label="Ver HU en detalle" />
-					{locked ? null : (
-						<>
-					<button
-						type="button"
-						onClick={onStartEdit}
-						aria-label="Editar HU"
-						title="Editar HU"
-						className="inline-flex cursor-pointer items-center justify-center rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
-					>
-						<EditIcon />
-					</button>
-					<button
-						type="button"
-						onClick={async () => {
-							const confirmed = await confirm({
-								title: `¿Eliminar ${row.story.id}?`,
-								description: `"${row.story.title}" se eliminará del backlog. Esta acción no se puede deshacer.`,
-								confirmLabel: 'Eliminar',
-								variant: 'danger',
-							});
-							if (!confirmed) return;
-							setIsDeleting(true);
-							try {
-								await onDelete();
-							} finally {
-								setIsDeleting(false);
-							}
-						}}
-						disabled={isDeleting}
-						aria-label="Eliminar HU"
-						title="Eliminar HU"
-						className={[
-							'cursor-pointer inline-flex items-center justify-center rounded-lg p-1.5 text-muted transition-all',
-							isDeleting
-								? 'cursor-not-allowed opacity-60'
-								: 'hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30',
-						].join(' ')}
-					>
-						<TrashIcon />
-					</button>
-						</>
-					)}
-				</div>
-			</td>
-		</tr>
-	);
-}
-
-function formatDateRange(startDate: string | null, endDate: string | null): string {
-	if (!startDate || !endDate) return '';
-	return `${startDate} - ${endDate}`;
-}
-
-function SprintStatusBadge({ status }: { status: 'planned' | 'active' | 'completed' }) {
-	const styles =
-		status === 'active'
-			? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300'
-			: status === 'completed'
-				? 'border-border bg-surface-muted text-muted'
-				: 'border-border bg-surface text-foreground';
-	const label =
-		status === 'active' ? 'Activo' : status === 'completed' ? 'Cerrado' : 'Planificado';
-	return (
-		<span
-			className={`rounded-full border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider ${styles}`}
-		>
-			{label}
-		</span>
 	);
 }
 
@@ -1606,34 +803,10 @@ function CompleteSprintDialog({
 	);
 }
 
-function EditIcon() {
-	return (
-		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
-			<path
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-			/>
-		</svg>
-	);
-}
-
 function PlusIcon() {
 	return (
 		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
 			<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-		</svg>
-	);
-}
-
-function TrashIcon() {
-	return (
-		<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
-			<path
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-			/>
 		</svg>
 	);
 }

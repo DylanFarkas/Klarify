@@ -229,41 +229,53 @@ export function StackContent({
 
   const mainContent =
     !pipelineReady || isEmpty ? (
-      <StackEmptyState
-        pipelineReady={pipelineReady}
-        onBuildManual={startManual}
-        onRecommend={handleRecommend}
-      />
+      <div className="flex w-full flex-col gap-5 px-6 pt-3 pb-5 md:gap-6">
+        {pipelineReady ? (
+          <header className="flex min-h-10 flex-col justify-center gap-2 border-b border-border/60 py-1.5">
+            <div className="min-w-0">
+              <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
+                Stack tecnológico
+              </h1>
+              <p className="mt-0.5 truncate text-[12px] text-muted">
+                Arquitectura y tecnologías para implementar el backlog actual.
+              </p>
+            </div>
+          </header>
+        ) : null}
+        <StackEmptyState
+          pipelineReady={pipelineReady}
+          onBuildManual={startManual}
+          onRecommend={handleRecommend}
+        />
+      </div>
     ) : (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 md:gap-7 animate-[fadeIn_0.3s_ease-out]">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+    <div className="flex w-full flex-col gap-5 px-6 pt-3 pb-5 md:gap-6 animate-[fadeIn_0.3s_ease-out]">
+      <header className="flex min-h-10 flex-col justify-center gap-2 border-b border-border/60 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
             Stack tecnológico
           </h1>
-          <p className="text-sm text-muted">
+          <p className="truncate text-[12px] text-muted">
             Arquitectura y tecnologías para implementar el backlog actual.
+            {displayStack ? (
+              <>
+                {' · '}
+                <span className="tabular-nums text-subtle">
+                  {countStackTechnologies(displayStack)} tecnologías
+                  {' · '}
+                  {stackSourceLabel(displayStack.source)}
+                  {saving ? <> · Guardando…</> : null}
+                  {displayStack.warnings && displayStack.warnings.length > 0 ? (
+                    <>
+                      {' · '}
+                      {displayStack.warnings.length} aviso
+                      {displayStack.warnings.length !== 1 ? 's' : ''}
+                    </>
+                  ) : null}
+                </span>
+              </>
+            ) : null}
           </p>
-          {displayStack ? (
-            <p className="text-[12px] tabular-nums text-subtle">
-              {countStackTechnologies(displayStack)} tecnologías
-              {' · '}
-              {stackSourceLabel(displayStack.source)}
-              {saving ? (
-                <>
-                  {' · '}
-                  Guardando…
-                </>
-              ) : null}
-              {displayStack.warnings && displayStack.warnings.length > 0 ? (
-                <>
-                  {' · '}
-                  {displayStack.warnings.length} aviso
-                  {displayStack.warnings.length !== 1 ? 's' : ''}
-                </>
-              ) : null}
-            </p>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -273,21 +285,21 @@ export function StackContent({
               setPickerLayer('frontend');
               setPickerOpen(true);
             }}
-            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
+            className="cursor-pointer rounded-md bg-surface-muted px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             Añadir tecnología
           </button>
           <button
             type="button"
             onClick={handleRecommend}
-            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground cursor-pointer"
+            className="cursor-pointer rounded-md bg-surface-muted px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             Preguntar a Klark
           </button>
           <button
             type="button"
             onClick={() => setClearConfirmOpen(true)}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-danger cursor-pointer"
+            className="cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-danger"
           >
             Limpiar
           </button>
@@ -333,7 +345,7 @@ export function StackContent({
                       addCatalogItem(conflictPrompt.catalogId, conflictPrompt.layer, false);
                       setConflictPrompt(null);
                     }}
-                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover cursor-pointer"
+                    className="cursor-pointer rounded-md bg-surface-muted px-4 py-2 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
                   >
                     Mantener ambos
                   </button>
@@ -373,7 +385,7 @@ export function StackContent({
                     type="button"
                     onClick={() => setClearConfirmOpen(false)}
                     disabled={clearing}
-                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:bg-surface-hover disabled:opacity-40 cursor-pointer"
+                    className="cursor-pointer rounded-md bg-surface-muted px-4 py-2 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
                   >
                     Cancelar
                   </button>

@@ -16,6 +16,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { TeamPanel } from './TeamPanel';
 import { StoryExecutionDrawer } from './StoryExecutionDrawer';
 import { ActiveSprintHeader } from './ActiveSprintHeader';
+import { DashboardLoadingState } from '@/components/agents/dashboard/DashboardLoadingState';
 
 export function BoardWorkspace() {
   const {
@@ -136,37 +137,35 @@ export function BoardWorkspace() {
   }
 
   if (!isExecutionReady || isInitializing) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="text-sm text-muted">Preparando tablero…</p>
-      </div>
-    );
+    return <DashboardLoadingState variant="board" />;
   }
 
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex w-full flex-col gap-4 px-6 pt-3 pb-5 animate-[fadeIn_0.3s_ease-out]">
+      <header className="flex min-h-10 flex-col justify-center gap-2 border-b border-border/60 py-1.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <Link
-            href="/agentes/dashboard"
-            className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            Volver al dashboard
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tablero Kanban</h1>
-          <p className="mt-1 text-sm text-muted">
+          <div className="mb-0.5 flex items-center gap-2">
+            <Link
+              href="/agentes/dashboard"
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-subtle transition-colors hover:text-foreground"
+            >
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              Dashboard
+            </Link>
+          </div>
+          <h1 className="text-[50px] font-semibold tracking-tight text-foreground">Tablero Kanban</h1>
+          <p className="mt-0.5 text-[12px] text-muted">
             {boardData.stories.length} historias visibles · {progress}% completadas
           </p>
         </div>
         <div className="w-full max-w-xs">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
+          <div className="mb-1 flex items-center justify-between gap-2">
             <span className="text-[11px] text-subtle">Progreso</span>
             <span className="text-[11px] tabular-nums text-subtle">{progress}%</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-border">
+          <div className="h-1 overflow-hidden rounded-full bg-border">
             <div
               className="h-full rounded-full bg-foreground/70 transition-all duration-500"
               style={{ width: `${progress}%` }}

@@ -8,6 +8,12 @@ import { ProjectSwitcher } from './ProjectSwitcher';
 import { WorkspaceGridBackground } from './WorkspaceGridBackground';
 import { WorkspaceSidebarChrome } from './WorkspaceSidebarChrome';
 import { WorkspaceSidebarNav } from './WorkspaceSidebarNav';
+import {
+  SIDEBAR_ICON_CLASS,
+  sidebarIconSlotClass,
+  sidebarLabelClass,
+  sidebarNavItemClass,
+} from './sidebar-styles';
 
 interface AgentLayoutShellProps {
   children: React.ReactNode;
@@ -15,44 +21,45 @@ interface AgentLayoutShellProps {
   agentTitle: string;
 }
 
+/**
+ * Shell del workspace: sidebar izquierda + área de contenido a ancho completo.
+ */
 export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLayoutShellProps) {
   return (
-    <div className="flex h-full min-h-0 bg-background text-foreground">
+    <div className="relative flex h-full min-h-0 bg-background text-foreground">
+      <WorkspaceGridBackground />
+
       <WorkspaceSidebarChrome
-        brandSubtitle="Workspace de agentes"
         footer={
-          <>
+          <div className="flex flex-col gap-0.5">
             <AgentSidebarSettings />
-            <div className="mt-1">
-              <NewSessionButton />
-            </div>
+            <NewSessionButton />
             <Link
               href="/manual"
-              className="mt-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              title="Guía de uso"
+              className={sidebarNavItemClass(false)}
             >
-              <svg className="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                />
-              </svg>
-              <span>Guía de uso</span>
+              <span className={sidebarIconSlotClass}>
+                <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
+                  />
+                </svg>
+              </span>
+              <span className={sidebarLabelClass}>Guía de uso</span>
             </Link>
-          </>
+          </div>
         }
       >
         {currentStep >= 6 ? <WorkspaceSidebarNav /> : <AgentStepper currentStep={currentStep} />}
 
-        <div className="mt-1">
-          <ProjectSwitcher />
-        </div>
+        <ProjectSwitcher />
       </WorkspaceSidebarChrome>
 
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <WorkspaceGridBackground />
-
-        <div className="relative z-10 border-b border-border bg-surface/90 px-4 py-3 backdrop-blur-md lg:hidden">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+        <div className="shrink-0 border-b border-border px-3 py-2 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <Link
@@ -71,11 +78,11 @@ export function AgentLayoutShell({ children, currentStep, agentTitle }: AgentLay
               </span>
             )}
           </div>
-          <AgentSidebarSettings className="mt-2.5" />
-          <NewSessionButton className="mt-1" />
+          <AgentSidebarSettings className="mt-2" />
+          <NewSessionButton className="mt-0.5" />
         </div>
 
-        <main className="relative z-10 flex-1 overflow-y-auto scrollbar-gutter-stable px-6 py-8 lg:px-12 lg:py-10">
+        <main className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
           {children}
         </main>
       </div>

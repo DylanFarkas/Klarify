@@ -30,12 +30,14 @@ interface AgentThemeContextType {
 const AgentThemeContext = createContext<AgentThemeContextType | null>(null);
 
 function applyThemeToDocument(theme: AgentTheme, klarifyAccent: KlarifyAccent) {
-  document.documentElement.setAttribute('data-agent-theme', theme);
-  document.documentElement.removeAttribute('data-carbon-accent');
+  const root = document.documentElement;
+  root.setAttribute('data-agent-theme', theme);
+  root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+  root.removeAttribute('data-carbon-accent');
   if (theme === 'klarify') {
-    document.documentElement.setAttribute('data-klarify-accent', klarifyAccent);
+    root.setAttribute('data-klarify-accent', klarifyAccent);
   } else {
-    document.documentElement.removeAttribute('data-klarify-accent');
+    root.removeAttribute('data-klarify-accent');
   }
 }
 
@@ -66,9 +68,11 @@ export function AgentThemeProvider({ children }: { children: ReactNode }) {
   // Limpia los atributos al salir del workspace de agentes
   useEffect(() => {
     return () => {
-      document.documentElement.removeAttribute('data-agent-theme');
-      document.documentElement.removeAttribute('data-klarify-accent');
-      document.documentElement.removeAttribute('data-carbon-accent');
+      const root = document.documentElement;
+      root.removeAttribute('data-agent-theme');
+      root.removeAttribute('data-klarify-accent');
+      root.removeAttribute('data-carbon-accent');
+      root.style.removeProperty('color-scheme');
     };
   }, []);
 
@@ -94,7 +98,7 @@ export function AgentThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <AgentThemeContext.Provider value={{ theme, setTheme, klarifyAccent, setKlarifyAccent }}>
-      <div className="agent-workspace h-dvh min-h-0 overflow-hidden">
+      <div className="agent-workspace h-dvh min-h-0 overflow-hidden bg-background text-foreground">
         {children}
       </div>
     </AgentThemeContext.Provider>

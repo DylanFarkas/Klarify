@@ -12,7 +12,7 @@ export default function StackPage() {
   const { workspace, isLoading, saveStack, clearStack } = useWorkspace();
 
   if (isLoading || !workspace) {
-    return <DashboardLoadingState />;
+    return <DashboardLoadingState variant="stack" />;
   }
 
   const pipelineReady = Boolean(workspace.pipeline.agent6Input);

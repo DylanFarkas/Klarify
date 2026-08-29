@@ -174,7 +174,7 @@ export function TeamPanel({ members, maxMembers, onUpsert, onDelete }: TeamPanel
           >
             <header className="shrink-0 border-b border-border px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Equipo</h2>
+                <h2 className="text-[20px] font-semibold tracking-tight text-foreground">Equipo</h2>
                 <span className="tabular-nums text-[11px] text-subtle">
                   {members.length}/{maxMembers}
                 </span>

@@ -17,17 +17,17 @@ export function DashboardCompletedSprints({ metrics }: DashboardCompletedSprints
 	}
 
 	return (
-		<section className="rounded-xl border border-border bg-surface" aria-label="Sprints completados">
-			<div className="border-b border-border px-4 py-3.5 md:px-5">
+		<section aria-label="Sprints completados">
+			<div className="mb-3">
 				<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
 					Sprints completados
 				</h2>
-				<p className="mt-1 text-[12px] text-muted">
+				<p className="mt-0.5 text-[12px] text-muted">
 					Registro histórico de sprints cerrados del proyecto.
 				</p>
 			</div>
 
-			<ul className="divide-y divide-border">
+			<ul className="flex flex-col">
 				{completedSprints.map((sprint) => {
 					const rows = metrics.sprintStoryRows.filter((row) => row.sprintId === sprint.id);
 					const doneCount = rows.filter((row) => row.executionStatus === 'done').length;
@@ -45,14 +45,17 @@ export function DashboardCompletedSprints({ metrics }: DashboardCompletedSprints
 						sprint.sprintGoal.replace(/^Sprint\s+\d+\s*:\s*/i, '').trim() || sprint.sprintGoal;
 
 					return (
-						<li key={sprint.id} className="px-4 py-3.5 md:px-5">
+						<li
+							key={sprint.id}
+							className="-mx-2 rounded-md px-2 py-3 transition-colors hover:bg-surface-hover/50"
+						>
 							<div className="flex flex-wrap items-start justify-between gap-3">
 								<div className="min-w-0">
 									<div className="flex flex-wrap items-center gap-2">
 										<p className="text-[13px] font-semibold text-foreground">
 											Sprint {sprint.number}
 										</p>
-										<span className="rounded-full border border-border bg-surface-muted px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-subtle">
+										<span className="rounded-md bg-surface-muted px-1.5 py-px text-[10px] font-medium text-subtle">
 											Completado
 										</span>
 									</div>

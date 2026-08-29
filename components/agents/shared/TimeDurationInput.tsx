@@ -14,6 +14,7 @@ interface TimeDurationInputProps {
   placeholder?: string;
   /** Compacto para tablas densas (alineado con DropdownSelect compact). */
   size?: 'default' | 'compact';
+  variant?: 'default' | 'ghost';
 }
 
 export function TimeDurationInput({
@@ -24,8 +25,10 @@ export function TimeDurationInput({
   className,
   placeholder = TIME_DURATION_EXAMPLES,
   size = 'default',
+  variant = 'default',
 }: TimeDurationInputProps) {
   const isCompact = size === 'compact';
+  const isGhost = variant === 'ghost';
   const inputRef = useRef<HTMLInputElement>(null);
   const errorId = `${id ?? 'duration'}-error`;
   const [draft, setDraft] = useState(value);
@@ -114,9 +117,11 @@ export function TimeDurationInput({
         className={[
           'w-full min-w-0 tabular-nums text-foreground outline-none transition-colors',
           'placeholder:text-placeholder disabled:cursor-not-allowed disabled:opacity-40',
-          isCompact
-            ? 'rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold focus:border-border-strong'
-            : 'rounded-lg border border-input-border bg-input px-3 py-2 text-sm focus:border-border-strong',
+          isGhost
+            ? 'h-8 rounded-md border-0 bg-transparent px-2 text-sm hover:bg-surface-hover focus:bg-surface-hover'
+            : isCompact
+              ? 'rounded-lg border border-border bg-surface px-1.5 py-1 text-xs font-bold focus:border-border-strong'
+              : 'rounded-lg border border-input-border bg-input px-3 py-2 text-sm focus:border-border-strong',
           error ? 'border-danger bg-danger/5 focus:border-danger' : '',
         ].join(' ')}
       />

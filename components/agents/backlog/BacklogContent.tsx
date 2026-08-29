@@ -54,28 +54,30 @@ export function BacklogContent({
 	onUpdateEpic,
 	onDeleteEpic,
 }: BacklogContentProps) {
-	return (
-		<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 md:gap-7">
-			<header className="flex flex-col gap-1">
-				<h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-					Backlog y sprints
-				</h1>
-				<p className="text-sm text-muted">{projectName}</p>
-				{hasContent ? (
-					<p className="text-[12px] tabular-nums text-subtle">
-						{metrics.sprintCount} sprint{metrics.sprintCount !== 1 ? 's' : ''}
-						{' · '}
-						{metrics.unassignedStoryCount} en backlog
-						{' · '}
-						{metrics.storyCount} HU totales
-					</p>
-				) : (
-					<p className="text-[12px] text-subtle">Sin historias todavía</p>
-				)}
-			</header>
+	const subtitle = hasContent ? (
+		<>
+			{projectName}
+			{' · '}
+			<span className="tabular-nums text-subtle">
+				{metrics.sprintCount} sprint{metrics.sprintCount !== 1 ? 's' : ''}
+				{' · '}
+				{metrics.unassignedStoryCount} en backlog
+				{' · '}
+				{metrics.storyCount} HU
+			</span>
+		</>
+	) : (
+		<>
+			{projectName} · Sin historias todavía
+		</>
+	);
 
+	return (
+		<div className="flex w-full flex-col gap-5 px-6 pt-3 pb-5 md:gap-6">
 			{hasContent ? (
 				<DashboardSprintPlan
+					title="Backlog y Sprints"
+					subtitle={subtitle}
 					epics={metrics.epics}
 					estimations={metrics.estimations}
 					framework={metrics.framework}
@@ -98,11 +100,21 @@ export function BacklogContent({
 					onCompleteSprint={onCompleteSprint}
 				/>
 			) : (
-				<section className="rounded-xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
-					<p className="text-sm text-muted">
-						Completa el pipeline de agentes para generar historias y planificar sprints.
-					</p>
-				</section>
+				<>
+					<header className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
+						<div className="min-w-0 flex flex-col justify-center gap-0.5">
+							<h1 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+								Backlog y sprints
+							</h1>
+							<p className="truncate text-[12px] text-muted">{subtitle}</p>
+						</div>
+					</header>
+					<section className="rounded-xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
+						<p className="text-sm text-muted">
+							Completa el pipeline de agentes para generar historias y planificar sprints.
+						</p>
+					</section>
+				</>
 			)}
 		</div>
 	);

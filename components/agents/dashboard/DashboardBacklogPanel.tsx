@@ -2,16 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { Epic, UserStory } from '@/lib/types/agent-2';
+import type { Epic } from '@/lib/types/agent-2';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
 import { CategoryBadge } from '@/components/agents/agent-4/CategorySelect';
-import { DetailModal } from '@/components/agents/shared/DetailModal';
 import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
-import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
-import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { WorkItemTypeBadge } from '@/components/agents/shared/WorkItemTypeBadge';
 import type { DashboardMetrics, DashboardSprintStoryRow } from './dashboardMetrics';
 import { formatEffortTotal, formatEstimation, getEffortValue } from '@/lib/utils/estimation';
+import { backlogStoryHref } from '@/lib/utils/backlog-story-navigation';
 
 interface DashboardBacklogPanelProps {
 	metrics: DashboardMetrics;
@@ -125,7 +123,6 @@ function DashboardEpicGroup({
 	sprintByStoryId: Map<string, { label: string }>;
 }) {
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [detailStory, setDetailStory] = useState<UserStory | null>(null);
 	const displayNumber = String(index + 1).padStart(2, '0');
 	const epicPoints = epic.userStories.reduce(
 		(sum, story) => sum + getEffortValue(estimations[story.id], estimationMode),
@@ -196,7 +193,10 @@ function DashboardEpicGroup({
 										storyIndex > 0 ? 'border-t border-border' : '',
 									].join(' ')}
 								>
-									<div className="min-w-0 flex-1">
+									<Link
+										href={backlogStoryHref(story.id)}
+										className="min-w-0 flex-1 transition-colors hover:text-primary"
+									>
 										<div className="flex flex-wrap items-center gap-1.5">
 											<p className="text-[11px] tabular-nums text-subtle">
 												{story.id}
@@ -206,7 +206,7 @@ function DashboardEpicGroup({
 										<p className="mt-0.5 text-[13px] font-medium text-foreground">
 											{story.title}
 										</p>
-									</div>
+									</Link>
 									<div className="flex shrink-0 flex-wrap items-center gap-1.5">
 										{estimateLabel !== '—' ? (
 											<span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] tabular-nums text-muted">
@@ -222,10 +222,6 @@ function DashboardEpicGroup({
 										{sprint ? (
 											<span className="text-[11px] text-subtle">{sprint.label}</span>
 										) : null}
-										<ViewDetailsButton
-											onClick={() => setDetailStory(story)}
-											label="Ver HU en detalle"
-										/>
 									</div>
 								</li>
 							);
@@ -233,25 +229,6 @@ function DashboardEpicGroup({
 					)}
 				</ul>
 			) : null}
-
-			<DetailModal
-				open={Boolean(detailStory)}
-				onClose={() => setDetailStory(null)}
-				title={detailStory?.title ?? ''}
-				subtitle={detailStory?.id}
-				eyebrow="Historia de usuario"
-			>
-				{detailStory ? (
-					<UserStoryDetailContent
-						story={detailStory}
-						epicTitle={epic.title}
-						estimation={estimations[detailStory.id]}
-						estimationMode={estimationMode}
-						prioritization={priorities[detailStory.id]}
-						framework={framework ?? undefined}
-					/>
-				) : null}
-			</DetailModal>
 		</article>
 	);
 }
