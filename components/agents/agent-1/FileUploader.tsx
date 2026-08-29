@@ -243,216 +243,139 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
     }
   };
 
-  // ── Obtener icono según extensión ──────────────────────────────
-  const getFileIcon = (name: string) => {
-    const ext = name.split('.').pop()?.toLowerCase();
-    if (ext === 'mp3' || ext === 'wav') return '🎵';
-    if (ext === 'pdf') return '📄';
-    if (ext === 'txt') return '📝';
-    return '📁';
-  };
+  const primaryBtn =
+    'inline-flex cursor-pointer items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90';
+  const secondaryBtn =
+    'inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground';
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-4">
-        {/* ── Zona de drop principal ───────────────────────────── */}
+      {isProcessing ? (
+        <div className="flex flex-col items-center gap-4 py-16 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-sm font-medium text-foreground">Procesando archivo…</p>
+            {selectedFileName ? (
+              <p className="text-[13px] text-muted">{selectedFileName}</p>
+            ) : null}
+          </div>
+          <div className="h-1 w-40 overflow-hidden rounded-full bg-border">
+            <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-foreground/70" />
+          </div>
+        </div>
+      ) : null}
+
+      {!isProcessing && isRecording ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-surface px-5 py-8">
+          <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <span className="text-[12px] font-medium text-foreground">Escuchando…</span>
+            </div>
+
+            <div className="max-h-45 min-h-28 w-full overflow-y-auto rounded-lg border border-border bg-input px-4 py-3 text-left">
+              <p className="text-sm italic leading-relaxed text-body">
+                {liveTranscription || 'Habla ahora, te estoy escuchando…'}
+              </p>
+            </div>
+
+            <button
+              id="stop-record-button"
+              type="button"
+              onClick={stopRecording}
+              className={primaryBtn}
+            >
+              Detener y revisar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!isProcessing && !isRecording ? (
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => {
-            if (!isProcessing && !isRecording) {
-              handleUploadIntent();
-            }
-          }}
           className={[
-            'group relative flex min-h-55 cursor-pointer flex-col items-center justify-center',
-            'overflow-hidden rounded-xl border border-dashed p-6 text-center transition-colors',
+            'mx-auto flex w-full max-w-lg flex-col items-center rounded-xl border px-5 py-8 text-center transition-colors animate-[fadeIn_0.3s_ease-out]',
             isDragging
-              ? 'border-primary bg-primary/5'
-              : 'border-border-strong bg-surface hover:border-primary/50 hover:bg-surface-hover/40',
-            isProcessing && 'pointer-events-none opacity-70',
-            isRecording && 'cursor-default border-red-500/40',
-            error && !isProcessing && 'border-red-500/40',
-          ]
-            .filter(Boolean)
-            .join(' ')}
+              ? 'border-dashed border-primary/40 bg-primary/5'
+              : 'border-transparent',
+          ].join(' ')}
         >
-          {/* Estado: Procesando archivo */}
-          {isProcessing && selectedFileName && (
-            <div className="relative z-10 flex flex-col items-center gap-4">
-              <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
-              <div className="flex flex-col items-center gap-1">
-                <p className="text-sm font-medium text-foreground">Procesando archivo…</p>
-                <p className="text-[13px] text-muted">
-                  {getFileIcon(selectedFileName)} {selectedFileName}
-                </p>
-              </div>
-              <div className="h-1 w-48 overflow-hidden rounded-full bg-border">
-                <div className="h-full w-1/3 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary" />
-              </div>
-            </div>
-          )}
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface-muted">
+            <svg
+              className={['h-6 w-6', isDragging ? 'text-primary' : 'text-muted'].join(' ')}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12.75h6.75m-6.75 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+              />
+            </svg>
+          </div>
 
-          {/* Estado: Grabando */}
-          {!isProcessing && isRecording && (
-            <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-4">
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                </span>
-                <span className="text-xs font-medium uppercase tracking-wider text-foreground">
-                  Escuchando…
-                </span>
-              </div>
+          <h3 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">
+            {isDragging ? 'Suelta el archivo aquí' : 'Comparte el contexto del proyecto'}
+          </h3>
+          <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+            Escríbelo a mano, graba una reunión o arrastra un archivo. Extraemos los
+            requerimientos a partir de eso.
+          </p>
 
-              <div className="max-h-45 min-h-25 w-full overflow-y-auto rounded-lg border border-border bg-input p-4 text-left">
-                <p className="text-sm italic leading-relaxed text-body">
-                  {liveTranscription || 'Habla ahora, te estoy escuchando…'}
-                </p>
-              </div>
-
-              <button
-                id="stop-record-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  stopRecording();
-                }}
-                className="cursor-pointer rounded-lg bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-              >
-                Detener y revisar
-              </button>
-            </div>
-          )}
-
-          {/* Estado: Idle / Esperando archivo */}
-          {!isProcessing && !isRecording && (
-            <div className="relative z-10">
-              <div
-                className={[
-                  'mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border transition-colors',
-                  isDragging
-                    ? 'border-primary/40 bg-primary/15'
-                    : 'border-border bg-surface-muted group-hover:border-primary/30',
-                ].join(' ')}
-              >
-                <svg
-                  className={[
-                    'h-6 w-6 transition-colors',
-                    isDragging ? 'text-primary' : 'text-muted',
-                  ].join(' ')}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
-                  />
-                </svg>
-              </div>
-
-              <h3 className="mb-1.5 text-[15px] font-semibold text-foreground">
-                {isDragging ? 'Suelta el archivo aquí' : 'Arrastra un archivo o elige un método'}
-              </h3>
-              <p className="mx-auto mb-5 max-w-md text-[13px] text-muted">
-                Aceptamos {ALLOWED_EXTENSIONS.join(', ')}. Máx. {MAX_FILE_SIZE_LABEL}.
-              </p>
-
-              <button
-                id="file-select-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleUploadIntent();
-                }}
-                className="mx-auto inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-              >
-                Seleccionar archivo
-              </button>
-            </div>
-          )}
-
-          {/* Input oculto */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={FILE_INPUT_ACCEPT}
-            onChange={handleInputChange}
-            className="hidden"
-            aria-label="Seleccionar archivo"
-          />
-        </div>
-
-        {/* ── Acciones ─────────────────────────────────────────── */}
-        {!isProcessing && !isRecording && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
             <button
               type="button"
-              onClick={handleUploadIntent}
-              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
+              id="write-text-button"
+              onClick={() => onTranscriptionComplete?.('')}
+              className={primaryBtn}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <h5 className="text-sm font-medium text-foreground">Subir archivo</h5>
-                <p className="mt-0.5 text-xs text-muted">Documentos o audios</p>
-              </div>
+              Escribir texto
             </button>
-
             <button
               type="button"
               id="start-record-button"
               onClick={startRecording}
-              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
+              className={secondaryBtn}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <h5 className="text-sm font-medium text-foreground">Grabar audio</h5>
-                <p className="mt-0.5 text-xs text-muted">Reunión en vivo</p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              id="write-text-button"
-              onClick={() => {
-                if (onTranscriptionComplete) onTranscriptionComplete('');
-              }}
-              className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <h5 className="text-sm font-medium text-foreground">Escribir texto</h5>
-                <p className="mt-0.5 text-xs text-muted">Notas o minutas</p>
-              </div>
+              Grabar audio
             </button>
           </div>
-        )}
-      </div>
 
-      {/* ── Mensaje de error ───────────────────────────────────── */}
-      {error && (
-        <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
+          <button
+            type="button"
+            id="file-select-button"
+            onClick={handleUploadIntent}
+            className="mt-4 cursor-pointer text-[12px] text-subtle transition-colors hover:text-foreground"
+          >
+            Subir archivo · {ALLOWED_EXTENSIONS.join(', ')} · máx. {MAX_FILE_SIZE_LABEL}
+          </button>
+        </div>
+      ) : null}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={FILE_INPUT_ACCEPT}
+        onChange={handleInputChange}
+        className="hidden"
+        aria-label="Seleccionar archivo"
+      />
+
+      {error ? (
+        <div className="mx-auto mt-3 max-w-lg rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
           <p className="text-sm text-danger">{error}</p>
         </div>
-      )}
+      ) : null}
 
-      {/* ── Aviso: carga de archivos en prueba ─────────────────── */}
       <DetailModal
         open={showUploadNotice}
         onClose={() => setShowUploadNotice(false)}
@@ -468,43 +391,26 @@ export function FileUploader({ onFileSelect, isProcessing, error: externalError,
             grabando audio en vivo o escribiendo el texto directamente.
           </p>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowUploadNotice(false);
-                startRecording();
-              }}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <div>
-                <h5 className="text-sm font-medium text-foreground">Grabar audio</h5>
-                <p className="mt-0.5 text-xs text-muted">Reunión en vivo</p>
-              </div>
-            </button>
-
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
                 setShowUploadNotice(false);
                 onTranscriptionComplete?.('');
               }}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:bg-surface-hover"
+              className={primaryBtn}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
-                <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                </svg>
-              </div>
-              <div>
-                <h5 className="text-sm font-medium text-foreground">Escribir texto</h5>
-                <p className="mt-0.5 text-xs text-muted">Notas o minutas</p>
-              </div>
+              Escribir texto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowUploadNotice(false);
+                startRecording();
+              }}
+              className={secondaryBtn}
+            >
+              Grabar audio
             </button>
           </div>
         </div>

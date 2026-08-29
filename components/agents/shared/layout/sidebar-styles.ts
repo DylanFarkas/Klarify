@@ -38,7 +38,7 @@ export function sidebarNavItemClass(isActive = false): string {
     'text-left text-sm',
     '[&_svg]:shrink-0',
     isActive
-      ? 'bg-elevated font-medium text-primary'
+      ? 'font-semibold text-primary'
       : 'text-foreground-contrast hover:bg-surface-hover hover:text-foreground',
   ].join(' ');
 }

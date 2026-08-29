@@ -11,7 +11,8 @@ Referencias ya aplicadas:
 | Backlog | `BacklogContent`, `DashboardSprintPlan`, `BacklogStoryRow`, `backlog-table-layout.tsx`, `BacklogStoryDetailPage` |
 | Tablero | `BoardWorkspace`, `BoardFilters`, `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `TeamPanel` |
 | Stack | `StackContent`, `StackEmptyState`, `StackBoard`, `StackTechPicker` |
-| Agentes 1–5 | paneles en `components/agents/agent-*` |
+| Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `TranscriptionPanel` |
+| Agentes 2–5 | paneles en `components/agents/agent-*` (migrar al patrón A1) |
 | Klark | `HarnessChatDock`, `HarnessChatPanel` (+ estilos `.harness-*` en `globals.css`) |
 | Tokens | `app/agent-themes.css`, mapeo en `app/globals.css` |
 
@@ -44,7 +45,7 @@ Klarify debe verse como un **producto SaaS de trabajo**: limpio, denso donde imp
 | Sí | No |
 | -- | -- |
 | Contraste y tipografía como jerarquía | Glow, sombras de neón, bordes animados |
-| Dos registros tipográficos: **compacto** (pipeline) y **display** (vistas de trabajo) | Un solo tamaño de título para todo el producto |
+| Dos registros: **display en el h1 de página** y **compacto dentro de paneles** | Un solo tamaño de título para todo el producto |
 | Superficies planas y bordes finos (`border-border/60`) | Gradientes decorativos, glassmorphism pesado |
 | CTAs en `foreground` / `background` | Botones primary con `shadow-[0_0_30px_…]` y `scale` |
 | Un foco claro por pantalla | Dashboards con muchas stats en cards |
@@ -108,17 +109,20 @@ Jerarquía en **dos registros** según contexto.
 
 ### Registro A — Pipeline de agentes (etapas 1–5)
 
-Compacto, sin títulos display.
+El **h1 de página** usa el mismo display que backlog/tablero/stack. El cromo interno (paneles, wizard, listas) sigue compacto.
 
 | Nivel | Clases típicas | Ejemplo |
 | ----- | -------------- | ------- |
-| Título de página | `text-xl`–`text-2xl font-semibold tracking-tight` | Ingesta de Contexto |
-| Título de panel | `text-[15px] font-semibold tracking-tight` | Deseos del cliente |
-| Cuerpo | `text-sm` / `text-[13px] text-muted` | Descripciones |
-| Meta / labels | `text-xs` / `text-[11px]`–`text-[12px] text-subtle` | Paso 1/6, timestamps |
+| Título de página | `text-[50px] font-semibold tracking-tight text-foreground` | Ingesta de Contexto |
+| Meta de página | `text-[12px] text-muted` | `Paso 1/6 · Captura · …` |
+| Título de panel / wizard | `text-[15px] font-semibold tracking-tight` | Deseos del cliente, Afinemos tu proyecto |
+| Cuerpo | `text-sm` / `text-[13px] text-muted` | Descripciones, contexto de apoyo |
+| Meta / labels | `text-[11px]`–`text-[12px] text-subtle` | Contador de deseos, categoría |
 | Contenido prioritario | `text-[15px] font-medium text-foreground` | Texto de un deseo |
 
-Ancho preferido: `max-w-3xl` (foco) o `max-w-5xl` (comparación).
+Anchos: `max-w-3xl` en captura y edición de texto; `max-w-5xl` en clarificación y revisión.
+
+**No** usar `text-[50px]` dentro de paneles, empty states internos ni preguntas del wizard.
 
 ### Registro B — Vistas de trabajo (post-pipeline)
 
@@ -135,7 +139,7 @@ Títulos **display** + meta compacta. Patrón unificado en backlog, tablero y st
 | Labels de columna Kanban | `text-[13px] font-semibold tracking-tight` | To-Do, In Progress |
 | Card Kanban título | `text-[13px] font-medium leading-snug` | Inicio de sesión |
 
-Evitar en pipeline: `text-[50px]`, badges uppercase innecesarios, monospace en headings (sí en IDs: `HU-003`, `font-mono text-[12px]`).
+Evitar: badges uppercase innecesarios, monospace en headings (sí en IDs de trabajo: `HU-003`, `font-mono text-[12px]`). En listas HITL de pipeline el número de fila basta; no repetir `DESEO-004` + índice.
 
 ---
 
@@ -289,6 +293,66 @@ Referencia: `BacklogStoryDetailPage`, `BacklogStoryDetailHeader`.
 | Layout cuerpo | Dos columnas: contenido (descripción, criterios) + sidebar propiedades |
 | Guardar | CTA fijo al pie del formulario: `bg-foreground text-background rounded-lg` |
 
+### 5.7 Agente 1 — Ingesta de contexto
+
+Referencia para el resto del pipeline. Página: `app/agentes/1/page.tsx`.
+
+**Header de página** (todas las fases):
+
+```tsx
+<header className="shrink-0 pb-3">
+  <h1 className="text-[50px] font-semibold tracking-tight text-foreground">Ingesta de Contexto</h1>
+  <p className="mt-1 text-[12px] text-muted">Paso 1/6 · Captura · …</p>
+</header>
+```
+
+Sin `AgentPageHero`. El empty state / panel queda **justo debajo** del header (no centrado en el viewport).
+
+#### Captura (`FileUploader`)
+
+Empty state al estilo Stack, no dropzone gigante + 3 cards:
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Contenedor | `max-w-lg` centrado, `py-8`; borde transparente; al arrastrar `border-dashed border-primary/40` |
+| Icono | `h-12 w-12 rounded-md bg-surface-muted` |
+| Título interno | `text-[15px] font-semibold` — *Comparte el contexto del proyecto* |
+| CTAs | Primario **Escribir texto** (`bg-foreground`) · Secundario **Grabar audio** (`bg-surface-muted`) |
+| Archivo | Enlace `text-[12px] text-subtle` debajo, no CTA principal (la carga puede estar en prueba) |
+| Grabación / proceso | Panel opaco o spinner `border-t-foreground`; barra `h-1 bg-foreground/70` |
+
+#### Edición de texto
+
+Panel `rounded-xl border bg-surface`: título `15px`–`20px`, textarea `bg-input`, pie con hint a la izquierda y acciones a la derecha (secundario muted + primario foreground).
+
+#### Clarificación (`ClarifyingQuestionsPanel`)
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Header del card | Meta `4 preguntas` / `1 / 4` / `Revisión` + **Saltar** + barra `h-1` |
+| Intro | Sin sidebar interno. Título `15px`, resumen, gaps como **lista** `border-t` (no grid de cards) |
+| Preguntas | Stepper lateral solo desde la 1.ª pregunta: categoría, sin repetir el enunciado. Activo `bg-elevated` |
+| Opciones | Filas con check circular `foreground`, `border-t`, no cards |
+| Revisión del wizard | Lista; **Editar** al hover |
+
+#### Revisión de deseos (`WishesList` + `TranscriptionPanel`)
+
+Foco: **leer y aprobar deseos**. El contexto es apoyo.
+
+```
+┌─────────────────────────────┬──────────────────┐
+│ Deseos (1.75fr, izquierda)  │ Contexto (1fr)   │
+└─────────────────────────────┴──────────────────┘
+```
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Grid | `lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] items-start` — deseos primero en el DOM |
+| Lista | Sin `max-h` interno: scrollea la página. Filas `border-t`, hover `bg-surface-hover/30` |
+| Fila deseo | `grid-cols-[1.25rem_minmax(0,1fr)_auto]` — índice + texto `15px font-medium`. Meta Manual/Editado solo si aplica. Acciones al hover a la derecha |
+| Contexto | Título `text-[13px] text-muted`. Respuestas en pares categoría → valor, sin repetir la pregunta |
+| CTA | Pie de página: **Empezar de nuevo** muted + **Aprobar deseos y continuar** foreground |
+
 ---
 
 ## 6. Componentes transversales
@@ -311,14 +375,14 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 
 - Panel = `rounded-xl border border-border bg-surface` (opaco)
 - Listas: contenedor + filas `border-t`, no card por ítem
-- Hover fila: `hover:bg-surface-hover/40`
+- Hover fila: `hover:bg-surface-hover/30`
 - Acciones secundarias: `opacity-0 group-hover:opacity-100` en desktop
 - Empty states: compactos, CTA `foreground`/`background`, sin blur orbs
 
 ### Formularios
 
 - Inputs: `rounded-lg border border-border bg-input px-3 py-2 text-sm focus:border-border-strong`
-- Opciones wizard: fila con borde + check circular en `foreground`
+- Opciones wizard: filas `border-t` + check circular en `foreground` (no card por opción)
 
 ### Klark (asistente)
 
@@ -338,9 +402,9 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 
 | Vista | Foco |
 | ----- | ---- |
-| Captura (A1) | Dropzone + 3 métodos |
-| Clarificación | Pregunta actual + opciones |
-| Revisión deseos | Lista de deseos (más ancha) |
+| Captura (A1) | Empty state (escribir / grabar / arrastrar), debajo del h1 |
+| Clarificación | Pregunta actual + opciones en lista; intro sin sidebar |
+| Revisión deseos | Lista de deseos a la izquierda (más ancha); contexto muted a la derecha |
 | Backlog (A2) / Backlog workspace | Tabla de HUs + planificación sprints |
 | Estimación (A3) | Workspace de estimación |
 | Priorización (A4) | Workspace + selector metodología |
@@ -392,7 +456,8 @@ En sidebar del producto:
 9. ¿Cards Kanban son `bg-surface` sobre columnas `bg-background/40`?
 10. ¿Badges de tipo/estado usan tintes (`primary/12`, `red-500/12`) y no colores sólidos chillones?
 11. ¿Klark FAB usa `.harness-fab` con `primary`?
-12. ¿Pipeline de agentes sigue en registro compacto (`max-w-3xl`)?
+12. ¿Pipeline usa h1 display `text-[50px]` y paneles internos compactos (`15px`)?
+13. ¿Captura A1 es empty state (no dropzone + 3 cards)? ¿Revisión pone deseos a la izquierda, más anchos?
 
 Si algo no encaja, mirar primero los archivos de la tabla de referencias al inicio.
 
@@ -404,13 +469,16 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Pipeline con círculos `h-9` y conectores verticales gruesos
 - Sidebar fijo `w-64` con branding centrado y `bg-surface`
 - Nav activo con solo `bg-surface-hover` sin acento `text-primary`
-- Dropzone `h-[min(400px,55vh)]` + cards con `scale-110`
+- Dropzone `h-[min(400px,55vh)]` + tres cards de método duplicando el CTA
+- Wizard de clarificación con sidebar en el intro, gaps en cards y `min-h` vacío
+- Revisión con dos columnas del mismo peso, IDs `DESEO-004` + índice, y `max-h` que recorta la lista
 - Modal de actividad con gradient animado
 - ApproveButton / GenerateBacklogButton con sombra primary y `hover:scale`
 - Barras `sticky bottom-6` con glass sobre contenido
 - Paneles `bg-surface-muted/40` como superficie principal
 - Cards anidadas con fondos distintos para diferenciar ítems
-- Títulos `text-xl` en vistas de trabajo que deberían ser display
+- Títulos `text-xl` en h1 de página que deberían ser display `text-[50px]`
+- `text-[50px]` dentro de un panel, wizard o empty state interno
 
 ---
 

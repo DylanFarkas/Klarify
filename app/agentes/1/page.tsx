@@ -460,25 +460,40 @@ export default function Agent1Page() {
   const isReview = state.status === 'review';
   const wishCount = state.wishes.length;
   const answeredQuestions = state.discovery?.questions?.length ?? 0;
+  const isCapturePhase =
+    state.status === 'idle' ||
+    state.status === 'uploading' ||
+    state.status === 'transcribing';
+  const hasTranscriptionText = Boolean(state.transcription?.fullText?.trim());
+
+  const headerSubtitle =
+    state.status === 'editing_transcription'
+      ? 'Revisa el texto antes de analizar el contexto.'
+      : state.status === 'clarifying'
+        ? 'Unas preguntas cortas para afinar el alcance.'
+        : state.status === 'assessing' || state.status === 'extracting'
+          ? null
+          : isReview
+            ? null
+            : 'Audio, notas o un archivo para extraer los requerimientos.';
 
   return (
     <div
       className={[
-        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col gap-6 px-6 pt-3 pb-5',
-        isReview ? 'max-w-5xl' : 'max-w-3xl',
+        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col px-6 pt-3 pb-5',
+        isReview || state.status === 'clarifying' ? 'max-w-5xl gap-5' : 'max-w-3xl gap-5',
       ].join(' ')}
     >
-      <header className="border-b border-border/60 pb-3">
-        <p className="text-[12px] text-subtle">Paso 1/6 · Captura</p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+      <header className="shrink-0 pb-3">
+        <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
           Ingesta de Contexto
         </h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-muted">
-          Comparte tu idea o la transcripción de una reunión. Analizamos el contexto, te hacemos
-          unas preguntas rápidas si hace falta, y extraemos los requerimientos listos para revisar.
+        <p className="mt-1 text-[12px] text-muted">
+          Paso 1/6 · Captura
+          {headerSubtitle ? <> · {headerSubtitle}</> : null}
         </p>
         {isReview && wishCount > 0 ? (
-          <p className="mt-2 text-[12px] text-muted">
+          <p className="mt-1 text-[12px] text-muted">
             <span className="tabular-nums text-foreground">{wishCount}</span>
             {' '}
             {wishCount === 1 ? 'deseo extraído' : 'deseos extraídos'}
@@ -494,35 +509,28 @@ export default function Agent1Page() {
         ) : null}
       </header>
 
-      {/* Upload */}
-      {(state.status === 'idle' ||
-        state.status === 'uploading' ||
-        state.status === 'transcribing') && (
+      {isCapturePhase ? (
         <FileUploader
           onFileSelect={handleFileUpload}
           onTranscriptionComplete={handleLiveTranscriptionComplete}
           isProcessing={state.status === 'transcribing'}
           error={state.error}
         />
-      )}
+      ) : null}
 
       {/* Edición de transcripción */}
       {state.status === 'editing_transcription' && (
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <div className="border-b border-border/60 px-4 py-3.5 md:px-5">
-            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
-              {state.transcription?.fullText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
+            <h2 className="text-[20px] font-semibold tracking-tight text-foreground">
+              {hasTranscriptionText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
             </h2>
-            <p className="mt-1 text-[13px] text-muted">
-              {state.transcription?.fullText
-                ? 'Corrige la transcripción si hace falta. Luego analizamos el contexto y te guiamos con preguntas puntuales si es necesario.'
-                : 'Describe tu proyecto o pega apuntes de una reunión. Cuando estés listo, analizamos el contexto.'}
-            </p>
           </div>
 
-          <div className="flex flex-col gap-4 px-4 py-4 md:px-5 md:py-5">
+          <div className="px-4 py-4 md:px-5 md:py-5">
             <textarea
-              className="min-h-55 w-full resize-y rounded-lg border border-input-border bg-input p-4 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
+              autoFocus
+              className="min-h-52 w-full resize-y rounded-lg bg-input px-3 py-3 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
               placeholder="Ejemplo: Quiero una app para vender zapatos online con catálogo, carrito y pagos..."
               value={state.transcription?.fullText || ''}
               onChange={(e) =>
@@ -537,23 +545,32 @@ export default function Agent1Page() {
               }
             />
 
-            {state.error && (
-              <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
+            {state.error ? (
+              <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
                 <p className="text-sm text-danger">{state.error}</p>
               </div>
-            )}
+            ) : null}
+          </div>
 
-            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+          <div className="flex flex-col-reverse items-stretch justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center md:px-5">
+            <p className="text-[12px] text-subtle">
+              {hasTranscriptionText
+                ? 'Corrige la transcripción antes de continuar.'
+                : 'Describe el proyecto con el mayor detalle posible.'}
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <button
+                type="button"
                 onClick={handleReset}
                 className="cursor-pointer rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 Descartar y volver
               </button>
               <button
+                type="button"
                 onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
-                disabled={!state.transcription?.fullText?.trim()}
-                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-disabled disabled:text-disabled-text disabled:opacity-40"
+                disabled={!hasTranscriptionText}
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Analizar contexto
               </button>
@@ -588,20 +605,18 @@ export default function Agent1Page() {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.25fr)]">
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
+            <WishesList
+              wishes={state.wishes}
+              onEdit={handleEditWish}
+              onDelete={handleDeleteWish}
+              onAdd={handleAddWish}
+              isApproved={false}
+            />
             <TranscriptionPanel
               transcription={state.transcription}
               discovery={state.discovery}
             />
-            <div className="order-first lg:order-0">
-              <WishesList
-                wishes={state.wishes}
-                onEdit={handleEditWish}
-                onDelete={handleDeleteWish}
-                onAdd={handleAddWish}
-                isApproved={false}
-              />
-            </div>
           </div>
 
           <div className="flex flex-col items-stretch justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">

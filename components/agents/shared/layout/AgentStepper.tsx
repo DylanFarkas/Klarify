@@ -30,7 +30,6 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
             key={step.number}
             className={[
               sidebarRowClass,
-              isActive ? 'bg-elevated' : '',
               isFuture ? 'opacity-55' : '',
             ]
               .filter(Boolean)
@@ -66,26 +65,18 @@ export function AgentStepper({ currentStep }: AgentStepperProps) {
               </div>
             </div>
 
-            <div className={`min-w-0 flex-1 ${sidebarFadeClass}`}>
-              <span
-                className={[
-                  'block truncate text-sm leading-5',
-                  isActive && 'font-medium text-foreground',
-                  isCompleted && 'text-muted',
-                  isFuture && 'text-step-future-text',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {step.name}
-              </span>
-
-              {isActive ? (
-                <span className="mt-0.5 block text-xs leading-snug text-subtle">
-                  {step.description}
-                </span>
-              ) : null}
-            </div>
+            <span
+              className={[
+                `min-w-0 truncate text-sm ${sidebarFadeClass}`,
+                isActive && 'font-medium text-foreground',
+                isCompleted && 'text-muted',
+                isFuture && 'text-step-future-text',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {step.name}
+            </span>
           </div>
         );
       })}

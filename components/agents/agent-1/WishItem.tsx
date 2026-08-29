@@ -83,30 +83,24 @@ export function WishItem({ wish, onEdit, onDelete, isApproved, index }: WishItem
     }
   };
 
-  const displayNumber = String(index + 1).padStart(2, '0');
+  const sourceHint =
+    wish.source === 'manual' || wish.isEdited
+      ? [wish.source === 'manual' ? 'Manual' : null, wish.isEdited ? 'Editado' : null]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
 
   return (
     <article
       className={[
-        'group relative px-4 py-3.5 transition-colors md:px-5',
-        index > 0 ? 'border-t border-border' : '',
-        isEditing ? 'bg-surface-hover/50' : 'hover:bg-surface-hover/40',
+        'group relative px-4 py-3 transition-colors md:px-5',
+        index > 0 ? '' : '',
+        isEditing ? 'bg-surface-hover/50' : 'hover:bg-surface-hover/30',
         isDeleting && 'opacity-0',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="mb-1 flex items-center gap-2">
-        <span className="text-[11px] font-medium tabular-nums text-subtle">
-          {displayNumber}
-        </span>
-        <span className="font-mono text-[11px] text-subtle">{wish.id}</span>
-        <span className="text-[11px] text-subtle">
-          · {wish.source === 'auto' ? 'IA' : 'Manual'}
-          {wish.isEdited ? ' · Editado' : ''}
-        </span>
-      </div>
-
       {isEditing ? (
         <div className="flex flex-col gap-2.5">
           <textarea
@@ -137,30 +131,58 @@ export function WishItem({ wish, onEdit, onDelete, isApproved, index }: WishItem
           </div>
         </div>
       ) : (
-        <>
-          <p className="text-[15px] font-medium leading-relaxed text-foreground">
-            {wish.text}
-          </p>
+        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5">
+          <span className="mt-px text-[12px] tabular-nums text-subtle">
+            {index + 1}
+          </span>
+
+          <div className="min-w-0">
+            <p className="text-[15px] font-medium leading-snug text-foreground">
+              {wish.text}
+            </p>
+            {sourceHint ? (
+              <p className="mt-1 text-[11px] text-subtle">{sourceHint}</p>
+            ) : null}
+
+            {!isApproved ? (
+              <div className="mt-1.5 flex items-center gap-1 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-[12px] font-medium text-muted hover:bg-surface-hover hover:text-foreground"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  className="inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-[12px] font-medium text-muted hover:bg-red-500/10 hover:text-red-500"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           {!isApproved ? (
-            <div className="mt-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+            <div className="hidden items-center gap-0.5 sm:flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100">
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="cursor-pointer rounded-md px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 Editar
               </button>
               <button
                 type="button"
                 onClick={() => void handleDelete()}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
+                className="cursor-pointer rounded-md px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-red-500/10 hover:text-red-500"
               >
                 Eliminar
               </button>
             </div>
           ) : null}
-        </>
+        </div>
       )}
     </article>
   );

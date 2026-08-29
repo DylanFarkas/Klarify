@@ -103,9 +103,8 @@ function WizardSidebar({
   onGoToQuestion: (index: number) => void;
 }) {
   return (
-    <aside className="hidden shrink-0 border-r border-border lg:block lg:w-56 xl:w-60">
-      <div className="sticky top-0 px-3 py-4">
-        <p className="mb-2 px-2 text-xs font-medium text-subtle">Progreso</p>
+    <aside className="hidden shrink-0 border-r border-border/60 lg:block lg:w-48">
+      <nav className="px-2 py-3" aria-label="Preguntas">
         <ol className="flex flex-col gap-0.5">
           {questions.map((question, index) => {
             const done = isAnswerValid(question.id, answers);
@@ -118,9 +117,9 @@ function WizardSidebar({
                   onClick={() => done && onGoToQuestion(index)}
                   disabled={!done && !isCurrent}
                   className={[
-                    'grid w-full grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-lg px-2 py-2 text-left transition-colors',
+                    'grid w-full grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
                     isCurrent
-                      ? 'bg-surface-hover text-foreground'
+                      ? 'bg-elevated font-medium text-foreground'
                       : done
                         ? 'cursor-pointer text-muted hover:bg-surface-hover hover:text-foreground'
                         : 'cursor-default text-subtle',
@@ -141,9 +140,6 @@ function WizardSidebar({
                   <span className="min-w-0 truncate text-[13px] leading-5">
                     {CATEGORY_LABELS[question.category]}
                   </span>
-                  <span className="col-start-2 line-clamp-2 text-[11px] leading-snug text-subtle">
-                    {question.question}
-                  </span>
                 </button>
               </li>
             );
@@ -151,25 +147,23 @@ function WizardSidebar({
           <li>
             <div
               className={[
-                'grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-lg px-2 py-2',
-                phase === 'review' ? 'bg-surface-hover text-foreground' : 'text-subtle',
+                'grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-2.5 rounded-md px-2 py-1.5',
+                phase === 'review' ? 'bg-elevated font-medium text-foreground' : 'text-subtle',
               ].join(' ')}
             >
               <span
                 className={[
                   'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-                  phase === 'review'
-                    ? 'bg-foreground text-background'
-                    : 'border border-border',
+                  phase === 'review' ? 'bg-foreground text-background' : 'border border-border',
                 ].join(' ')}
               >
-                ✓
+                {phase === 'review' ? <CheckIcon className="h-3 w-3" /> : '✓'}
               </span>
-              <span className="text-[13px] leading-5">Revisión final</span>
+              <span className="text-[13px] leading-5">Revisión</span>
             </div>
           </li>
         </ol>
-      </div>
+      </nav>
     </aside>
   );
 }
@@ -191,11 +185,9 @@ function OptionCard({
       disabled={disabled}
       onClick={onSelect}
       className={[
-        'group flex w-full items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors',
+        'group flex w-full items-center gap-3 border-t border-border/60 px-1 py-2.5 text-left transition-colors first:border-t-0',
         'cursor-pointer',
-        selected
-          ? 'border-border-strong bg-surface-hover'
-          : 'border-border bg-surface hover:bg-surface-hover/60',
+        selected ? 'text-foreground' : 'text-muted hover:bg-surface-hover/30 hover:text-foreground',
         disabled && 'cursor-not-allowed opacity-50',
       ].join(' ')}
     >
@@ -209,7 +201,7 @@ function OptionCard({
       >
         {selected ? <CheckIcon className="h-2.5 w-2.5" /> : null}
       </span>
-      <span className="text-sm leading-snug text-foreground">{label}</span>
+      <span className="text-sm leading-snug">{label}</span>
     </button>
   );
 }
@@ -315,32 +307,25 @@ export function ClarifyingQuestionsPanel({
   const primaryBtn =
     'inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40';
   const ghostBtn =
-    'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40';
+    'inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-surface-muted px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40';
+
+  const stepLabel =
+    phase === 'intro'
+      ? `${totalQuestions} ${totalQuestions === 1 ? 'pregunta' : 'preguntas'}`
+      : phase === 'review'
+        ? 'Revisión'
+        : `${questionIndex + 1} / ${totalQuestions}`;
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="border-b border-border px-4 py-3 md:px-5">
+      <div className="border-b border-border/60 px-4 py-3 md:px-5">
         <div className="mb-2.5 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-xs font-medium text-subtle">Definición del proyecto</span>
-            {phase !== 'intro' ? (
-              <>
-                <span className="text-subtle" aria-hidden>
-                  ·
-                </span>
-                <span className="truncate text-xs text-muted">
-                  {phase === 'review'
-                    ? 'Revisión'
-                    : `Paso ${questionIndex + 1} de ${totalQuestions}`}
-                </span>
-              </>
-            ) : null}
-          </div>
+          <span className="text-[12px] tabular-nums text-muted">{stepLabel}</span>
           <button
             type="button"
             onClick={onSkip}
             disabled={isProcessing}
-            className="shrink-0 cursor-pointer text-xs font-medium text-subtle transition-colors hover:text-foreground disabled:opacity-50"
+            className="shrink-0 cursor-pointer text-[12px] font-medium text-subtle transition-colors hover:text-foreground disabled:opacity-50"
           >
             Saltar preguntas
           </button>
@@ -353,67 +338,56 @@ export function ClarifyingQuestionsPanel({
         </div>
       </div>
 
-      <div className="flex min-h-100 flex-col lg:flex-row">
-        <WizardSidebar
-          questions={questions}
-          answers={answers}
-          phase={phase}
-          questionIndex={questionIndex}
-          onGoToQuestion={handleGoToQuestion}
-        />
+      <div className="flex flex-col lg:flex-row">
+        {phase !== 'intro' ? (
+          <WizardSidebar
+            questions={questions}
+            answers={answers}
+            phase={phase}
+            questionIndex={questionIndex}
+            onGoToQuestion={handleGoToQuestion}
+          />
+        ) : null}
 
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-1 flex-col px-4 py-5 md:px-6 md:py-6">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex flex-col px-4 py-5 md:px-6">
             {phase === 'intro' && (
-              <div key="intro" className={`flex flex-1 flex-col ${slideClass}`}>
-                <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              <div key="intro" className={slideClass}>
+                <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
                   Afinemos tu proyecto
                 </h2>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+                <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted">
                   {discovery.summary}
                 </p>
 
                 {discovery.gaps.length > 0 ? (
-                  <div className="mt-5">
-                    <p className="mb-2 text-xs font-medium text-subtle">Qué nos falta entender</p>
-                    <ul className="grid gap-1.5 sm:grid-cols-2">
-                      {discovery.gaps.map((gap) => (
-                        <li
-                          key={gap}
-                          className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-muted"
-                        >
-                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-foreground/40" />
-                          {gap}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ul className="mt-4">
+                    {discovery.gaps.map((gap, index) => (
+                      <li
+                        key={gap}
+                        className={[
+                          'py-2 text-[13px] text-muted',
+                          index > 0 ? 'border-t border-border/60' : '',
+                        ].join(' ')}
+                      >
+                        {gap}
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
-
-                <p className="mt-5 text-[13px] leading-relaxed text-muted">
-                  Te haremos{' '}
-                  <span className="font-medium text-foreground">
-                    {totalQuestions} {totalQuestions === 1 ? 'pregunta' : 'preguntas'}
-                  </span>{' '}
-                  puntuales. Elige la opción que mejor encaje o escribe la tuya.
-                </p>
               </div>
             )}
 
             {phase === 'question' && currentQuestion && (
-              <div key={`q-${currentQuestion.id}`} className={`flex flex-1 flex-col ${slideClass}`}>
-                <p className="mb-1.5 text-xs font-medium text-subtle">
+              <div key={`q-${currentQuestion.id}`} className={slideClass}>
+                <p className="mb-1 text-[12px] text-subtle">
                   {CATEGORY_LABELS[currentQuestion.category]}
                 </p>
-
-                <h2 className="text-lg font-semibold leading-snug tracking-tight text-foreground">
+                <h2 className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
                   {currentQuestion.question}
                 </h2>
-                <p className="mt-1.5 text-[13px] text-muted">
-                  Selecciona la opción que mejor describa tu caso.
-                </p>
 
-                <div className="mt-5 flex flex-col gap-2">
+                <div className="mt-4">
                   {currentQuestion.options.map((option) => (
                     <OptionCard
                       key={option.id}
@@ -439,8 +413,8 @@ export function ClarifyingQuestionsPanel({
 
                   {answers.find((a) => a.questionId === currentQuestion.id)?.selectedOptionId ===
                   OTHER_OPTION_ID ? (
-                    <div className="mt-1">
-                      <label className="mb-1.5 block text-xs text-subtle">
+                    <div className="mt-3">
+                      <label className="mb-1.5 block text-[12px] text-subtle">
                         Describe tu respuesta
                       </label>
                       <textarea
@@ -462,30 +436,33 @@ export function ClarifyingQuestionsPanel({
             )}
 
             {phase === 'review' && (
-              <div key="review" className={`flex flex-1 flex-col ${slideClass}`}>
-                <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              <div key="review" className={slideClass}>
+                <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
                   Revisa tus respuestas
                 </h2>
-                <p className="mt-1.5 text-sm text-muted">
+                <p className="mt-1 text-[12px] text-muted">
                   Confirma que todo esté correcto antes de generar los requerimientos.
                 </p>
 
-                <div className="mt-5 flex flex-col gap-1.5">
+                <ul className="mt-4">
                   {questions.map((question, index) => {
                     const label = getAnswerLabel(question, answers);
                     return (
-                      <div
+                      <li
                         key={question.id}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-border px-3.5 py-3"
+                        className={[
+                          'group flex items-start justify-between gap-3 py-3',
+                          index > 0 ? 'border-t border-border/60' : '',
+                        ].join(' ')}
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-subtle">
+                          <p className="text-[12px] text-subtle">
                             {CATEGORY_LABELS[question.category]}
                           </p>
                           <p className="mt-0.5 text-sm font-medium text-foreground">
                             {question.question}
                           </p>
-                          <p className="mt-1.5 text-[13px] text-muted">
+                          <p className="mt-1 text-[13px] text-muted">
                             {label ?? (
                               <span className="italic text-subtle">Sin responder</span>
                             )}
@@ -494,14 +471,14 @@ export function ClarifyingQuestionsPanel({
                         <button
                           type="button"
                           onClick={() => handleGoToQuestion(index)}
-                          className="shrink-0 cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                          className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                         >
                           Editar
                         </button>
-                      </div>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               </div>
             )}
 
@@ -512,7 +489,7 @@ export function ClarifyingQuestionsPanel({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 md:px-6">
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 md:px-6">
             <button
               type="button"
               onClick={goBack}
