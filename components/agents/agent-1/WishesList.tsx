@@ -2,6 +2,7 @@
  * @fileoverview WishesList — Lista HITL de deseos (foco de la revisión).
  *
  * Cumple CA2 (listado estructurado) y CA3 (HITL: editar/añadir/eliminar).
+ * Alta y edición van en WishFormModal (DetailModal), no inline.
  */
 
 'use client';
@@ -9,7 +10,7 @@
 import { useState } from 'react';
 import type { Wish } from '@/lib/types/agent-1';
 import { WishItem } from './WishItem';
-import { AddWishForm } from './AddWishForm';
+import { WishFormModal, type WishFormValues } from './WishFormModal';
 
 interface WishesListProps {
   wishes: Wish[];
@@ -26,9 +27,18 @@ export function WishesList({
   onAdd,
   isApproved,
 }: WishesListProps) {
-  const [isAddingWish, setIsAddingWish] = useState(false);
+  const [formWish, setFormWish] = useState<Wish | 'new' | null>(null);
 
   const manualCount = wishes.filter((w) => w.source === 'manual').length;
+
+  const handleFormSubmit = (values: WishFormValues) => {
+    if (formWish === 'new') {
+      onAdd(values.text);
+    } else if (formWish && values.text !== formWish.text) {
+      onEdit(formWish.id, values.text);
+    }
+    setFormWish(null);
+  };
 
   return (
     <section
@@ -49,11 +59,11 @@ export function WishesList({
           </span>
         </div>
 
-        {!isApproved && !isAddingWish ? (
+        {!isApproved ? (
           <button
             id="add-wish-button"
             type="button"
-            onClick={() => setIsAddingWish(true)}
+            onClick={() => setFormWish('new')}
             className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <svg
@@ -71,7 +81,7 @@ export function WishesList({
         ) : null}
       </div>
 
-      {wishes.length === 0 && !isAddingWish ? (
+      {wishes.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
           <p className="text-sm text-muted">Aún no hay deseos.</p>
           <p className="mt-1 text-[12px] text-subtle">
@@ -80,7 +90,7 @@ export function WishesList({
           {!isApproved ? (
             <button
               type="button"
-              onClick={() => setIsAddingWish(true)}
+              onClick={() => setFormWish('new')}
               className="mt-4 cursor-pointer rounded-lg bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
             >
               Añadir deseo
@@ -93,27 +103,22 @@ export function WishesList({
             <li key={wish.id}>
               <WishItem
                 wish={wish}
-                onEdit={onEdit}
+                onRequestEdit={setFormWish}
                 onDelete={onDelete}
                 isApproved={isApproved}
                 index={index}
               />
             </li>
           ))}
-
-          {isAddingWish ? (
-            <li className={wishes.length > 0 ? 'border-t border-border/60' : ''}>
-              <AddWishForm
-                onAdd={(text) => {
-                  onAdd(text);
-                  setIsAddingWish(false);
-                }}
-                onCancel={() => setIsAddingWish(false)}
-              />
-            </li>
-          ) : null}
         </ol>
       )}
+
+      <WishFormModal
+        open={formWish !== null}
+        onClose={() => setFormWish(null)}
+        onSubmit={handleFormSubmit}
+        wish={formWish === 'new' || formWish === null ? null : formWish}
+      />
     </section>
   );
 }

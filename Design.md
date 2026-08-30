@@ -11,7 +11,7 @@ Referencias ya aplicadas:
 | Backlog | `BacklogContent`, `DashboardSprintPlan`, `BacklogStoryRow`, `backlog-table-layout.tsx`, `BacklogStoryDetailPage` |
 | Tablero | `BoardWorkspace`, `BoardFilters`, `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `TeamPanel` |
 | Stack | `StackContent`, `StackEmptyState`, `StackBoard`, `StackTechPicker` |
-| Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `TranscriptionPanel` |
+| Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `WishFormModal`, `TranscriptionPanel` |
 | Agente 2 | `app/agentes/2/page.tsx`, `EmptyBacklogState`, `BacklogView`, `EpicAccordion`, `UserStoryItem`, `UserStoryFormModal`, `WishesSummaryPanel` |
 | Agente 3 | `app/agentes/3/page.tsx`, `EmptyPrioritizationState`, `EstimationWorkspace` |
 | Agente 4 | `app/agentes/4/page.tsx`, `EmptyAgent4State`, `EmptyPrioritizationStartState`, `FrameworkSelector`, `PrioritizationWorkspace` |
@@ -352,7 +352,8 @@ Foco: **leer y aprobar deseos**. El contexto es apoyo.
 | ----- | ------ |
 | Grid | `lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] items-start` — deseos primero en el DOM |
 | Lista | Sin `max-h` interno: scrollea la página. Filas `border-t`, hover `bg-surface-hover/30` |
-| Fila deseo | `grid-cols-[1.25rem_minmax(0,1fr)_auto]` — índice + texto `15px font-medium`. Meta Manual/Editado solo si aplica. Acciones al hover a la derecha |
+| Fila deseo | `grid-cols-[1.25rem_minmax(0,1fr)_auto]` — índice + texto `15px font-medium`. Meta Manual/Editado solo si aplica. Acciones al hover a la derecha (iconos lápiz / papelera, `p-1.5`, `aria-label`) |
+| Alta / edición | `WishFormModal` sobre `DetailModal` (mismo shell que `UserStoryFormModal`): textarea del deseo. No formulario inline |
 | Contexto | Título `text-[13px] text-muted`. Respuestas en pares categoría → valor, sin repetir la pregunta |
 | CTA | Pie de página: **Empezar de nuevo** muted + **Aprobar deseos y continuar** foreground |
 
@@ -632,7 +633,7 @@ En sidebar del producto:
 11. ¿Klark FAB usa `.harness-fab` con `primary`?
 12. ¿Pipeline usa h1 display `text-[50px]` y paneles internos compactos (`15px`)?
 13. ¿Captura A1 es empty state (no dropzone + 3 cards)? ¿Revisión pone deseos a la izquierda, más anchos?
-14. ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
+14. ¿A1 revisa deseos en `WishFormModal` (`DetailModal`), no inline? ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
 15. ¿A3 empty es elección de modo (chips + CTA compacto), no un panel “Workspace” con cards? ¿Revisión pone el esfuerzo a la derecha, sin IDs ni caja de razonamiento?
 16. ¿A4 empty es elección de metodología (chips `elevated`/`surface-muted` + CTA compacto), sin `AgentPageHero` ni toggle invertido blanco? ¿Revisión pone la prioridad a la derecha, sin IDs ni caja de razonamiento?
 
