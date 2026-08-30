@@ -14,7 +14,8 @@ Referencias ya aplicadas:
 | Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `TranscriptionPanel` |
 | Agente 2 | `app/agentes/2/page.tsx`, `EmptyBacklogState`, `BacklogView`, `EpicAccordion`, `UserStoryItem`, `UserStoryFormModal`, `WishesSummaryPanel` |
 | Agente 3 | `app/agentes/3/page.tsx`, `EmptyPrioritizationState`, `EstimationWorkspace` |
-| Agentes 4–5 | paneles en `components/agents/agent-*` (migrar al patrón A1/A2/A3) |
+| Agente 4 | `app/agentes/4/page.tsx`, `EmptyAgent4State`, `EmptyPrioritizationStartState`, `FrameworkSelector`, `PrioritizationWorkspace` |
+| Agente 5 | paneles en `components/agents/agent-5` (migrar al patrón A1/A2/A3) |
 | Klark | `HarnessChatDock`, `HarnessChatPanel` (+ estilos `.harness-*` en `globals.css`) |
 | Tokens | `app/agent-themes.css`, mapeo en `app/globals.css` |
 
@@ -465,6 +466,63 @@ Estimaciones  N                    3/3 · 9 SP
 | Acciones de fila | Ojo (`p-1.5`, `aria-label`) al hover; detalle en `DetailModal` |
 | CTA | Pie `border-t`: **Regenerar** muted + **Consolidar backlog estimado** foreground |
 
+### 5.10 Agente 4 — Priorización
+
+Misma familia que A1/A2/A3. Página: `app/agentes/4/page.tsx`.
+
+**Header de página** (todas las fases):
+
+```tsx
+<header className="shrink-0 pb-3">
+  <h1 className="text-[50px] font-semibold tracking-tight text-foreground">Priorización del Backlog</h1>
+  <p className="mt-1 text-[12px] text-muted">Paso 4/6 · Orden · …</p>
+</header>
+```
+
+Sin `AgentPageHero`. El empty / panel queda **justo debajo** del header. En revisión, una segunda línea de meta `12px` con conteos (`N épicas · M historias · total SP o tiempo`) y `Aprobado` en `text-success` si aplica. Anchos: `max-w-3xl` en empty y elección de metodología; `max-w-5xl` en revisión.
+
+El **foco** es la categoría de cada historia. Todo lo demás (razonamiento, IDs, barras) es apoyo o se omite.
+
+#### Empty sin estimaciones (`EmptyAgent4State`)
+
+Como A3 / Stack: `max-w-lg` centrado, `py-8`, borde transparente, icono `h-12 w-12 rounded-md bg-surface-muted`, título `15px`. CTA **Volver al Agente 3** (`bg-surface-muted`).
+
+#### Elección de metodología (antes de priorizar)
+
+Empty compacto bajo el h1, como elección de modo A3:
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Contenedor | `max-w-lg` centrado, `py-8`, `border-transparent` |
+| Icono | `h-12 w-12 rounded-md bg-surface-muted` |
+| Título interno | `text-[15px] font-semibold` — *Elige cómo priorizar* |
+| Metodologías | Cuatro chips: **MoSCoW** / **WSJF** / **RICE** / **Valor / Esfuerzo**. Idle `bg-surface-muted`; seleccionado `bg-elevated`. No cards bordeadas ni invertido blanco |
+| CTA | **Sugerir priorización MoSCoW** (o el framework activo) `foreground`, compacto, no a todo el ancho |
+| Meta | Una línea `12px text-subtle`: conteos + esfuerzo + framework activo |
+
+#### Revisión (`PrioritizationWorkspace`)
+
+Foco: **leer y ajustar la prioridad**. Lista al estilo Estimación A3, sin columna extra de razonamiento.
+
+```
+Prioridades  N                     3/3 · 2 Must · 1 Could
+─────────────────────────────────────────────
+Épica                              2 Must · 1 Could
+  HU  título…                      Could
+                                   [Must Should Could Won't]
+```
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Panel | Como `EstimationWorkspace`: `rounded-xl bg-surface`, **sin borde exterior**. Header `15px` + contador. A la derecha, chips de metodología compactos + meta `N/N · distribución` (`12px tabular-nums`). Sin barra de progreso |
+| Lista | Sin `max-h` interno. **Divisor entre épicas** (`border-t border-border/60`), **no entre HUs**. Sin `bg-surface-muted` anidado |
+| Épica | Título `15px font-semibold`; descripción `13px muted` si hay; meta `N/N priorizadas`. Distribución del grupo a la derecha `13px font-medium`. Sin IDs `EPIC-001`. Sin acordeón: las HUs quedan visibles |
+| HU | Indentada (`ml-8` / `md:ml-11`). Índice + título `13px font-medium` + descripción `13px muted`. Razonamiento IA como línea `12px text-subtle` (`line-clamp-2`), **no caja**. Meta `Ajustado` y esfuerzo (`2 SP`) solo si aplica. Sin IDs `HU-001` |
+| Prioridad | Columna derecha (`shrink-0`): valor `12px font-medium` (`Must`, `Could`, `Quick Win`…) + chips. En mobile, debajo del texto con el mismo indent |
+| Chips de categoría | Seleccionado `bg-foreground text-background`. Idle sin borde: `text-muted hover:bg-surface-hover`. El valor elegido es el único relleno. Labels cortos en el chip; `aria-label` con el nombre completo |
+| Acciones de fila | Ojo (`p-1.5`, `aria-label`) al hover; detalle en `DetailModal` |
+| CTA | Pie `border-t`: **Regenerar** muted + **Consolidar backlog priorizado** foreground |
+
 ---
 
 ## 6. Componentes transversales
@@ -521,7 +579,7 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 | Revisión deseos | Lista de deseos a la izquierda (más ancha); contexto muted a la derecha |
 | Revisión backlog (A2) | Épicas e historias a la izquierda (más ancha); deseos muted a la derecha |
 | Estimación (A3) | Empty de modo o lista de esfuerzo (SP/tiempo a la derecha); razonamiento muted |
-| Priorización (A4) | Workspace + selector metodología |
+| Priorización (A4) | Empty de metodología o lista de categorías (prioridad a la derecha); razonamiento muted |
 | Sprints (A5) | Config + board de sprints |
 | **Backlog** (`/agentes/backlog`) | Tabla densa + toolbar; detalle HU en página dedicada |
 | **Tablero** (`/agentes/board`) | Columnas Kanban + filtros + equipo |
@@ -576,6 +634,7 @@ En sidebar del producto:
 13. ¿Captura A1 es empty state (no dropzone + 3 cards)? ¿Revisión pone deseos a la izquierda, más anchos?
 14. ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
 15. ¿A3 empty es elección de modo (chips + CTA compacto), no un panel “Workspace” con cards? ¿Revisión pone el esfuerzo a la derecha, sin IDs ni caja de razonamiento?
+16. ¿A4 empty es elección de metodología (chips `elevated`/`surface-muted` + CTA compacto), sin `AgentPageHero` ni toggle invertido blanco? ¿Revisión pone la prioridad a la derecha, sin IDs ni caja de razonamiento?
 
 Si algo no encaja, mirar primero los archivos de la tabla de referencias al inicio.
 
@@ -592,6 +651,8 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Revisión con dos columnas del mismo peso, IDs `DESEO-004` / `EPIC-001` / `HU-001 · IA` + índice, y `max-h` que recorta la lista
 - A2 con wishes a la izquierda más estrechos, cards anidadas de HU, formularios inline de historia y **Añadir HU** al pie de cada lista
 - A3 con `AgentPageHero`, panel “Workspace de estimación” bordeado, cards de modo lado a lado, CTA a todo el ancho, IDs `EPIC-001` / `HU-001`, caja “Razonamiento IA”, barra de progreso en el header de lista y divisor entre HUs
+- A4 con `AgentPageHero`, empty en card bordeada, toggle de metodología invertido blanco y stats con iconos en el header del empty
+- A4 revisión con panel “Workspace de priorización” bordeado, barra de progreso, IDs `EPIC-001` / `HU-001`, caja “Razonamiento IA”, badge + dropdown de categoría y divisor entre HUs
 - Ver / Editar / Eliminar en texto en filas HITL (usar iconos con `aria-label`)
 - Divisores entre HUs dentro de una épica; el corte visual va **entre épicas**
 - Modal de actividad con gradient animado

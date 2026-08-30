@@ -16,16 +16,31 @@ const FRAMEWORK_OPTIONS = [
   { id: 'value-effort' as const, enabled: true },
 ];
 
+const selectedFrameworkBtn =
+  'inline-flex cursor-pointer items-center justify-center rounded-lg bg-elevated px-4 py-2 text-sm font-medium text-foreground';
+const idleFrameworkBtn =
+  'inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground';
+const compactSelectedFrameworkBtn =
+  'inline-flex cursor-pointer items-center justify-center rounded-lg bg-elevated px-2.5 py-1.5 text-[12px] font-medium text-foreground';
+const compactIdleFrameworkBtn =
+  'inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-muted px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground';
+
 interface FrameworkSelectorProps {
   value: PrioritizationFramework;
   onChange: (framework: PrioritizationFramework) => void;
   disabled?: boolean;
+  centered?: boolean;
+  hideLabel?: boolean;
+  size?: 'default' | 'compact';
 }
 
 export function FrameworkSelector({
   value,
   onChange,
   disabled,
+  centered,
+  hideLabel,
+  size = 'default',
 }: FrameworkSelectorProps) {
   const [hoveredId, setHoveredId] = useState<PrioritizationFramework | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
@@ -61,10 +76,30 @@ export function FrameworkSelector({
     };
   }, []);
 
+  const isCompact = size === 'compact';
+  const selectedBtn = isCompact ? compactSelectedFrameworkBtn : selectedFrameworkBtn;
+  const idleBtn = isCompact ? compactIdleFrameworkBtn : idleFrameworkBtn;
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-medium text-subtle">Metodología</label>
-      <div className="flex flex-wrap gap-1.5">
+    <div
+      className={[
+        'flex flex-col gap-1.5',
+        centered ? 'items-center' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {hideLabel ? null : <p className="text-[12px] text-subtle">Metodología</p>}
+      <div
+        className={[
+          'flex flex-wrap gap-2',
+          centered ? 'justify-center' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        role="group"
+        aria-label="Metodología de priorización"
+      >
         {FRAMEWORK_OPTIONS.map((opt) => {
           const desc = FRAMEWORK_DESCRIPTIONS[opt.id];
           const isActive = value === opt.id;
@@ -81,15 +116,14 @@ export function FrameworkSelector({
                 onClick={() => opt.enabled && onChange(opt.id)}
                 onMouseEnter={() => opt.enabled && showTooltip(opt.id)}
                 onMouseLeave={hideTooltip}
+                aria-pressed={isActive}
+                aria-label={desc.label}
                 className={[
-                  'inline-flex cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors',
-                  isActive
-                    ? 'border-foreground bg-foreground text-background'
-                    : opt.enabled
-                      ? 'border-border bg-background text-muted hover:border-border-strong hover:bg-surface-hover hover:text-foreground'
-                      : 'cursor-not-allowed border-border text-subtle opacity-40',
-                  'disabled:cursor-not-allowed disabled:opacity-40',
-                ].join(' ')}
+                  isActive ? selectedBtn : idleBtn,
+                  !opt.enabled || disabled ? 'cursor-not-allowed opacity-40' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
                 {desc.label}
               </button>

@@ -21,7 +21,6 @@ import type {
 } from '@/lib/types/agent-4';
 import { EmptyAgent4State } from '@/components/agents/agent-4/EmptyAgent4State';
 import { PrioritizationWorkspace } from '@/components/agents/agent-4/PrioritizationWorkspace';
-import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import { getFrameworkLabels } from '@/lib/constants/agent-4';
@@ -216,81 +215,57 @@ export default function Agent4Page() {
   if (isLoading || !isHydrated) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-foreground" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
       </div>
     );
   }
 
   const hasInput = state.input !== null && state.input.epics.length > 0;
   const isApproved = state.status === 'approved';
+  const showReviewStats = hasInput && hasPriorities;
+  const headerSubtitle = showReviewStats
+    ? null
+    : 'Elige la metodología y sugiere el orden del backlog.';
 
   return (
     <div
       className={[
-        'mx-auto flex w-full flex-col gap-7 px-6 pt-3 pb-5',
-        hasInput ? 'max-w-5xl' : 'max-w-3xl',
+        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col px-6 pt-3 pb-5',
+        showReviewStats ? 'max-w-5xl gap-5' : 'max-w-3xl gap-5',
       ].join(' ')}
     >
-      <AgentPageHero
-        step={4}
-        variant="order"
-        title="Priorización del Backlog"
-        description="Ordena épicas e historias según valor de negocio y esfuerzo. Tu equipo revisa y ajusta antes de consolidar."
-        statusBadge={
-          isApproved ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Aprobado
+      <header className="shrink-0 pb-3">
+        <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
+          Priorización del Backlog
+        </h1>
+        <p className="mt-1 text-[12px] text-muted">
+          Paso 4/6 · Orden
+          {headerSubtitle ? <> · {headerSubtitle}</> : null}
+        </p>
+        {showReviewStats ? (
+          <p className="mt-1 text-[12px] text-muted">
+            <span className="tabular-nums text-foreground">{epicCount}</span>
+            {' '}
+            {epicCount === 1 ? 'épica' : 'épicas'}
+            {' · '}
+            <span className="tabular-nums text-foreground">{storyCount}</span>
+            {' '}
+            {storyCount === 1 ? 'historia' : 'historias'}
+            {' · '}
+            <span className="tabular-nums text-foreground">
+              {formatEffortTotal(totalEffort, estimationMode)}
             </span>
-          ) : undefined
-        }
-        stats={
-          hasInput ? (
-            <>
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
-                  </svg>
-                }
-                value={epicCount}
-                label={`épica${epicCount !== 1 ? 's' : ''}`}
-              />
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                  </svg>
-                }
-                value={storyCount}
-                label={`historia${storyCount !== 1 ? 's' : ''} de usuario`}
-              />
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-                value={formatEffortTotal(totalEffort, estimationMode)}
-                label={estimationMode === 'time' ? 'Tiempo total' : 'Story Points'}
-              />
-              {hasPriorities ? (
-                <AgentStat
-                  icon={
-                    <svg className="h-4 w-4 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-                    </svg>
-                  }
-                  value={Object.keys(state.priorities).length}
-                  label={`priorizada${Object.keys(state.priorities).length !== 1 ? 's' : ''}`}
-                />
-              ) : null}
-            </>
-          ) : undefined
-        }
-      />
+            {' '}
+            {estimationMode === 'time' ? 'tiempo total' : 'Story Points'}
+            {isApproved ? (
+              <>
+                {' · '}
+                <span className="text-success">Aprobado</span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+      </header>
 
       {state.error && (
         <AgentErrorBanner

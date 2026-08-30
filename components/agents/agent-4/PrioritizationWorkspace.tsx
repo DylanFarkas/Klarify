@@ -15,18 +15,18 @@ import type {
 } from '@/lib/types/agent-4';
 import {
   FRAMEWORK_DESCRIPTIONS,
+  getFrameworkCategories,
+  getFrameworkLabels,
   getFrameworkShortLabels,
 } from '@/lib/constants/agent-4';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
-import { ViewDetailsButton } from '@/components/agents/shared/ViewDetailsButton';
 import { UserStoryDetailContent } from '@/components/agents/shared/UserStoryDetailContent';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { RegenerationHint } from '@/components/agents/shared/RegenerationHint';
 import { formatEffortTotal, formatEstimation, getEffortValue } from '@/lib/utils/estimation';
-import { CategorySelect, CategoryBadge } from './CategorySelect';
 import { FrameworkSelector } from './FrameworkSelector';
 import { EmptyPrioritizationStartState } from './EmptyPrioritizationStartState';
 import type { PrioritizationFramework } from '@/lib/types/agent-4';
@@ -46,24 +46,74 @@ interface PrioritizationWorkspaceProps {
   onError?: (message: string) => void;
 }
 
-function useCategoryDistribution(
+function formatCategorySummary(
+  stories: UserStory[],
   priorities: Record<string, StoryPrioritization>,
   framework: PrioritizationFramework
-) {
-  return useMemo(() => {
-    const labels = getFrameworkShortLabels(framework);
-    const counts: Record<string, number> = {};
-    for (const pri of Object.values(priorities)) {
-      counts[pri.category] = (counts[pri.category] ?? 0) + 1;
-    }
-    return Object.entries(counts)
-      .filter(([, c]) => c > 0)
-      .map(([cat, count]) => ({
-        category: cat,
-        count,
-        label: labels[cat] ?? cat,
-      }));
-  }, [priorities, framework]);
+): string | null {
+  const labels = getFrameworkShortLabels(framework);
+  const counts: Record<string, number> = {};
+  for (const story of stories) {
+    const cat = priorities[story.id]?.category;
+    if (!cat) continue;
+    counts[cat] = (counts[cat] ?? 0) + 1;
+  }
+  const parts = getFrameworkCategories(framework)
+    .filter((cat) => (counts[cat] ?? 0) > 0)
+    .map((cat) => `${counts[cat]} ${labels[cat] ?? cat}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+const iconBtnClass =
+  'inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground';
+
+function EyeIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+interface CategoryPickerProps {
+  framework: PrioritizationFramework;
+  value: FrameworkCategory | '';
+  onChange: (category: FrameworkCategory) => void;
+  disabled: boolean;
+}
+
+function CategoryPicker({ framework, value, onChange, disabled }: CategoryPickerProps) {
+  const categories = getFrameworkCategories(framework);
+  const shortLabels = getFrameworkShortLabels(framework);
+  const labels = getFrameworkLabels(framework);
+
+  return (
+    <div className="flex flex-wrap gap-0.5" role="group" aria-label="Seleccionar prioridad">
+      {categories.map((cat) => {
+        const isSelected = value === cat;
+        return (
+          <button
+            key={cat}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(cat as FrameworkCategory)}
+            className={[
+              'flex h-7 items-center justify-center rounded-md px-2 text-[12px] font-medium transition-colors',
+              isSelected
+                ? 'bg-foreground text-background'
+                : 'text-muted hover:bg-surface-hover hover:text-foreground',
+              'cursor-pointer disabled:cursor-not-allowed disabled:opacity-40',
+            ].join(' ')}
+            aria-pressed={isSelected}
+            aria-label={labels[cat] ?? cat}
+          >
+            {shortLabels[cat] ?? cat}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 interface PrioritizationStoryRowProps {
@@ -93,59 +143,59 @@ function PrioritizationStoryRow({
 }: PrioritizationStoryRowProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const hasCategory = Boolean(pri?.category);
-  const displayNumber = String(index + 1).padStart(2, '0');
+  const shortLabels = getFrameworkShortLabels(framework);
+  const categoryLabel = hasCategory && pri ? (shortLabels[pri.category] ?? pri.category) : null;
+
+  const viewButton = (
+    <button
+      type="button"
+      onClick={() => setIsDetailOpen(true)}
+      className={iconBtnClass}
+      title="Ver"
+      aria-label="Ver historia"
+    >
+      <EyeIcon />
+    </button>
+  );
 
   return (
-    <article
-      className={[
-        'px-4 py-3.5 transition-colors md:px-5',
-        index > 0 ? 'border-t border-border' : '',
-        pri?.isModified ? 'bg-surface-hover/30' : 'hover:bg-surface-hover/40',
-      ].join(' ')}
-    >
-      <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start lg:gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium tabular-nums text-subtle">
-              {displayNumber}
-            </span>
-            <span className="font-mono text-[11px] text-subtle">{story.id}</span>
-            {pri?.isModified ? (
-              <span className="text-[11px] text-subtle">· Ajustado</span>
+    <article className="group/story relative px-3 py-2.5 transition-colors hover:bg-surface-hover/30">
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+        <div className="grid min-w-0 flex-1 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5">
+          <span className="mt-px text-[12px] tabular-nums text-subtle">{index + 1}</span>
+
+          <div className="min-w-0">
+            <p className="text-[13px] font-medium leading-snug text-foreground">{story.title}</p>
+            {story.description ? (
+              <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{story.description}</p>
             ) : null}
-            <div className="ml-auto">
-              <ViewDetailsButton onClick={() => setIsDetailOpen(true)} />
-            </div>
-          </div>
-          <h5 className="text-[15px] font-medium leading-snug text-foreground">{story.title}</h5>
-          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">
-            {story.description}
-          </p>
-          {est ? (
-            <p className="mt-1.5 text-[12px] tabular-nums text-subtle">
-              {formatEstimation(est, estimationMode)}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="lg:w-60 shrink-0">
-          <p className="mb-1.5 text-[11px] font-medium text-subtle">Razonamiento IA</p>
-          <div className="min-h-12 rounded-lg border border-border bg-background px-3 py-2">
             {pri?.justification ? (
-              <p className="text-[12px] leading-relaxed text-muted">{pri.justification}</p>
-            ) : (
-              <p className="text-[12px] text-subtle">
-                {isAnalyzing ? 'Analizando…' : 'Pendiente de clasificación'}
+              <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-subtle">
+                {pri.justification}
               </p>
-            )}
+            ) : isAnalyzing ? (
+              <p className="mt-1 text-[12px] text-subtle">Analizando prioridad…</p>
+            ) : null}
+            {est || pri?.isModified ? (
+              <p className="mt-1 text-[11px] text-subtle">
+                {est ? formatEstimation(est, estimationMode) : null}
+                {est && pri?.isModified ? ' · ' : null}
+                {pri?.isModified ? 'Ajustado' : null}
+              </p>
+            ) : null}
+            <div className="mt-1.5 sm:hidden">{viewButton}</div>
+          </div>
+
+          <div className="hidden sm:flex sm:opacity-0 sm:transition-opacity sm:group-hover/story:opacity-100 sm:focus-within:opacity-100">
+            {viewButton}
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:w-50 lg:justify-end">
-          {hasCategory && pri ? (
-            <CategoryBadge framework={framework} category={pri.category} />
+        <div className="shrink-0 pl-8 lg:pl-0 lg:pt-0.5">
+          {categoryLabel ? (
+            <p className="mb-1.5 text-[12px] font-medium text-foreground">{categoryLabel}</p>
           ) : null}
-          <CategorySelect
+          <CategoryPicker
             framework={framework}
             value={pri?.category ?? ''}
             onChange={onCategoryChange}
@@ -216,11 +266,8 @@ export function PrioritizationWorkspace({
   );
   const effortLabel = formatEffortTotal(totalEffort, estimationMode);
   const hasPriorities = Object.keys(priorities).length > 0;
-  const showIdleStart = !hasPriorities && !isAnalyzing && !isApproved;
   const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
-  const categoryDistribution = useCategoryDistribution(priorities, framework);
-  const progressPct =
-    totalStories > 0 ? Math.round((prioritizedCount / totalStories) * 100) : 0;
+  const categorySummary = formatCategorySummary(allStories, priorities, framework);
 
   const handlePrioritizeWithAgent = useCallback(async () => {
     if (!input || !user) return;
@@ -293,205 +340,197 @@ export function PrioritizationWorkspace({
 
   if (input.epics.length === 0) return null;
 
-  if (showIdleStart) {
+  const activityModal = showModelReasoning ? (
+    <AgentActivityModal
+      open={activityModalOpen}
+      isActive={isAnalyzing}
+      title={
+        hasPriorities
+          ? `Regenerando priorización ${frameworkLabel}...`
+          : `Priorizando backlog (${frameworkLabel})...`
+      }
+      description={
+        hasPriorities
+          ? `El Product Owner IA vuelve a clasificar las historias en categorías ${frameworkLabel}. Los valores anteriores serán reemplazados.`
+          : `El Product Owner IA analiza y clasifica el backlog usando la metodología ${frameworkLabel}.`
+      }
+      meta={`${input.epics.length} épica${input.epics.length !== 1 ? 's' : ''} · ${totalStories} historias`}
+      entries={entries}
+    />
+  ) : null;
+
+  const analyzingSpinner =
+    isAnalyzing && !showModelReasoning ? (
+      <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-sm font-medium text-foreground">
+            {hasPriorities ? 'Regenerando priorizaciones…' : 'Clasificando backlog…'}
+          </p>
+          <p className="text-[13px] text-muted">
+            Evaluando {totalStories} historia{totalStories !== 1 ? 's' : ''} con {frameworkLabel}
+          </p>
+        </div>
+        <div className="h-1 w-40 overflow-hidden rounded-full bg-border">
+          <div className="h-full w-1/3 rounded-full bg-foreground/70" />
+        </div>
+      </div>
+    ) : null;
+
+  if (!hasPriorities && !isApproved) {
     return (
       <>
-        {showModelReasoning && (
-          <AgentActivityModal
-            open={activityModalOpen}
-            isActive={isAnalyzing}
-            title={`Priorizando backlog (${frameworkLabel})...`}
-            description={`El Product Owner IA analiza y clasifica el backlog usando la metodología ${frameworkLabel}.`}
-            meta={`${input.epics.length} épica${input.epics.length !== 1 ? 's' : ''} · ${totalStories} historias`}
-            entries={entries}
+        {activityModal}
+        {analyzingSpinner}
+        {!isAnalyzing ? (
+          <EmptyPrioritizationStartState
+            framework={framework}
+            onFrameworkChange={onFrameworkChange}
+            onPrioritize={handlePrioritizeWithAgent}
+            isPrioritizing={isAnalyzing}
+            epicCount={input.epics.length}
+            storyCount={totalStories}
+            effortLabel={effortLabel}
           />
-        )}
-        <EmptyPrioritizationStartState
-          framework={framework}
-          onFrameworkChange={onFrameworkChange}
-          onPrioritize={handlePrioritizeWithAgent}
-          isPrioritizing={isAnalyzing}
-          epicCount={input.epics.length}
-          storyCount={totalStories}
-          effortLabel={effortLabel}
-        />
+        ) : null}
       </>
     );
   }
 
   return (
-    <section
-      className="flex flex-col rounded-xl border border-border bg-surface animate-[fadeIn_0.3s_ease-out]"
-      aria-labelledby="prioritization-workspace-heading"
-    >
-      {showModelReasoning && (
-        <AgentActivityModal
-          open={activityModalOpen}
-          isActive={isAnalyzing}
-          title={
-            hasPriorities
-              ? `Regenerando priorización ${frameworkLabel}...`
-              : `Priorizando backlog (${frameworkLabel})...`
-          }
-          description={
-            hasPriorities
-              ? `El Product Owner IA vuelve a clasificar las historias en categorías ${frameworkLabel}. Los valores anteriores serán reemplazados.`
-              : `El Product Owner IA analiza y clasifica el backlog usando la metodología ${frameworkLabel}.`
-          }
-          meta={
-            input
-              ? `${input.epics.length} épica${input.epics.length !== 1 ? 's' : ''} · ${totalStories} historias`
-              : undefined
-          }
-          entries={entries}
-        />
-      )}
-
-      <div className="flex flex-col gap-3 border-b border-border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between md:px-5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
+    <>
+      {activityModal}
+      <section
+        className="flex flex-col rounded-xl bg-surface animate-[fadeIn_0.3s_ease-out]"
+        aria-labelledby="prioritization-workspace-heading"
+      >
+        <div className="flex flex-col gap-2.5 border-b border-border/60 px-4 py-3 md:px-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-baseline gap-2">
             <h3
               id="prioritization-workspace-heading"
               className="text-[15px] font-semibold tracking-tight text-foreground"
             >
-              Workspace de priorización
+              Prioridades
             </h3>
             <span className="text-[12px] tabular-nums text-subtle">{totalStories}</span>
           </div>
-          <p className="mt-1 text-[12px] text-muted">
-            {frameworkLabel} · {input.epics.length} épica
-            {input.epics.length !== 1 ? 's' : ''} · {totalStories} historia
-            {totalStories !== 1 ? 's' : ''}
-          </p>
-        </div>
-
-        {hasPriorities ? (
-          <div className="flex items-center gap-4 sm:min-w-50">
-            <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center justify-between text-[11px]">
-                <span className="text-subtle">Progreso</span>
-                <span className="tabular-nums text-foreground">
-                  {prioritizedCount}/{totalStories}
-                </span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-border">
-                <div
-                  className="h-full rounded-full bg-foreground/70 transition-all duration-500 ease-out"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {hasPriorities && !isApproved ? (
+              <FrameworkSelector
+                value={framework}
+                onChange={onFrameworkChange}
+                disabled={isAnalyzing || isApproving}
+                hideLabel
+                size="compact"
+              />
+            ) : null}
+            {hasPriorities ? (
+              <p className="shrink-0 text-[12px] tabular-nums text-muted">
+                <span className="text-foreground">{prioritizedCount}</span>/{totalStories}
+                {categorySummary ? (
+                  <>
+                    {' · '}
+                    <span className="font-medium text-foreground">{categorySummary}</span>
+                  </>
+                ) : (
+                  <>
+                    {' · '}
+                    <span className="font-medium text-foreground">{frameworkLabel}</span>
+                  </>
+                )}
+              </p>
+            ) : null}
           </div>
-        ) : null}
-      </div>
-
-      {hasPriorities && categoryDistribution.length > 0 ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-border px-4 py-2.5 md:px-5">
-          {categoryDistribution.map(({ category, count, label }) => (
-            <span key={category} className="text-[12px] text-subtle">
-              <span className="font-medium text-foreground">{count}</span> {label}
-            </span>
-          ))}
         </div>
-      ) : null}
 
-      {hasPriorities && !isApproved ? (
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-3.5 sm:flex-row sm:items-end sm:justify-between md:px-5">
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-foreground">Revisión de prioridades</p>
-            <p className="mt-0.5 text-[12px] text-muted">
-              Ajusta las categorías {frameworkLabel} sugeridas cuando haga falta.
-            </p>
-          </div>
-          <FrameworkSelector
-            value={framework}
-            onChange={onFrameworkChange}
-            disabled={isAnalyzing || isApproving}
-          />
-        </div>
-      ) : null}
+        {analyzingSpinner}
 
-      {isAnalyzing && !showModelReasoning ? (
-        <div className="flex flex-col items-center px-5 py-16">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-foreground" />
-          <p className="mt-5 text-sm font-medium text-foreground">
-            {hasPriorities ? 'Regenerando priorizaciones…' : 'Clasificando backlog…'}
-          </p>
-          <p className="mt-1 text-[12px] text-muted">
-            Evaluando {totalStories} historia{totalStories !== 1 ? 's' : ''} con {frameworkLabel}
-          </p>
-        </div>
-      ) : null}
+        {(hasPriorities || isApproved) && !isAnalyzing ? (
+          <div>
+            {input.epics.map((epic, epicIdx) => {
+              const epicStories = epic.userStories || [];
+              const epicPrioritized = epicStories.filter(
+                (s) => priorities[s.id]?.category
+              ).length;
+              const epicSummary = formatCategorySummary(
+                epicStories,
+                priorities,
+                framework
+              );
 
-      {(hasPriorities || isApproved) && !isAnalyzing ? (
-        <div>
-          {input.epics.map((epic, epicIdx) => {
-            const epicStories = epic.userStories || [];
-            const epicPrioritized = epicStories.filter(
-              (s) => priorities[s.id]?.category
-            ).length;
-
-            return (
-              <div
-                key={epic.id}
-                className={epicIdx > 0 ? 'border-t border-border' : ''}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-5">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-medium tabular-nums text-subtle">
-                        {String(epicIdx + 1).padStart(2, '0')}
-                      </span>
-                      <span className="font-mono text-[11px] text-subtle">{epic.id}</span>
-                      <h4 className="text-[15px] font-medium tracking-tight text-foreground">
+              return (
+                <article
+                  key={epic.id}
+                  className={epicIdx > 0 ? 'border-t border-border/60' : ''}
+                >
+                  <div className="flex items-start justify-between gap-3 px-4 py-3.5 md:px-5">
+                    <div className="min-w-0">
+                      <h4 className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
                         {epic.title}
                       </h4>
+                      {epic.description ? (
+                        <p className="mt-1 text-[13px] leading-relaxed text-muted">
+                          {epic.description}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-[12px] text-subtle">
+                        {epicPrioritized}/{epicStories.length} priorizada
+                        {epicStories.length !== 1 ? 's' : ''}
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-[12px] text-muted">
-                      {epicPrioritized}/{epicStories.length} priorizadas
+                    {epicSummary ? (
+                      <span className="shrink-0 pt-0.5 text-[13px] font-medium text-foreground">
+                        {epicSummary}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {epicStories.length > 0 ? (
+                    <div className="mb-3 ml-8 md:ml-11">
+                      {epicStories.map((story, storyIdx) => (
+                        <PrioritizationStoryRow
+                          key={story.id}
+                          story={story}
+                          epicTitle={epic.title}
+                          pri={priorities[story.id]}
+                          est={input.estimations[story.id]}
+                          estimationMode={estimationMode}
+                          framework={framework}
+                          isAnalyzing={isAnalyzing}
+                          isApproved={isApproved}
+                          onCategoryChange={(cat) => handleCategoryChange(story.id, cat)}
+                          index={storyIdx}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mb-3 ml-8 px-3 py-2 text-[13px] text-muted md:ml-11">
+                      Esta épica no tiene historias de usuario.
                     </p>
-                  </div>
-                </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
 
-                {epicStories.length > 0 ? (
-                  <div className="border-t border-border/70 bg-surface-muted/25">
-                    {epicStories.map((story, storyIdx) => (
-                      <PrioritizationStoryRow
-                        key={story.id}
-                        story={story}
-                        epicTitle={epic.title}
-                        pri={priorities[story.id]}
-                        est={input.estimations[story.id]}
-                        estimationMode={estimationMode}
-                        framework={framework}
-                        isAnalyzing={isAnalyzing}
-                        isApproved={isApproved}
-                        onCategoryChange={(cat) => handleCategoryChange(story.id, cat)}
-                        index={storyIdx}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="border-t border-border px-4 py-8 text-center text-sm text-muted md:px-5">
-                    Esta épica no tiene historias de usuario.
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+        {hasPriorities && !isApproved ? (
+          <div className="flex flex-col items-stretch justify-between gap-3 border-t border-border/60 px-4 py-3 md:px-5 sm:flex-row sm:items-center">
+            {isApprovable ? (
+              <p className="text-[13px] text-subtle">
+                Revisa las prioridades antes de consolidar el backlog.
+              </p>
+            ) : (
+              <p className="text-[13px] text-subtle">
+                <span className="tabular-nums text-foreground">{prioritizedCount}</span>
+                /{totalStories} historias · {frameworkLabel}
+                {' · '}
+                faltan {totalStories - prioritizedCount}
+              </p>
+            )}
 
-      {hasPriorities && !isApproved ? (
-        <div className="border-t border-border px-4 py-3 md:px-5">
-          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <p className="hidden text-sm text-subtle sm:block">
-              <span className="font-medium text-foreground">{prioritizedCount}</span>/
-              {totalStories} historias · {frameworkLabel}
-            </p>
-
-            <div className="flex w-full flex-col-reverse items-center gap-2.5 sm:w-auto sm:flex-row">
-              <div className="flex w-full flex-col items-center gap-1.5 sm:w-auto sm:items-end">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
                 <button
                   type="button"
                   onClick={handlePrioritizeWithAgent}
@@ -500,22 +539,8 @@ export function PrioritizationWorkspace({
                     isApproving ||
                     (hasPriorities && !canRegenerate('agent4'))
                   }
-                  className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                  className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"
-                    />
-                  </svg>
                   Regenerar
                 </button>
                 {hasPriorities ? (
@@ -530,8 +555,8 @@ export function PrioritizationWorkspace({
               />
             </div>
           </div>
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </section>
+    </>
   );
 }

@@ -27,8 +27,8 @@ export function EmptyPrioritizationStartState({
   const frameworkLabel = FRAMEWORK_DESCRIPTIONS[framework].label;
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-5 py-14 text-center animate-[fadeIn_0.3s_ease-out]">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-surface-muted">
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center rounded-xl border border-transparent px-5 py-8 text-center animate-[fadeIn_0.3s_ease-out]">
+      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface-muted">
         <svg
           className="h-6 w-6 text-muted"
           fill="none"
@@ -46,12 +46,10 @@ export function EmptyPrioritizationStartState({
       </div>
 
       <h3 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">
-        Priorización no generada
+        Elige cómo priorizar
       </h3>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
-        Clasifica {storyCount} historia{storyCount !== 1 ? 's' : ''} de {epicCount} épica
-        {epicCount !== 1 ? 's' : ''} ({effortLabel}) según valor de negocio con{' '}
-        {frameworkLabel}.
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+        Clasifica las historias según valor de negocio. Después puedes ajustar las categorías.
       </p>
 
       <div className="mt-6 flex justify-center">
@@ -59,6 +57,7 @@ export function EmptyPrioritizationStartState({
           value={framework}
           onChange={onFrameworkChange}
           disabled={isPrioritizing}
+          centered
         />
       </div>
 
@@ -70,6 +69,20 @@ export function EmptyPrioritizationStartState({
           generatingLabel={`Clasificando ${frameworkLabel}…`}
         />
       </div>
+
+      <p className="mt-4 text-[12px] text-subtle">
+        <span className="tabular-nums">{epicCount}</span>
+        {' '}
+        {epicCount === 1 ? 'épica' : 'épicas'}
+        {' · '}
+        <span className="tabular-nums">{storyCount}</span>
+        {' '}
+        {storyCount === 1 ? 'historia' : 'historias'}
+        {' · '}
+        {effortLabel}
+        {' · '}
+        {frameworkLabel}
+      </p>
     </div>
   );
 }
