@@ -11,6 +11,10 @@ interface DetailModalProps {
   subtitle?: string;
   eyebrow?: string;
   children: ReactNode;
+  /** Acciones fijas al pie (fuera del scroll). */
+  footer?: ReactNode;
+  /** Título de panel (formularios), no display de detalle. */
+  compact?: boolean;
   /** Ancho máximo del panel */
   maxWidth?: 'md' | 'lg' | 'xl' | '2xl';
 }
@@ -29,6 +33,8 @@ export function DetailModal({
   subtitle,
   eyebrow,
   children,
+  footer,
+  compact = false,
   maxWidth = 'lg',
 }: DetailModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -109,8 +115,13 @@ export function DetailModal({
           closing ? 'detail-modal-panel-out' : 'detail-modal-panel-in',
         ].join(' ')}
       >
-        <div className="relative flex max-h-[min(92vh,860px)] flex-col overflow-hidden rounded-t-2xl border border-border/70 bg-surface shadow-2xl sm:rounded-2xl">
-          <header className="relative shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
+        <div className="relative flex max-h-[min(92vh,860px)] flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-surface shadow-2xl sm:rounded-2xl">
+          <header
+            className={[
+              'relative shrink-0 px-5 sm:px-6',
+              compact ? 'pt-4 pb-3.5 sm:pt-5' : 'pt-5 pb-4 sm:pt-6',
+            ].join(' ')}
+          >
             <button
               ref={closeBtnRef}
               type="button"
@@ -147,7 +158,9 @@ export function DetailModal({
                 id="detail-modal-title"
                 className={[
                   'font-semibold tracking-tight text-foreground',
-                  'text-lg sm:text-[30px] sm:leading-tight',
+                  compact
+                    ? 'text-[20px] leading-snug sm:text-[22px]'
+                    : 'text-lg sm:text-[30px] sm:leading-tight',
                   eyebrow || subtitle ? 'mt-1' : '',
                 ].join(' ')}
               >
@@ -159,6 +172,12 @@ export function DetailModal({
           <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto border-t border-border/60 px-5 py-5 sm:px-6">
             {children}
           </div>
+
+          {footer ? (
+            <div className="shrink-0 border-t border-border/60 px-5 py-3.5 sm:px-6">
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>,

@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import { EpicAccordion } from './EpicAccordion';
+import { EpicFormModal, type EpicFormValues } from './EpicFormModal';
 
 interface BacklogViewProps {
   epics: Epic[];
@@ -38,8 +39,6 @@ export function BacklogView({
   isApproved,
 }: BacklogViewProps) {
   const [isAdding, setIsAdding] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
 
   const totalStories = epics.reduce((sum, e) => sum + e.userStories.length, 0);
   const manualStories = epics.reduce(
@@ -49,24 +48,10 @@ export function BacklogView({
   const manualEpics = epics.filter((e) => e.source === 'manual').length;
   const manualCount = manualEpics + manualStories;
 
-  const handleAdd = () => {
-    const trimmedTitle = newTitle.trim();
-    const trimmedDesc = newDescription.trim();
-    if (!trimmedTitle) return;
-
-    onAddEpic({ title: trimmedTitle, description: trimmedDesc });
-    setNewTitle('');
-    setNewDescription('');
+  const handleAdd = (values: EpicFormValues) => {
+    onAddEpic({ title: values.title, description: values.description });
     setIsAdding(false);
   };
-
-  const handleCancelAdd = () => {
-    setNewTitle('');
-    setNewDescription('');
-    setIsAdding(false);
-  };
-
-  const isAddDisabled = !newTitle.trim();
 
   return (
     <section
@@ -87,7 +72,7 @@ export function BacklogView({
           </span>
         </div>
 
-        {!isApproved && !isAdding ? (
+        {!isApproved ? (
           <button
             type="button"
             onClick={() => setIsAdding(true)}
@@ -108,7 +93,7 @@ export function BacklogView({
         ) : null}
       </div>
 
-      {epics.length === 0 && !isAdding ? (
+      {epics.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
           <p className="text-sm text-muted">Aún no hay épicas.</p>
           <p className="mt-1 text-[12px] text-subtle">
@@ -139,46 +124,14 @@ export function BacklogView({
               index={index}
             />
           ))}
-
-          {!isApproved && isAdding ? (
-            <div className={epics.length > 0 ? 'border-t border-border/60 px-4 py-3 md:px-5' : 'px-4 py-3 md:px-5'}>
-              <p className="mb-2.5 text-[12px] font-medium text-muted">Nueva épica</p>
-              <div className="flex flex-col gap-2.5">
-                <input
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Título de la épica…"
-                  className="w-full rounded-lg border border-input-border bg-input px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
-                />
-                <textarea
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Descripción de la épica…"
-                  className="w-full resize-none rounded-lg border border-input-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCancelAdd}
-                    className="cursor-pointer rounded-md px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={isAddDisabled}
-                    className="cursor-pointer rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Añadir
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       )}
+
+      <EpicFormModal
+        open={isAdding}
+        onClose={() => setIsAdding(false)}
+        onSubmit={handleAdd}
+      />
     </section>
   );
 }

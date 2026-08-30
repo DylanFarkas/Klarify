@@ -103,6 +103,45 @@ function mergeStories(oldStories: UserStory[], newStories: UserStory[]): UserSto
   return result;
 }
 
+type ApprovalBlockInfo = {
+  message: string;
+  epicTitles?: string[];
+};
+
+function getApprovalBlockInfo(epics: Epic[]): ApprovalBlockInfo | null {
+  if (epics.length === 0) {
+    return { message: 'Añade al menos una épica con historias de usuario.' };
+  }
+
+  const epicsWithoutStories = epics.filter((epic) => epic.userStories.length === 0);
+  if (epicsWithoutStories.length > 0) {
+    if (epicsWithoutStories.length === 1) {
+      return {
+        message: `Añade al menos una historia a «${epicsWithoutStories[0].title}» para continuar.`,
+      };
+    }
+    return {
+      message: 'Estas épicas necesitan al menos una historia de usuario:',
+      epicTitles: epicsWithoutStories.map((epic) => epic.title),
+    };
+  }
+
+  if (epics.some((epic) => epic.title.trim() === '')) {
+    return { message: 'Completa el título de todas las épicas para continuar.' };
+  }
+
+  const hasIncompleteStory = epics.some((epic) =>
+    epic.userStories.some(
+      (story) => story.title.trim() === '' || story.description.trim() === ''
+    )
+  );
+  if (hasIncompleteStory) {
+    return { message: 'Completa título y descripción de todas las historias para continuar.' };
+  }
+
+  return null;
+}
+
 export default function Agent2Page() {
   const router = useRouter();
   const { user } = useAuth();
@@ -360,6 +399,7 @@ export default function Agent2Page() {
             story.description.trim() !== ''
         )
     );
+  const approvalBlockInfo = isApprovable ? null : getApprovalBlockInfo(state.epics);
 
   // ── Datos derivados ──────────────────────────────────────
   const totalStories = state.epics.reduce((s, e) => s + e.userStories.length, 0);
@@ -450,9 +490,44 @@ export default function Agent2Page() {
 
           {state.status === 'review' && (
             <div className="flex flex-col items-stretch justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
-              <p className="text-[13px] text-subtle">
-                Revisa el backlog antes de continuar a la estimación.
-              </p>
+              {approvalBlockInfo ? (
+                <div
+                  className="flex items-start gap-2 rounded-lg border border-amber-500/15 bg-amber-500/5 px-3 py-2"
+                  role="status"
+                >
+                  <svg
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500/70"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                    />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-muted">{approvalBlockInfo.message}</p>
+                    {approvalBlockInfo.epicTitles && approvalBlockInfo.epicTitles.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-[12px] text-subtle">
+                        {approvalBlockInfo.epicTitles.map((title) => (
+                          <li key={title} className="flex items-center gap-1.5">
+                            <span aria-hidden="true">·</span>
+                            <span>{title}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[13px] text-subtle">
+                  Revisa el backlog antes de continuar a la estimación.
+                </p>
+              )}
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
                 <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
                   <button

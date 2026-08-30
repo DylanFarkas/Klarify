@@ -7,9 +7,9 @@
 import { useState } from 'react';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
 import { useConfirm } from '@/components/agents/shared/ConfirmDialog';
-import { EpicHeader } from './EpicHeader';
 import { UserStoryList } from './UserStoryList';
 import { UserStoryFormModal, type UserStoryFormValues } from './UserStoryFormModal';
+import { EpicFormModal, type EpicFormValues } from './EpicFormModal';
 
 interface EpicAccordionProps {
   epic: Epic;
@@ -67,6 +67,15 @@ export function EpicAccordion({
     setFormStory(null);
   };
 
+  const handleEpicSubmit = (values: EpicFormValues) => {
+    const hasChanges =
+      values.title !== epic.title || values.description !== epic.description;
+    if (hasChanges) {
+      onEditEpic(epic.id, values);
+    }
+    setIsEditing(false);
+  };
+
   const storyCountLabel = `${epic.userStories.length} historia${epic.userStories.length !== 1 ? 's' : ''}`;
   const sourceHint =
     epic.source === 'manual' || epic.isEdited
@@ -77,128 +86,118 @@ export function EpicAccordion({
 
   return (
     <article className={index > 0 ? 'border-t border-border/60' : ''}>
-      {isEditing ? (
-        <div className="px-4 py-3 md:px-5">
-          <EpicHeader
-            epic={epic}
-            onEdit={onEditEpic}
-            onClose={() => setIsEditing(false)}
-          />
-        </div>
-      ) : (
-        <div className="group grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-4 py-3.5 md:px-5">
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
-            aria-expanded={isExpanded}
-            aria-label={isExpanded ? 'Colapsar épica' : 'Expandir épica'}
+      <div className="group grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-4 py-3.5 md:px-5">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+          aria-expanded={isExpanded}
+          aria-label={isExpanded ? 'Colapsar épica' : 'Expandir épica'}
+        >
+          <svg
+            className={[
+              'h-3.5 w-3.5 transition-transform duration-380 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none',
+              isExpanded && 'rotate-90',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
           >
-            <svg
-              className={[
-                'h-3.5 w-3.5 transition-transform duration-380 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none',
-                isExpanded && 'rotate-90',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
 
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
-              {epic.title}
-            </h3>
-            {epic.description ? (
-              <p className="mt-1 text-[13px] leading-relaxed text-muted">{epic.description}</p>
-            ) : null}
-            <p className="mt-1 text-[12px] text-subtle">
-              {storyCountLabel}
-              {sourceHint ? ` · ${sourceHint}` : ''}
-            </p>
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
+            {epic.title}
+          </h3>
+          {epic.description ? (
+            <p className="mt-1 text-[13px] leading-relaxed text-muted">{epic.description}</p>
+          ) : null}
+          <p className="mt-1 text-[12px] text-subtle">
+            {storyCountLabel}
+            {sourceHint ? ` · ${sourceHint}` : ''}
+          </p>
 
-            {!isApproved ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-0.5 sm:hidden">
-                <button
-                  type="button"
-                  onClick={() => setFormStory('new')}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted hover:bg-surface-hover hover:text-foreground"
-                >
-                  Añadir historia
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-                  title="Editar"
-                  aria-label="Editar épica"
-                >
-                  <PencilIcon />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete()}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-red-500/10 hover:text-danger"
-                  title="Eliminar"
-                  aria-label="Eliminar épica"
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="hidden items-center gap-0.5 sm:flex">
-            {!isApproved ? (
+          {!isApproved ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-0.5 sm:hidden">
               <button
                 type="button"
                 onClick={() => setFormStory('new')}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted hover:bg-surface-hover hover:text-foreground"
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
                 Añadir historia
               </button>
-            ) : null}
-            {!isApproved ? (
-              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-                  title="Editar"
-                  aria-label="Editar épica"
-                >
-                  <PencilIcon />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete()}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-red-500/10 hover:text-danger"
-                  title="Eliminar"
-                  aria-label="Eliminar épica"
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            ) : null}
-          </div>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                title="Editar"
+                aria-label="Editar épica"
+              >
+                <PencilIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-red-500/10 hover:text-danger"
+                title="Eliminar"
+                aria-label="Eliminar épica"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          ) : null}
         </div>
-      )}
+
+        <div className="hidden items-center gap-0.5 sm:flex">
+          {!isApproved ? (
+            <button
+              type="button"
+              onClick={() => setFormStory('new')}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Añadir historia
+            </button>
+          ) : null}
+          {!isApproved ? (
+            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+                title="Editar"
+                aria-label="Editar épica"
+              >
+                <PencilIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                className="inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-muted transition-colors hover:bg-red-500/10 hover:text-danger"
+                title="Eliminar"
+                aria-label="Eliminar épica"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       <div
         className={[
@@ -230,6 +229,13 @@ export function EpicAccordion({
         onSubmit={handleFormSubmit}
         story={formStory === 'new' || formStory === null ? null : formStory}
         epicTitle={epic.title}
+      />
+
+      <EpicFormModal
+        open={isEditing}
+        onClose={() => setIsEditing(false)}
+        onSubmit={handleEpicSubmit}
+        epic={epic}
       />
     </article>
   );

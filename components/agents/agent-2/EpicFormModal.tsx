@@ -1,61 +1,53 @@
 /**
- * @fileoverview Modal para crear o editar una historia de usuario en el Agente 2.
- * Shell: DetailModal (mismo patrón que DashboardStoryFormModal).
+ * @fileoverview Modal para crear o editar una épica en el Agente 2.
+ * Shell: DetailModal (mismo patrón que UserStoryFormModal).
  */
 
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { UserStory } from '@/lib/types/agent-2';
-import { MAX_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
+import type { Epic } from '@/lib/types/agent-2';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
-import { AcceptanceCriteriaEditor } from './AcceptanceCriteriaEditor';
 
-export interface UserStoryFormValues {
+export interface EpicFormValues {
   title: string;
   description: string;
-  acceptanceCriteria: string[];
 }
 
-interface UserStoryFormModalProps {
+interface EpicFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (values: UserStoryFormValues) => void;
-  story?: UserStory | null;
-  epicTitle?: string;
+  onSubmit: (values: EpicFormValues) => void;
+  epic?: Epic | null;
 }
 
 const fieldLabelClass = 'text-[12px] font-medium text-muted';
 const fieldControlClass =
   'mt-1.5 w-full rounded-lg border border-border/80 bg-input px-3 py-2.5 text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong';
 
-export function UserStoryFormModal({
+export function EpicFormModal({
   open,
   onClose,
   onSubmit,
-  story = null,
-  epicTitle,
-}: UserStoryFormModalProps) {
-  const isEdit = Boolean(story);
+  epic = null,
+}: EpicFormModalProps) {
+  const isEdit = Boolean(epic);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [criteria, setCriteria] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
-    setTitle(story?.title ?? '');
-    setDescription(story?.description ?? '');
-    setCriteria(story?.acceptanceCriteria ?? []);
-  }, [open, story]);
+    setTitle(epic?.title ?? '');
+    setDescription(epic?.description ?? '');
+  }, [open, epic]);
 
-  const isSaveDisabled = !title.trim() || !description.trim();
+  const isSaveDisabled = !title.trim();
 
   const handleSubmit = () => {
     if (isSaveDisabled) return;
     onSubmit({
       title: title.trim(),
       description: description.trim(),
-      acceptanceCriteria: criteria,
     });
   };
 
@@ -63,9 +55,9 @@ export function UserStoryFormModal({
     <DetailModal
       open={open}
       onClose={onClose}
-      eyebrow={epicTitle ?? 'Backlog'}
-      subtitle={isEdit ? story?.id : undefined}
-      title={isEdit ? 'Editar historia' : 'Nueva historia'}
+      eyebrow="Backlog"
+      subtitle={isEdit ? epic?.id : undefined}
+      title={isEdit ? 'Editar épica' : 'Nueva épica'}
       maxWidth="lg"
       compact
       footer={
@@ -88,7 +80,7 @@ export function UserStoryFormModal({
                 : 'bg-foreground text-background hover:opacity-90',
             ].join(' ')}
           >
-            {isEdit ? 'Guardar' : 'Añadir historia'}
+            {isEdit ? 'Guardar' : 'Añadir épica'}
           </button>
         </div>
       }
@@ -99,7 +91,7 @@ export function UserStoryFormModal({
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Título de la historia…"
+            placeholder="Título de la épica…"
             className={`${fieldControlClass} text-[15px] font-medium`}
           />
         </label>
@@ -110,25 +102,10 @@ export function UserStoryFormModal({
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             rows={4}
-            placeholder="Como [rol], quiero [acción] para [beneficio]…"
+            placeholder="Qué cubre esta épica…"
             className={`${fieldControlClass} resize-none text-sm leading-relaxed`}
           />
         </label>
-
-        <div>
-          <div className="mb-1.5 flex items-baseline justify-between gap-3">
-            <p className={fieldLabelClass}>Criterios de aceptación</p>
-            <span className="text-[11px] tabular-nums text-subtle">
-              {criteria.length}/{MAX_ACCEPTANCE_CRITERIA}
-            </span>
-          </div>
-          <AcceptanceCriteriaEditor
-            criteria={criteria}
-            onChange={setCriteria}
-            disabled={false}
-            hideCount
-          />
-        </div>
       </div>
     </DetailModal>
   );
