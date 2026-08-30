@@ -13,7 +13,8 @@ Referencias ya aplicadas:
 | Stack | `StackContent`, `StackEmptyState`, `StackBoard`, `StackTechPicker` |
 | Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `TranscriptionPanel` |
 | Agente 2 | `app/agentes/2/page.tsx`, `EmptyBacklogState`, `BacklogView`, `EpicAccordion`, `UserStoryItem`, `UserStoryFormModal`, `WishesSummaryPanel` |
-| Agentes 3–5 | paneles en `components/agents/agent-*` (migrar al patrón A1/A2) |
+| Agente 3 | `app/agentes/3/page.tsx`, `EmptyPrioritizationState`, `EstimationWorkspace` |
+| Agentes 4–5 | paneles en `components/agents/agent-*` (migrar al patrón A1/A2/A3) |
 | Klark | `HarnessChatDock`, `HarnessChatPanel` (+ estilos `.harness-*` en `globals.css`) |
 | Tokens | `app/agent-themes.css`, mapeo en `app/globals.css` |
 
@@ -114,14 +115,14 @@ El **h1 de página** usa el mismo display que backlog/tablero/stack. El cromo in
 
 | Nivel | Clases típicas | Ejemplo |
 | ----- | -------------- | ------- |
-| Título de página | `text-[50px] font-semibold tracking-tight text-foreground` | Ingesta de Contexto, Backlog Inicial |
+| Título de página | `text-[50px] font-semibold tracking-tight text-foreground` | Ingesta de Contexto, Backlog Inicial, Estimación en Story Points |
 | Meta de página | `text-[12px] text-muted` | `Paso 1/6 · Captura · …` |
 | Título de panel / wizard | `text-[15px] font-semibold tracking-tight` | Deseos del cliente, Afinemos tu proyecto |
 | Cuerpo | `text-sm` / `text-[13px] text-muted` | Descripciones, contexto de apoyo |
 | Meta / labels | `text-[11px]`–`text-[12px] text-subtle` | Contador de deseos, categoría |
 | Contenido prioritario | `text-[15px] font-medium text-foreground` | Texto de un deseo |
 
-Anchos: `max-w-3xl` en captura y edición de texto; `max-w-5xl` en clarificación y revisión.
+Anchos: `max-w-3xl` en captura, empty y elección de modo; `max-w-5xl` en clarificación y revisión.
 
 **No** usar `text-[50px]` dentro de paneles, empty states internos ni preguntas del wizard.
 
@@ -406,6 +407,64 @@ grid transition-[grid-template-rows] duration-[380ms] ease-[cubic-bezier(0.16,1,
 
 Chevron con el mismo easing. Respetar `motion-reduce:transition-none`.
 
+### 5.9 Agente 3 — Estimación
+
+Misma familia que A1/A2. Página: `app/agentes/3/page.tsx`.
+
+**Header de página** (todas las fases):
+
+```tsx
+<header className="shrink-0 pb-3">
+  <h1 className="text-[50px] font-semibold tracking-tight text-foreground">Estimación en Story Points</h1>
+  <p className="mt-1 text-[12px] text-muted">Paso 3/6 · Medición · …</p>
+</header>
+```
+
+Sin `AgentPageHero`. El empty / panel queda **justo debajo** del header. En revisión, una segunda línea de meta `12px` con conteos (`N épicas · M historias · total SP o tiempo`) y `Aprobado` en `text-success` si aplica. Anchos: `max-w-3xl` en empty y elección de modo; `max-w-5xl` en revisión.
+
+El **foco** es el esfuerzo de cada historia. Todo lo demás (razonamiento, IDs, barras) es apoyo o se omite.
+
+#### Empty sin backlog (`EmptyPrioritizationState`)
+
+Como A2 / Stack: `max-w-lg` centrado, `py-8`, borde transparente, icono `h-12 w-12 rounded-md bg-surface-muted`, título `15px`. CTA **Volver al Agente 2** (`bg-surface-muted`).
+
+#### Elección de modo (antes de estimar)
+
+No hay “workspace” en caja. Empty compacto bajo el h1, como captura A1:
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Contenedor | `max-w-lg` centrado, `py-8`, `border-transparent` |
+| Icono | `h-12 w-12 rounded-md bg-surface-muted` |
+| Título interno | `text-[15px] font-semibold` — *Elige cómo estimar* |
+| Modos | Dos chips: **Story Points** / **Tiempo**. Idle `bg-surface-muted`; seleccionado `bg-elevated`. No cards bordeadas ni invertido blanco |
+| CTA | **Sugerir Story Points con IA** (o tiempos) `foreground`, compacto, no a todo el ancho. Deshabilitado hasta elegir modo |
+| Meta | Una línea `12px text-subtle`: conteos + escala o “Selecciona un modo para continuar” |
+
+#### Revisión (`EstimationWorkspace`)
+
+Foco: **leer y ajustar el esfuerzo**. Lista al estilo Backlog A2, sin columna extra de razonamiento.
+
+```
+Estimaciones  N                    3/3 · 9 SP
+─────────────────────────────────────────────
+Épica                              9 SP
+  HU  título…                      3 SP · Media
+                                   [1 2 3 5 8 13 21]
+```
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Panel | Como `BacklogView`: `rounded-xl bg-surface`, **sin borde exterior**. Header `15px` + contador. A la derecha, meta compacta `N/N · total` (`12px tabular-nums`). Sin barra de progreso |
+| Lista | Sin `max-h` interno. **Divisor entre épicas** (`border-t border-border/60`), **no entre HUs**. Sin `bg-surface-muted` anidado |
+| Épica | Título `15px font-semibold`; descripción `13px muted` si hay; meta `N/N estimadas`. Esfuerzo del grupo a la derecha `13px font-medium tabular-nums`. Sin IDs `EPIC-001`. Sin acordeón: las HUs quedan visibles (el trabajo es estimar) |
+| HU | Indentada (`ml-8` / `md:ml-11`). Índice + título `13px font-medium` + descripción `13px muted`. Razonamiento IA como línea `12px text-subtle` (`line-clamp-2`), **no caja**. Meta `Ajustado` solo si aplica. Sin IDs `HU-001` |
+| Esfuerzo | Columna derecha (`shrink-0`): valor `12px font-medium` (`3 SP · Media` o duración) + control. En mobile, debajo del texto con el mismo indent |
+| Fibonacci | Seleccionado `bg-foreground text-background`. Idle sin borde: `text-muted hover:bg-surface-hover`. El valor elegido es el único relleno |
+| Tiempo | `TimeDurationInput` (`bg-input`); la etiqueta de duración hace de valor |
+| Acciones de fila | Ojo (`p-1.5`, `aria-label`) al hover; detalle en `DetailModal` |
+| CTA | Pie `border-t`: **Regenerar** muted + **Consolidar backlog estimado** foreground |
+
 ---
 
 ## 6. Componentes transversales
@@ -461,7 +520,7 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 | Clarificación | Pregunta actual + opciones en lista; intro sin sidebar |
 | Revisión deseos | Lista de deseos a la izquierda (más ancha); contexto muted a la derecha |
 | Revisión backlog (A2) | Épicas e historias a la izquierda (más ancha); deseos muted a la derecha |
-| Estimación (A3) | Workspace de estimación |
+| Estimación (A3) | Empty de modo o lista de esfuerzo (SP/tiempo a la derecha); razonamiento muted |
 | Priorización (A4) | Workspace + selector metodología |
 | Sprints (A5) | Config + board de sprints |
 | **Backlog** (`/agentes/backlog`) | Tabla densa + toolbar; detalle HU en página dedicada |
@@ -516,6 +575,7 @@ En sidebar del producto:
 12. ¿Pipeline usa h1 display `text-[50px]` y paneles internos compactos (`15px`)?
 13. ¿Captura A1 es empty state (no dropzone + 3 cards)? ¿Revisión pone deseos a la izquierda, más anchos?
 14. ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
+15. ¿A3 empty es elección de modo (chips + CTA compacto), no un panel “Workspace” con cards? ¿Revisión pone el esfuerzo a la derecha, sin IDs ni caja de razonamiento?
 
 Si algo no encaja, mirar primero los archivos de la tabla de referencias al inicio.
 
@@ -531,6 +591,7 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Wizard de clarificación con sidebar en el intro, gaps en cards y `min-h` vacío
 - Revisión con dos columnas del mismo peso, IDs `DESEO-004` / `EPIC-001` / `HU-001 · IA` + índice, y `max-h` que recorta la lista
 - A2 con wishes a la izquierda más estrechos, cards anidadas de HU, formularios inline de historia y **Añadir HU** al pie de cada lista
+- A3 con `AgentPageHero`, panel “Workspace de estimación” bordeado, cards de modo lado a lado, CTA a todo el ancho, IDs `EPIC-001` / `HU-001`, caja “Razonamiento IA”, barra de progreso en el header de lista y divisor entre HUs
 - Ver / Editar / Eliminar en texto en filas HITL (usar iconos con `aria-label`)
 - Divisores entre HUs dentro de una épica; el corte visual va **entre épicas**
 - Modal de actividad con gradient animado

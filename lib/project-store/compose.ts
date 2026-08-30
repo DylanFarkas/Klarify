@@ -211,18 +211,29 @@ function applyLiveBacklog(
   }
 
   next.agent2 = { ...workspace.agent2, epics };
-  if (workspace.agent3.status !== 'idle' || workspace.agent3.input) {
-    next.agent3 = {
-      ...workspace.agent3,
-      estimations: Object.keys(estimations).length ? estimations : workspace.agent3.estimations,
-      estimationMode,
-      input: {
-        epics,
-        sourceWishIds,
+
+  const agent3Started =
+    workspace.agent3.status !== 'idle' || Boolean(workspace.agent3.input);
+  const agent2Approved = workspace.agent2.status === 'approved';
+
+  if (epics.length > 0 && (agent3Started || agent2Approved)) {
+    const agent3Input = {
+      epics,
+      sourceWishIds,
+      approvedAt:
+        workspace.agent3.input?.approvedAt ??
+        workspace.pipeline.agent3Input?.approvedAt ??
         approvedAt,
-      },
     };
-    next.pipeline = { ...next.pipeline, agent3Input: next.agent3.input };
+    next.pipeline = { ...next.pipeline, agent3Input };
+    if (agent3Started) {
+      next.agent3 = {
+        ...workspace.agent3,
+        estimations: Object.keys(estimations).length ? estimations : workspace.agent3.estimations,
+        estimationMode,
+        input: agent3Input,
+      };
+    }
   }
   if (workspace.agent4.status !== 'idle' || workspace.agent4.input) {
     next.agent4 = {
