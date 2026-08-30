@@ -9,54 +9,50 @@ interface WishesSummaryPanelProps {
 export function WishesSummaryPanel({ wishes }: WishesSummaryPanelProps) {
   return (
     <section
-      className="flex flex-col rounded-xl border border-border bg-surface"
+      className="flex flex-col rounded-xl bg-background/40"
       aria-labelledby="wishes-summary-heading"
     >
-      <div className="border-b border-border px-4 py-3.5 md:px-5">
-        <div className="flex items-center gap-2.5">
-          <h3
-            id="wishes-summary-heading"
-            className="text-[15px] font-semibold tracking-tight text-foreground"
-          >
-            Deseos aprobados
-          </h3>
-          <span className="text-[12px] tabular-nums text-subtle">{wishes.length}</span>
-        </div>
-        <p className="mt-1 text-[12px] text-muted">
-          Referencia para la trazabilidad de las historias.
-        </p>
+      <div className="flex items-baseline gap-2 px-4 pt-3">
+        <h3
+          id="wishes-summary-heading"
+          className="text-[13px] font-semibold tracking-tight text-muted"
+        >
+          Deseos aprobados
+        </h3>
+        <span className="text-[12px] tabular-nums text-subtle">{wishes.length}</span>
       </div>
 
-      <div className="max-h-80 flex-1 overflow-y-auto md:max-h-none lg:max-h-[min(520px,60vh)]">
-        {wishes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <p className="text-sm text-muted">No hay deseos aprobados.</p>
-          </div>
-        ) : (
-          <ul>
-            {wishes.map((wish, index) => (
+      {wishes.length === 0 ? (
+        <p className="px-4 py-3 text-[13px] text-subtle">No hay deseos aprobados.</p>
+      ) : (
+        <ol className="px-4 py-3">
+          {wishes.map((wish, index) => {
+            const sourceHint = wish.source === 'manual' || wish.isEdited
+              ? [wish.source === 'manual' ? 'Manual' : null, wish.isEdited ? 'Editado' : null]
+                  .filter(Boolean)
+                  .join(' · ')
+              : null;
+
+            return (
               <li
                 key={wish.id}
                 className={[
-                  'px-4 py-3.5 md:px-5',
-                  index > 0 ? 'border-t border-border' : '',
+                  'grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-2.5 py-2',
+                  index > 0 ? 'border-t border-border/60' : '',
                 ].join(' ')}
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="text-[11px] font-medium tabular-nums text-subtle">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span className="font-mono text-[11px] text-subtle">{wish.id}</span>
-                  <span className="text-[11px] text-subtle">
-                    · {wish.source === 'auto' ? 'IA' : 'Manual'}
-                  </span>
+                <span className="mt-px text-[12px] tabular-nums text-subtle">{index + 1}</span>
+                <div className="min-w-0">
+                  <p className="text-[13px] leading-relaxed text-muted">{wish.text}</p>
+                  {sourceHint ? (
+                    <p className="mt-0.5 text-[11px] text-subtle">{sourceHint}</p>
+                  ) : null}
                 </div>
-                <p className="text-[13px] leading-relaxed text-foreground">{wish.text}</p>
               </li>
-            ))}
-          </ul>
-        )}
-      </div>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }

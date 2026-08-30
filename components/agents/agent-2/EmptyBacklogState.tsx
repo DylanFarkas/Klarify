@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { GenerateBacklogButton } from './GenerateBacklogButton';
-import { EmptyAgentState } from '@/components/agents/shared/EmptyAgentState';
 
 interface EmptyBacklogStateProps {
   hasInput: boolean;
@@ -12,15 +11,9 @@ interface EmptyBacklogStateProps {
 
 export function EmptyBacklogState({ hasInput, onGenerate, isGenerating }: EmptyBacklogStateProps) {
   return (
-    <EmptyAgentState
-      title={hasInput ? 'Backlog no generado' : 'No hay datos del Agente 1'}
-      description={
-        hasInput
-          ? 'Genera épicas e historias de usuario a partir de tus deseos aprobados.'
-          : 'Para generar un backlog, primero debes completar el Agente 1 y aprobar tus deseos.'
-      }
-      icon={
-        hasInput ? (
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center rounded-xl border border-transparent px-5 py-8 text-center animate-[fadeIn_0.3s_ease-out]">
+      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-surface-muted">
+        {hasInput ? (
           <svg
             className="h-6 w-6 text-muted"
             fill="none"
@@ -50,34 +43,30 @@ export function EmptyBacklogState({ hasInput, onGenerate, isGenerating }: EmptyB
               d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
             />
           </svg>
-        )
-      }
-      action={
-        hasInput && onGenerate ? (
+        )}
+      </div>
+
+      <h3 className="mt-5 text-[15px] font-semibold tracking-tight text-foreground">
+        {hasInput ? 'Backlog no generado' : 'No hay datos del Agente 1'}
+      </h3>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+        {hasInput
+          ? 'Genera épicas e historias de usuario a partir de tus deseos aprobados.'
+          : 'Para generar un backlog, primero debes completar el Agente 1 y aprobar tus deseos.'}
+      </p>
+
+      <div className="mt-6">
+        {hasInput && onGenerate ? (
           <GenerateBacklogButton onClick={onGenerate} isGenerating={isGenerating ?? false} />
         ) : (
           <Link
             href="/agentes/1"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
-              />
-            </svg>
             Volver al Agente 1
           </Link>
-        )
-      }
-    />
+        )}
+      </div>
+    </div>
   );
 }

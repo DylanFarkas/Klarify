@@ -12,7 +12,8 @@ Referencias ya aplicadas:
 | Tablero | `BoardWorkspace`, `BoardFilters`, `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `TeamPanel` |
 | Stack | `StackContent`, `StackEmptyState`, `StackBoard`, `StackTechPicker` |
 | Agente 1 | `app/agentes/1/page.tsx`, `FileUploader`, `ClarifyingQuestionsPanel`, `WishesList`, `WishItem`, `TranscriptionPanel` |
-| Agentes 2–5 | paneles en `components/agents/agent-*` (migrar al patrón A1) |
+| Agente 2 | `app/agentes/2/page.tsx`, `EmptyBacklogState`, `BacklogView`, `EpicAccordion`, `UserStoryItem`, `UserStoryFormModal`, `WishesSummaryPanel` |
+| Agentes 3–5 | paneles en `components/agents/agent-*` (migrar al patrón A1/A2) |
 | Klark | `HarnessChatDock`, `HarnessChatPanel` (+ estilos `.harness-*` en `globals.css`) |
 | Tokens | `app/agent-themes.css`, mapeo en `app/globals.css` |
 
@@ -113,7 +114,7 @@ El **h1 de página** usa el mismo display que backlog/tablero/stack. El cromo in
 
 | Nivel | Clases típicas | Ejemplo |
 | ----- | -------------- | ------- |
-| Título de página | `text-[50px] font-semibold tracking-tight text-foreground` | Ingesta de Contexto |
+| Título de página | `text-[50px] font-semibold tracking-tight text-foreground` | Ingesta de Contexto, Backlog Inicial |
 | Meta de página | `text-[12px] text-muted` | `Paso 1/6 · Captura · …` |
 | Título de panel / wizard | `text-[15px] font-semibold tracking-tight` | Deseos del cliente, Afinemos tu proyecto |
 | Cuerpo | `text-sm` / `text-[13px] text-muted` | Descripciones, contexto de apoyo |
@@ -353,6 +354,58 @@ Foco: **leer y aprobar deseos**. El contexto es apoyo.
 | Contexto | Título `text-[13px] text-muted`. Respuestas en pares categoría → valor, sin repetir la pregunta |
 | CTA | Pie de página: **Empezar de nuevo** muted + **Aprobar deseos y continuar** foreground |
 
+### 5.8 Agente 2 — Backlog inicial
+
+Misma familia que A1. Página: `app/agentes/2/page.tsx`.
+
+**Header de página** (todas las fases):
+
+```tsx
+<header className="shrink-0 pb-3">
+  <h1 className="text-[50px] font-semibold tracking-tight text-foreground">Backlog Inicial</h1>
+  <p className="mt-1 text-[12px] text-muted">Paso 2/6 · Estructura · …</p>
+</header>
+```
+
+Sin `AgentPageHero`. En revisión, una segunda línea de meta `12px` con conteos (`N épicas · M historias`) y `Aprobado` en `text-success` si aplica. Anchos: `max-w-3xl` en empty/generación; `max-w-5xl` en revisión.
+
+#### Empty (`EmptyBacklogState`)
+
+Como captura A1 / Stack: `max-w-lg` centrado, `py-8`, borde transparente, icono `h-12 w-12 rounded-md bg-surface-muted`, título `15px`. CTA **Generar Backlog** (`foreground`) o secundario **Volver al Agente 1** (`bg-surface-muted`).
+
+#### Revisión (`BacklogView` + `WishesSummaryPanel`)
+
+Foco: **leer y aprobar el backlog**. Los deseos son apoyo.
+
+```
+┌─────────────────────────────┬──────────────────┐
+│ Backlog (1.75fr, izquierda) │ Deseos (1fr)     │
+└─────────────────────────────┴──────────────────┘
+```
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Grid | `lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] items-start` — backlog primero en el DOM |
+| Lista | Sin `max-h` interno: scrollea la página. **Divisor entre épicas** (`border-t border-border/60`), **no entre HUs** |
+| Épica | Encabezado `15px font-semibold` + chevron; descripción `13px muted`; meta `N historias`. Arranca **colapsada**. **Añadir historia** solo en el header de la épica (no al pie de la lista) |
+| HU | Indentada (`ml-8` / `md:ml-11`). Índice + título `13px font-medium` + descripción `13px muted`. Meta Manual/Editado/criterios solo si aplica. Sin IDs `EPIC-001` / `HU-001 · IA` |
+| Acciones de fila | Iconos (ojo / lápiz / papelera), `p-1.5`, `aria-label` + `title`. Hover en desktop. Peligro: `hover:text-danger` |
+| Deseos | Como contexto A1: `bg-background/40`, título `13px text-muted`, texto `13px muted` |
+| Alta / edición HU | `UserStoryFormModal` sobre `DetailModal` (mismo shell que `DashboardStoryFormModal`): título, descripción, criterios. No formulario inline |
+| CTA | Pie `border-t`: **Regenerar** muted + **Aprobar backlog y continuar** foreground |
+
+#### Acordeón (`EpicAccordion`)
+
+Altura con CSS, sin librería de animación:
+
+```tsx
+grid transition-[grid-template-rows] duration-[380ms] ease-[cubic-bezier(0.16,1,0.3,1)]
+// abierto: grid-rows-[1fr] · cerrado: grid-rows-[0fr]
+// hijo: min-h-0 overflow-hidden + fade de opacity
+```
+
+Chevron con el mismo easing. Respetar `motion-reduce:transition-none`.
+
 ---
 
 ## 6. Componentes transversales
@@ -376,8 +429,9 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 - Panel = `rounded-xl border border-border bg-surface` (opaco)
 - Listas: contenedor + filas `border-t`, no card por ítem
 - Hover fila: `hover:bg-surface-hover/30`
-- Acciones secundarias: `opacity-0 group-hover:opacity-100` en desktop
+- Acciones secundarias: iconos con `aria-label` (o texto al hover en listas simples); `opacity-0 group-hover:opacity-100` en desktop
 - Empty states: compactos, CTA `foreground`/`background`, sin blur orbs
+- Jerarquía agrupada (épicas → HUs): divisor entre **grupos**, no entre hijos
 
 ### Formularios
 
@@ -392,8 +446,9 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 
 ### Modales
 
-- Shell: `rounded-xl border border-border bg-surface`
+- Shell: `DetailModal` (`rounded-xl` / `rounded-2xl`, `border-border`, `bg-surface`)
 - Backdrop: `bg-background/70 backdrop-blur-sm`
+- Formularios de alta/edición (HU en A2, ítems del dashboard): label `12px text-muted`, pie Cancelar muted + Guardar `foreground`
 - Spinner: anillo fino `border-border border-t-foreground`
 
 ---
@@ -405,7 +460,7 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 | Captura (A1) | Empty state (escribir / grabar / arrastrar), debajo del h1 |
 | Clarificación | Pregunta actual + opciones en lista; intro sin sidebar |
 | Revisión deseos | Lista de deseos a la izquierda (más ancha); contexto muted a la derecha |
-| Backlog (A2) / Backlog workspace | Tabla de HUs + planificación sprints |
+| Revisión backlog (A2) | Épicas e historias a la izquierda (más ancha); deseos muted a la derecha |
 | Estimación (A3) | Workspace de estimación |
 | Priorización (A4) | Workspace + selector metodología |
 | Sprints (A5) | Config + board de sprints |
@@ -421,9 +476,11 @@ Si algo es secundario: tipografía más pequeña, `text-muted`/`text-subtle` —
 
 ## 8. Motion
 
-- Entradas vistas trabajo: `animate-[fadeIn_0.3s_ease-out]`
-- Sidebar: solo `width`, `grid-template-columns`, `opacity` — respetar `motion-reduce:transition-none`
-- Sidebar ease: `cubic-bezier(0.16, 1, 0.3, 1)` @ 380ms
+Animar con **CSS / Tailwind**, no con Framer Motion ni otra librería, salvo que aparezcan casos de layout animation (reordenación Kanban, shared element). Hasta entonces el coste no se justifica.
+
+- Entradas vistas trabajo y pipeline: `animate-[fadeIn_0.3s_ease-out]`
+- Sidebar y acordeones: `width` / `grid-template-columns` / `grid-template-rows` / `opacity` — `motion-reduce:transition-none`
+- Ease compartido: `cubic-bezier(0.16, 1, 0.3, 1)` @ 380ms
 - Loaders: spinner fino o 3 puntos
 - No animar bordes, escalas de botones ni barras sticky
 
@@ -458,6 +515,7 @@ En sidebar del producto:
 11. ¿Klark FAB usa `.harness-fab` con `primary`?
 12. ¿Pipeline usa h1 display `text-[50px]` y paneles internos compactos (`15px`)?
 13. ¿Captura A1 es empty state (no dropzone + 3 cards)? ¿Revisión pone deseos a la izquierda, más anchos?
+14. ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
 
 Si algo no encaja, mirar primero los archivos de la tabla de referencias al inicio.
 
@@ -471,7 +529,10 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Nav activo con solo `bg-surface-hover` sin acento `text-primary`
 - Dropzone `h-[min(400px,55vh)]` + tres cards de método duplicando el CTA
 - Wizard de clarificación con sidebar en el intro, gaps en cards y `min-h` vacío
-- Revisión con dos columnas del mismo peso, IDs `DESEO-004` + índice, y `max-h` que recorta la lista
+- Revisión con dos columnas del mismo peso, IDs `DESEO-004` / `EPIC-001` / `HU-001 · IA` + índice, y `max-h` que recorta la lista
+- A2 con wishes a la izquierda más estrechos, cards anidadas de HU, formularios inline de historia y **Añadir HU** al pie de cada lista
+- Ver / Editar / Eliminar en texto en filas HITL (usar iconos con `aria-label`)
+- Divisores entre HUs dentro de una épica; el corte visual va **entre épicas**
 - Modal de actividad con gradient animado
 - ApproveButton / GenerateBacklogButton con sombra primary y `hover:scale`
 - Barras `sticky bottom-6` con glass sobre contenido
@@ -479,6 +540,7 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Cards anidadas con fondos distintos para diferenciar ítems
 - Títulos `text-xl` en h1 de página que deberían ser display `text-[50px]`
 - `text-[50px]` dentro de un panel, wizard o empty state interno
+- Añadir Framer Motion (o similar) para un acordeón o un fade; usar CSS con el ease del sidebar
 
 ---
 
