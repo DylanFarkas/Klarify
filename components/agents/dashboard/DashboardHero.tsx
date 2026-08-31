@@ -19,44 +19,40 @@ export function DashboardHero({
 		`${metrics.epics.length} épica${metrics.epics.length === 1 ? '' : 's'}`,
 		`${metrics.storyCount} HU${metrics.storyCount === 1 ? '' : 's'}`,
 		`${formatEffortTotal(metrics.totalPoints, metrics.estimationMode)}`,
-		`${metrics.wishesCount} deseo${metrics.wishesCount === 1 ? '' : 's'}`,
 		`pipeline ${metrics.completionCount}/5`,
 	];
 
 	return (
-		<header className="flex min-h-10 flex-col justify-center gap-2 border-b border-border/60 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+		<header className="flex flex-wrap items-end justify-between gap-x-3 gap-y-3">
 			<div className="min-w-0">
-				<h1 className="text-[50px] font-semibold tracking-tight text-foreground">
+				<p className="text-[12px] text-muted">{projectName}</p>
+				<h1 className="mt-0.5 text-[50px] font-semibold tracking-tight text-foreground">
 					Dashboard
 				</h1>
-				<p className="mt-0.5 truncate text-[12px] text-muted">
-					{projectName}
-					{hasContent ? (
-						<>
-							{' · '}
-							<span className="tabular-nums text-subtle">{metaParts.join(' · ')}</span>
-						</>
-					) : (
-						<> · Sin datos todavía</>
-					)}
-				</p>
+				{hasContent ? (
+					<p className="mt-1 truncate text-[12px] tabular-nums text-subtle">
+						{metaParts.join(' · ')}
+					</p>
+				) : (
+					<p className="mt-1 text-[12px] text-subtle">Sin datos todavía</p>
+				)}
 			</div>
 
-			<div className="flex shrink-0 flex-wrap items-center gap-2">
-				<Link
-					href={metrics.nextAction.href}
-					className="inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
-				>
-					{metrics.nextAction.label}
-				</Link>
+			<div className="flex shrink-0 flex-wrap items-center gap-2 pb-1">
 				{metrics.hasPlan && executionBoardEnabled ? (
 					<Link
 						href="/agentes/board"
-						className="inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+						className="inline-flex items-center rounded-lg bg-surface-muted px-3 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 					>
 						Ir al tablero
 					</Link>
 				) : null}
+				<Link
+					href={metrics.nextAction.href}
+					className="inline-flex items-center rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90"
+				>
+					{metrics.nextAction.label}
+				</Link>
 			</div>
 		</header>
 	);

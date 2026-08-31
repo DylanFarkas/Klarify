@@ -6,7 +6,6 @@ import {
   Skeleton,
   SkeletonBlock,
   StoryTableRowSkeleton,
-  SummaryStripSkeleton,
 } from '@/components/ui/Skeleton';
 
 export type WorkspaceLoadingVariant = 'dashboard' | 'backlog' | 'stack' | 'board' | 'story-detail';
@@ -34,34 +33,42 @@ export function DashboardLoadingState({ variant = 'dashboard' }: DashboardLoadin
 
 function DashboardPageLoadingSkeleton() {
   return (
-    <div className={PAGE_SHELL} aria-busy="true" aria-label="Cargando dashboard">
-      <PageHeaderSkeleton actionCount={2} />
-
-      <SummaryStripSkeleton delay={80} />
-
-      <SkeletonBlock delay={140} className="border-b border-border/60 pb-5">
-        <Skeleton className="mb-3 h-4 w-32" />
-        <div className="space-y-0 rounded-xl border border-border/60 bg-surface/40 px-3 py-1">
+    <div className="flex w-full flex-col gap-8 px-6 pt-3 pb-5" aria-busy="true" aria-label="Cargando dashboard">
+      <SkeletonBlock delay={0} className="flex flex-col gap-5 border-b border-border/60 pb-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-10 w-52" delay={20} />
+            <Skeleton className="h-3 w-64 max-w-full" delay={40} />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-24 rounded-lg" />
+            <Skeleton className="h-8 w-32 rounded-lg" delay={30} />
+          </div>
+        </div>
+        <Skeleton className="h-1.5 w-full rounded-full" delay={60} />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <StoryTableRowSkeleton key={index} delay={index * 50} />
+            <div key={index} className="rounded-xl bg-background/40 px-4 py-3.5">
+              <Skeleton className="h-3 w-16" delay={index * 30} />
+              <Skeleton className="mt-3 h-7 w-10" delay={index * 30 + 20} />
+            </div>
           ))}
         </div>
       </SkeletonBlock>
 
-      <SkeletonBlock delay={220} className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-3 rounded-xl border border-border/60 bg-surface/40 p-4">
-          <Skeleton className="h-3.5 w-36" />
-          <Skeleton className="h-2.5 w-full" />
-          <Skeleton className="h-2.5 w-4/5" />
-          <Skeleton className="h-2.5 w-3/5" />
+      <SkeletonBlock delay={140} className="grid items-start gap-10 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-28" />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <StoryTableRowSkeleton key={index} delay={index * 50} />
+          ))}
         </div>
-        <div className="space-y-3 rounded-xl border border-border/60 bg-surface/40 p-4">
-          <Skeleton className="h-3.5 w-28" />
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <Skeleton key={index} className="h-7 w-20 rounded-full" delay={index * 35} />
-            ))}
-          </div>
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-2.5 w-full" delay={20} />
+          <Skeleton className="h-2.5 w-4/5" delay={40} />
+          <Skeleton className="h-2.5 w-3/5" delay={60} />
         </div>
       </SkeletonBlock>
     </div>

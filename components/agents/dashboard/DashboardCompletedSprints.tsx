@@ -18,16 +18,14 @@ export function DashboardCompletedSprints({ metrics }: DashboardCompletedSprints
 
 	return (
 		<section aria-label="Sprints completados">
-			<div className="mb-3">
+			<div className="mb-4 flex items-baseline justify-between gap-3">
 				<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
-					Sprints completados
+					Cerrados
 				</h2>
-				<p className="mt-0.5 text-[12px] text-muted">
-					Registro histórico de sprints cerrados del proyecto.
-				</p>
+				<p className="text-[12px] tabular-nums text-subtle">{completedSprints.length}</p>
 			</div>
 
-			<ul className="flex flex-col">
+			<ol className="flex flex-col">
 				{completedSprints.map((sprint) => {
 					const rows = metrics.sprintStoryRows.filter((row) => row.sprintId === sprint.id);
 					const doneCount = rows.filter((row) => row.executionStatus === 'done').length;
@@ -43,43 +41,31 @@ export function DashboardCompletedSprints({ metrics }: DashboardCompletedSprints
 						);
 					const goalShort =
 						sprint.sprintGoal.replace(/^Sprint\s+\d+\s*:\s*/i, '').trim() || sprint.sprintGoal;
+					const pct = rows.length > 0 ? Math.round((doneCount / rows.length) * 100) : 0;
 
 					return (
 						<li
 							key={sprint.id}
-							className="-mx-2 rounded-md px-2 py-3 transition-colors hover:bg-surface-hover/50"
+							className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-3 border-t border-border/60 py-3 first:border-t-0 first:pt-0"
 						>
-							<div className="flex flex-wrap items-start justify-between gap-3">
-								<div className="min-w-0">
-									<div className="flex flex-wrap items-center gap-2">
-										<p className="text-[13px] font-semibold text-foreground">
-											Sprint {sprint.number}
-										</p>
-										<span className="rounded-md bg-surface-muted px-1.5 py-px text-[10px] font-medium text-subtle">
-											Completado
-										</span>
-									</div>
-									<p className="mt-1 truncate text-[13px] text-muted" title={goalShort}>
-										{goalShort}
-									</p>
-									<p className="mt-1 text-[11px] tabular-nums text-subtle">
-										{sprint.startDate} → {sprint.endDate}
-									</p>
-								</div>
-								<div className="text-right text-[13px] tabular-nums text-foreground">
-									<p>
-										{doneCount}/{rows.length} hechas
-									</p>
-									<p className="mt-1 text-[11px] text-subtle">
-										{formatEffortTotal(doneSp, metrics.estimationMode)}/
-										{formatEffortTotal(committedSp, metrics.estimationMode)}
-									</p>
-								</div>
+							<span className="pt-0.5 text-[13px] font-semibold tabular-nums text-subtle">
+								{String(sprint.number).padStart(2, '0')}
+							</span>
+							<div className="min-w-0">
+								<p className="truncate text-[13px] text-foreground" title={goalShort}>
+									{goalShort}
+								</p>
+								<p className="mt-0.5 text-[11px] tabular-nums text-subtle">
+									{doneCount}/{rows.length} · {pct}%
+									{' · '}
+									{formatEffortTotal(doneSp, metrics.estimationMode)}/
+									{formatEffortTotal(committedSp, metrics.estimationMode)}
+								</p>
 							</div>
 						</li>
 					);
 				})}
-			</ul>
+			</ol>
 		</section>
 	);
 }

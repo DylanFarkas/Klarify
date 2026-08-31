@@ -1,3 +1,4 @@
+import { getSprintStatus } from '@/lib/types/agent-5';
 import { DashboardEmptyState } from './DashboardEmptyState';
 import { DashboardHero } from './DashboardHero';
 import { DashboardSummaryStrip } from './DashboardSummaryStrip';
@@ -36,34 +37,54 @@ export function DashboardContent({
 	onCompleteSprint,
 	workspace,
 }: DashboardContentProps) {
-	return (
-		<div className="flex w-full flex-col gap-5 px-6 pt-3 pb-5 md:gap-6">
-			<DashboardHero
-				projectName={projectName}
-				hasContent={hasContent}
-				metrics={metrics}
-				executionBoardEnabled={executionBoardEnabled}
-			/>
+	const hasCompletedSprints = Boolean(
+		metrics.plan?.sprints.some((sprint) => getSprintStatus(sprint) === 'completed')
+	);
+	const showAside = metrics.epicBreakdown.length > 0 || hasCompletedSprints;
 
-			{hasContent ? (
-				<>
+	return (
+		<div className="flex w-full flex-col gap-8 px-6 pt-3 pb-5 animate-[fadeIn_0.3s_ease-out]">
+			<div className="flex flex-col gap-5 border-b border-border/60 pb-5">
+				<DashboardHero
+					projectName={projectName}
+					hasContent={hasContent}
+					metrics={metrics}
+					executionBoardEnabled={executionBoardEnabled}
+				/>
+
+				{hasContent ? (
 					<DashboardSummaryStrip
 						metrics={metrics}
 						workspace={workspace}
 						executionBoardEnabled={executionBoardEnabled}
 					/>
+				) : null}
+			</div>
 
-					<DashboardActiveSprint
-						metrics={metrics}
-						workspace={workspace}
-						executionBoardEnabled={executionBoardEnabled}
-						onUpdateStoryStatus={onUpdateStoryStatus}
-						onCompleteSprint={onCompleteSprint}
-					/>
+			{hasContent ? (
+				<>
+					<div
+						className={
+							showAside
+								? 'grid items-start gap-10 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:gap-12'
+								: 'min-w-0'
+						}
+					>
+						<DashboardActiveSprint
+							metrics={metrics}
+							workspace={workspace}
+							executionBoardEnabled={executionBoardEnabled}
+							onUpdateStoryStatus={onUpdateStoryStatus}
+							onCompleteSprint={onCompleteSprint}
+						/>
 
-					<DashboardCompletedSprints metrics={metrics} />
-
-					<DashboardEpicProgress metrics={metrics} />
+						{showAside ? (
+							<aside className="flex min-w-0 flex-col gap-10">
+								<DashboardEpicProgress metrics={metrics} />
+								<DashboardCompletedSprints metrics={metrics} />
+							</aside>
+						) : null}
+					</div>
 
 					{projectId ? (
 						<section className="flex flex-col gap-3 border-t border-border/60 pt-5">

@@ -2,16 +2,24 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ActiveSprintHeader } from '@/components/agents/board/ActiveSprintHeader';
+import { WorkItemIdLabel } from '@/components/agents/shared/WorkItemTypeBadge';
 import { resolveBoardData, type BoardFilters } from '@/lib/board/board-utils';
 import { findActiveSprint } from '@/lib/utils/sprint-plan-mutations';
+import { backlogStoryHref } from '@/lib/utils/backlog-story-navigation';
 import { getSprintStatus } from '@/lib/types/agent-5';
+import { KANBAN_COLUMNS, type KanbanStatus } from '@/lib/types/execution';
 import type { PlannedSprint } from '@/lib/types/agent-5';
-import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 import type { DashboardMetrics } from './dashboardMetrics';
 import { ExecutionStatusBadge, ExecutionStatusSelect } from './ExecutionStatusBadge';
 import { formatEstimation } from '@/lib/utils/estimation';
+
+const COLUMN_DOT: Record<KanbanStatus, string> = {
+	todo: 'bg-subtle',
+	in_progress: 'bg-primary',
+	code_review: 'bg-[var(--sileo-state-warning)]',
+	done: 'bg-green-500',
+};
 
 interface DashboardActiveSprintProps {
 	metrics: DashboardMetrics;
@@ -51,6 +59,15 @@ export function DashboardActiveSprint({
 		[activeSprint, workspace, filters]
 	);
 
+	const groupedStories = useMemo(
+		() =>
+			KANBAN_COLUMNS.map((column) => ({
+				...column,
+				items: stories.filter((entry) => entry.execution.status === column.id),
+			})).filter((group) => group.items.length > 0),
+		[stories]
+	);
+
 	const handleCompleteSprint = useCallback(
 		async (rollover: 'backlog' | 'next_planned') => {
 			if (!activeSprint || !onCompleteSprint || lifecycleBusy) return;
@@ -67,18 +84,20 @@ export function DashboardActiveSprint({
 
 	if (!activeSprint) {
 		return (
-			<section className="border-b border-border/60 pb-5">
+			<section>
 				<h2 className="text-[15px] font-semibold tracking-tight text-foreground">Sprint activo</h2>
-				<p className="mt-1.5 text-[13px] text-muted">Ningún sprint en curso.</p>
-				<p className="mt-1 text-[12px] text-subtle">
-					Inicia un sprint planificado desde el backlog para comenzar la ejecución.
-				</p>
-				<Link
-					href="/agentes/backlog"
-					className="mt-3 inline-flex items-center text-[12px] font-medium text-foreground underline-offset-2 hover:underline"
-				>
-					Ir al backlog
-				</Link>
+				<div className="mt-4 rounded-xl bg-background/40 px-5 py-8">
+					<p className="text-[13px] font-medium text-foreground">Ningún sprint en curso</p>
+					<p className="mt-1 max-w-sm text-[12px] leading-relaxed text-muted">
+						Inicia un sprint planificado desde el backlog para comenzar la ejecución.
+					</p>
+					<Link
+						href="/agentes/backlog"
+						className="mt-4 inline-flex items-center rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90"
+					>
+						Ir al backlog
+					</Link>
+				</div>
 			</section>
 		);
 	}
@@ -89,14 +108,23 @@ export function DashboardActiveSprint({
 	);
 
 	return (
-		<section className="flex flex-col gap-4 border-b border-border/60 pb-5" aria-label="Sprint activo">
+		<section className="min-w-0" aria-label="Sprint activo">
 			<div className="flex flex-wrap items-start justify-between gap-3">
-				<h2 className="text-[15px] font-semibold tracking-tight text-foreground">Sprint activo</h2>
+				<div className="min-w-0">
+					<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
+						Sprint {activeSprint.number}
+					</h2>
+					<p className="mt-0.5 truncate text-[12px] text-muted">
+						{stories.length} historia{stories.length !== 1 ? 's' : ''}
+						{' · '}
+						{activeSprint.startDate} → {activeSprint.endDate}
+					</p>
+				</div>
 				<div className="flex flex-wrap items-center gap-2">
 					{executionBoardEnabled ? (
 						<Link
 							href="/agentes/board"
-							className="inline-flex items-center rounded-md px-2.5 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+							className="inline-flex items-center rounded-lg bg-surface-muted px-3 py-1.5 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
 						>
 							Ir al tablero
 						</Link>
@@ -106,7 +134,7 @@ export function DashboardActiveSprint({
 							type="button"
 							onClick={() => setCompleting(true)}
 							disabled={lifecycleBusy}
-							className="inline-flex cursor-pointer items-center rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+							className="inline-flex cursor-pointer items-center rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							Cerrar sprint
 						</button>
@@ -114,61 +142,67 @@ export function DashboardActiveSprint({
 				</div>
 			</div>
 
-			<ActiveSprintHeader
-				sprint={activeSprint}
-				stories={stories}
-				capacitySp={metrics.plan?.config.sprintCapacitySp}
-				flat
-			/>
-
-			<div className="overflow-x-auto">
-				<table className="w-full min-w-120 text-left text-[12px]">
-					<thead>
-						<tr className="border-b border-border/50 text-[11px] text-subtle">
-							<th className="pb-2.5 pr-4 font-medium">Historia</th>
-							<th className="pb-2.5 pr-4 font-medium">Épica</th>
-							<th className="hidden pb-2.5 pr-4 font-medium sm:table-cell">Estimación</th>
-							<th className="pb-2.5 font-medium">Estado</th>
-						</tr>
-					</thead>
-					<tbody>
-						{stories.length === 0 ? (
-							<tr>
-								<td colSpan={4} className="py-8 text-center text-muted">
-									Sin historias en este sprint.
-								</td>
-							</tr>
-						) : (
-							stories.map((entry) => (
-								<tr
-									key={entry.story.id}
-									className="border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-hover/40"
-								>
-									<td className="py-2.5 pr-4">
-										<p className="font-medium text-foreground">{entry.story.title}</p>
-										<p className="mt-0.5 text-[11px] text-subtle">{entry.story.id}</p>
-									</td>
-									<td className="py-2.5 pr-4 text-muted">{entry.epicTitle}</td>
-									<td className="hidden py-2.5 pr-4 tabular-nums text-muted sm:table-cell">
-										{formatEstimation(entry.estimation, entry.estimationMode)}
-									</td>
-									<td className="py-2.5">
-										{executionBoardEnabled && onUpdateStoryStatus ? (
-											<ExecutionStatusSelect
-												status={entry.execution.status}
-												onChange={(status) => onUpdateStoryStatus(entry.story.id, status)}
-												aria-label={`Estado de ${entry.story.title}`}
-											/>
-										) : (
-											<ExecutionStatusBadge status={entry.execution.status} />
-										)}
-									</td>
-								</tr>
-							))
-						)}
-					</tbody>
-				</table>
-			</div>
+			{stories.length === 0 ? (
+				<p className="mt-6 text-[13px] text-muted">Sin historias en este sprint.</p>
+			) : (
+				<div className="mt-5 flex flex-col gap-6">
+					{groupedStories.map((group) => (
+						<div key={group.id}>
+							<div className="mb-2 flex items-center gap-2">
+								<span className={`h-1.5 w-1.5 rounded-full ${COLUMN_DOT[group.id]}`} aria-hidden />
+								<h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+									{group.label}
+								</h3>
+								<span className="tabular-nums text-[11px] text-subtle">{group.items.length}</span>
+							</div>
+							<ul className="flex flex-col">
+								{group.items.map((entry) => (
+									<li
+										key={entry.story.id}
+										className="flex gap-3 border-b border-border/60 last:border-b-0"
+									>
+										<span
+											className={`mt-3.5 h-8 w-0.5 shrink-0 rounded-full ${COLUMN_DOT[group.id]}`}
+											aria-hidden
+										/>
+										<div className="flex min-w-0 flex-1 items-start justify-between gap-3 py-3 pr-1">
+											<div className="min-w-0">
+												<div className="flex min-w-0 flex-wrap items-center gap-2">
+													<WorkItemIdLabel id={entry.story.id} type={entry.story.type} />
+													<Link
+														href={backlogStoryHref(entry.story.id)}
+														className="min-w-0 text-[13px] font-medium text-foreground hover:text-primary"
+													>
+														<span className="line-clamp-2">{entry.story.title}</span>
+													</Link>
+												</div>
+												<p className="mt-1 truncate text-[11px] text-subtle">
+													{entry.epicTitle}
+													<span className="mx-1.5">·</span>
+													<span className="tabular-nums">
+														{formatEstimation(entry.estimation, entry.estimationMode)}
+													</span>
+												</p>
+											</div>
+											<div className="shrink-0 pt-0.5">
+												{executionBoardEnabled && onUpdateStoryStatus ? (
+													<ExecutionStatusSelect
+														status={entry.execution.status}
+														onChange={(status) => onUpdateStoryStatus(entry.story.id, status)}
+														aria-label={`Estado de ${entry.story.title}`}
+													/>
+												) : (
+													<ExecutionStatusBadge status={entry.execution.status} />
+												)}
+											</div>
+										</div>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</div>
+			)}
 
 			{completing ? (
 				<CompleteSprintDialog
@@ -200,14 +234,14 @@ function CompleteSprintDialog({
 	onConfirm: (rollover: 'backlog' | 'next_planned') => void;
 }) {
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm">
 			<div
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="dashboard-complete-sprint-title"
-				className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-xl"
+				className="w-full max-w-md rounded-xl border border-border bg-surface p-5"
 			>
-				<h3 id="dashboard-complete-sprint-title" className="text-base font-semibold text-foreground">
+				<h3 id="dashboard-complete-sprint-title" className="text-[15px] font-semibold tracking-tight text-foreground">
 					¿Cerrar Sprint {sprint.number}?
 				</h3>
 				<p className="mt-2 text-sm text-muted">
@@ -231,7 +265,7 @@ function CompleteSprintDialog({
 									type="button"
 									disabled={busy}
 									onClick={() => onConfirm('next_planned')}
-									className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-40"
+									className="cursor-pointer rounded-lg bg-surface-muted px-3 py-2 text-sm font-medium text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
 								>
 									Mover al siguiente sprint planificado
 								</button>
