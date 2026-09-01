@@ -17,6 +17,7 @@ Referencias ya aplicadas:
 | Agente 4 | `app/agentes/4/page.tsx`, `EmptyAgent4State`, `EmptyPrioritizationStartState`, `FrameworkSelector`, `PrioritizationWorkspace` |
 | Agente 5 | paneles en `components/agents/agent-5` (migrar al patrón A1/A2/A3) |
 | Klark | `HarnessChatDock`, `HarnessChatPanel` (+ estilos `.harness-*` en `globals.css`) |
+| Configuración | `WorkspaceSettingsModal`, `SettingsModalHost`, `TeamSettingsPanel`, `ThemeSettingsPanel`, `AiProviderConnectionPanel`, `GitHubConnectionPanel`, `GeneralSettingsPanel` |
 | Tokens | `app/agent-themes.css`, mapeo en `app/globals.css` |
 
 ---
@@ -569,6 +570,25 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 - Formularios de alta/edición (HU en A2, ítems del dashboard): label `12px text-muted`, pie Cancelar muted + Guardar `foreground`
 - Spinner: anillo fino `border-border border-t-foreground`
 
+### Configuración (`WorkspaceSettingsModal`)
+
+Modal de preferencias. Un solo shell para todo `/agentes` (`SettingsModalHost`). Título de **panel**, no display de página.
+
+| Pieza | Patrón |
+| ----- | ------ |
+| Backdrop | `bg-background/70 backdrop-blur-sm` |
+| Panel | `rounded-2xl border-border/60 bg-surface`, sin `shadow-2xl` ni pill footer |
+| Título | `text-[20px] font-semibold tracking-tight` (como `DetailModal` compact) |
+| Meta | `text-[12px] text-muted` |
+| Nav | `bg-background`, filas `h-8 rounded-md px-2`. Activo: `bg-elevated font-medium text-primary`. Inactivo: `text-muted hover:bg-surface-hover` |
+| Sección | Título `text-[15px] font-semibold` + descripción `12px muted` |
+| CTA pie | `rounded-lg bg-foreground px-4 py-2 text-sm` — **Listo** |
+| Temas | Mini previews `rounded-lg`; seleccionado `border-border-strong bg-elevated`. Sin blur orbs |
+| Integraciones | Bloques separados por `border-t`; títulos de bloque `13px font-medium`; inputs `bg-input` |
+| Generales | Fila con `border-t`, sin card `bg-surface-muted` |
+| Equipo | Lista de filas `border-t` + hover `bg-surface-hover/30`. Acciones icono al hover |
+| Alta miembro | `MemberFormModal` sobre `DetailModal` compact `max-w-lg`. Vacío: empty compacto (icono `h-12`, título `15px`, CTA **Añadir persona**) |
+
 ---
 
 ## 7. Jerarquía de contenido
@@ -587,6 +607,7 @@ Evitar: `shadow-[0_0_*px_primary]`, `hover:scale-*`, `py-4 text-base font-bold` 
 | **Stack** (`/agentes/stack`) | Capas tecnológicas o empty state centrado |
 | Hub proyectos | Lista densa; stats en meta, no cards |
 | Dashboard | Franja de salud + backlog jerárquico; sin `AgentPageHero` |
+| Configuración | Preferencias del workspace; equipo del **proyecto activo** |
 
 Si algo es secundario: tipografía más pequeña, `text-muted`/`text-subtle` — **no** bajar opacidad del panel entero.
 
@@ -636,6 +657,7 @@ En sidebar del producto:
 14. ¿A1 revisa deseos en `WishFormModal` (`DetailModal`), no inline? ¿A2 pone el backlog a la izquierda, más ancho? ¿Épicas colapsadas al generar? ¿HU en `DetailModal`? ¿Divisor entre épicas, no entre HUs?
 15. ¿A3 empty es elección de modo (chips + CTA compacto), no un panel “Workspace” con cards? ¿Revisión pone el esfuerzo a la derecha, sin IDs ni caja de razonamiento?
 16. ¿A4 empty es elección de metodología (chips `elevated`/`surface-muted` + CTA compacto), sin `AgentPageHero` ni toggle invertido blanco? ¿Revisión pone la prioridad a la derecha, sin IDs ni caja de razonamiento?
+17. ¿Configuración usa título `20px`, nav `bg-elevated text-primary`, inputs `bg-input` y lista de equipo sin card anidada?
 
 Si algo no encaja, mirar primero los archivos de la tabla de referencias al inicio.
 
@@ -664,6 +686,9 @@ Si algo no encaja, mirar primero los archivos de la tabla de referencias al inic
 - Títulos `text-xl` en h1 de página que deberían ser display `text-[50px]`
 - `text-[50px]` dentro de un panel, wizard o empty state interno
 - Añadir Framer Motion (o similar) para un acordeón o un fade; usar CSS con el ease del sidebar
+- Configuración con nav `bg-surface-muted/40`, tabs `rounded-xl shadow-sm`, título `text-2xl`/`28px` y footer `rounded-full`
+- Formulario de miembro inline o botón dashed a todo el ancho; el alta va en `MemberFormModal`
+- Rueda de acento con blur orb detrás
 
 ---
 

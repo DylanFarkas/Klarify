@@ -1,0 +1,8 @@
+/*
+  Sileo hace __insertCSS() al cargar el módulo y deja z-index: 50 en <head>
+  después de nuestros estilos. Sin !important el toast queda bajo Configuración
+  (z-100) y su backdrop-blur.
+*/
+[data-sileo-viewport] {
+  z-index: 9999 !important;
+}

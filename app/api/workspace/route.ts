@@ -232,12 +232,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, workspace });
       }
       case 'upsertProjectMember': {
-        const workspace = await upsertProjectMember(uid, body.payload.member);
-        return NextResponse.json({ ok: true, workspace });
+        const workspace = await upsertProjectMember(uid, body.payload.member, projectId);
+        return NextResponse.json({ ok: true, ...(workspace ? { workspace } : {}) });
       }
       case 'deleteProjectMember': {
-        const workspace = await deleteProjectMember(uid, body.payload.memberId);
-        return NextResponse.json({ ok: true, workspace });
+        const workspace = await deleteProjectMember(uid, body.payload.memberId, projectId);
+        return NextResponse.json({ ok: true, ...(workspace ? { workspace } : {}) });
       }
       case 'updateStoryExecution': {
         const workspace = await updateStoryExecution(

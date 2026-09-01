@@ -21,8 +21,12 @@ export async function assertExecutionBoardAllowed(
   }
 }
 
-export async function assertTeamMemberLimit(uid: string, currentCount: number): Promise<void> {
-  const plan = await resolveUserPlan(uid);
+export async function assertTeamMemberLimit(
+  uid: string,
+  currentCount: number,
+  preloadedUserSnapshot?: DocumentSnapshot
+): Promise<void> {
+  const plan = await resolveUserPlan(uid, preloadedUserSnapshot);
   if (!plan.limits.executionBoard) {
     throw new PlanLimitError(
       'La gestión de equipo está disponible en los planes Starter y Pro.',

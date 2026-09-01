@@ -70,7 +70,10 @@ export function DetailModal({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (event.key === 'Escape') handleClose();
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleClose();
     },
     [handleClose]
   );
@@ -78,14 +81,14 @@ export function DetailModal({
   useEffect(() => {
     if (!visible) return;
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     const unlockScroll = lockPageScroll();
 
     const focusTimer = window.setTimeout(() => closeBtnRef.current?.focus(), 80);
 
     return () => {
       window.clearTimeout(focusTimer);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
       unlockScroll();
     };
   }, [visible, handleKeyDown]);

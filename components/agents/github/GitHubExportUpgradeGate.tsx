@@ -6,7 +6,7 @@ export function GitHubExportUpgradeGate({ compact = false }: { compact?: boolean
   if (compact) {
     return (
       <div>
-        <h4 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h4>
+        <h4 className="text-[13px] font-medium text-foreground">GitHub</h4>
         <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
           Exporta épicas, historias y sprints a GitHub Projects. Disponible en el plan Pro.
         </p>

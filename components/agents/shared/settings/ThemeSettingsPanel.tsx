@@ -98,17 +98,11 @@ function KlarifyAccentWheel({
       aria-label="Acento de Klarify"
       style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}
     >
-      <div
-        className="pointer-events-none absolute inset-5 rounded-full opacity-35 blur-2xl transition-colors duration-300 motion-reduce:transition-none"
-        style={{ backgroundColor: active.primary }}
-        aria-hidden="true"
-      />
-
       <svg
         width={WHEEL_SIZE}
         height={WHEEL_SIZE}
         viewBox={`0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`}
-        className="relative cursor-pointer drop-shadow-sm"
+        className="relative cursor-pointer"
         onClick={(event) => {
           const next = accentAtPoint(
             event.clientX,
@@ -296,12 +290,12 @@ export function ThemeSettingsPanel() {
             role="dialog"
             aria-label="Elegir acento de Klarify"
             className={[
-              'fixed z-300 overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-2xl',
+              'fixed z-300 overflow-hidden rounded-xl border border-border/60 bg-surface',
               'animate-[fadeIn_0.15s_ease-out]',
             ].join(' ')}
             style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
           >
-            <div className="flex items-start justify-between gap-2 border-b border-border/70 px-4 py-3">
+            <div className="flex items-start justify-between gap-2 border-b border-border/60 px-4 py-3">
               <div className="min-w-0">
                 <p className="text-[13px] font-medium text-foreground">Acento</p>
                 <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
@@ -311,7 +305,7 @@ export function ThemeSettingsPanel() {
               <button
                 type="button"
                 onClick={() => setAccentOpen(false)}
-                className="cursor-pointer rounded-lg p-1.5 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="cursor-pointer rounded-md p-1.5 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
                 aria-label="Cerrar"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -345,9 +339,8 @@ export function ThemeSettingsPanel() {
 
   return (
     <div>
-      <p className="mb-3 text-[13px] font-medium text-foreground">Tema del workspace</p>
       <div
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        className="grid grid-cols-2 gap-2 sm:grid-cols-3"
         role="radiogroup"
         aria-label="Tema del workspace"
       >
@@ -362,7 +355,7 @@ export function ThemeSettingsPanel() {
             <div
               key={option.id}
               ref={isKlarify ? klarifyCardRef : undefined}
-              className="relative flex flex-col gap-1.5"
+              className="relative flex flex-col gap-1"
             >
               <button
                 type="button"
@@ -370,14 +363,14 @@ export function ThemeSettingsPanel() {
                 aria-checked={isSelected}
                 onClick={() => handleSelectTheme(option.id)}
                 className={[
-                  'group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border text-left transition-all duration-200',
+                  'group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border text-left transition-colors',
                   isSelected
-                    ? 'border-border-strong bg-surface-hover/40 shadow-sm'
-                    : 'border-border/80 hover:border-border-strong hover:bg-surface-hover/20',
+                    ? 'border-border-strong bg-elevated'
+                    : 'border-border/60 hover:bg-surface-hover/30',
                 ].join(' ')}
               >
                 <div
-                  className="relative h-16 w-full"
+                  className="relative h-12 w-full"
                   style={{ backgroundColor: option.preview.bg }}
                   aria-hidden="true"
                 >
@@ -385,41 +378,27 @@ export function ThemeSettingsPanel() {
                     className="absolute bottom-0 left-0 right-0 h-0.5"
                     style={{ backgroundColor: previewAccent }}
                   />
-                  <div
-                    className="absolute left-3.5 top-3.5 h-1.5 w-8 rounded-full opacity-45"
-                    style={{ backgroundColor: previewAccent }}
-                  />
-                  <div
-                    className="absolute left-3.5 top-7 h-1 w-11 rounded-full opacity-25"
-                    style={{ backgroundColor: previewAccent }}
-                  />
-                  {isSelected && (
-                    <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background shadow-sm">
-                      <svg
-                        className="h-3 w-3"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                  )}
                 </div>
-                <div className="border-t border-border/70 bg-surface px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2 px-2.5 py-2">
                   <span
                     className={[
-                      'text-[12px] font-medium',
+                      'truncate text-[12px] font-medium',
                       isSelected ? 'text-foreground' : 'text-muted',
                     ].join(' ')}
                   >
                     {option.label}
                   </span>
+                  {isSelected ? (
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+                      <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  ) : null}
                 </div>
               </button>
 
-              {isKlarify && isSelected && (
+              {isKlarify && isSelected ? (
                 <button
                   ref={triggerRef}
                   type="button"
@@ -433,35 +412,20 @@ export function ThemeSettingsPanel() {
                     }
                   }}
                   className={[
-                    'flex w-full cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors',
-                    accentOpen
-                      ? 'border-border-strong bg-surface-hover/50 shadow-sm'
-                      : 'border-border/80 bg-surface-muted/40 hover:border-border-strong hover:bg-surface-hover/30',
+                    'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                    accentOpen ? 'bg-elevated' : 'hover:bg-surface-hover',
                   ].join(' ')}
                 >
                   <span
-                    className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-border/60 ring-offset-1 ring-offset-surface"
+                    className="h-3 w-3 shrink-0 rounded-full"
                     style={{ backgroundColor: activeKlarifyAccent.primary }}
                     aria-hidden="true"
                   />
-                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
                     Acento · {activeKlarifyAccent.label}
                   </span>
-                  <svg
-                    className={[
-                      'h-3.5 w-3.5 shrink-0 text-muted transition-transform duration-200',
-                      accentOpen ? 'rotate-180' : '',
-                    ].join(' ')}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
                 </button>
-              )}
+              ) : null}
             </div>
           );
         })}

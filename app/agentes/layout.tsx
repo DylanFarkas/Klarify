@@ -3,6 +3,7 @@ import { AgentAuthGuard } from '@/components/agents/shared/auth/AgentAuthGuard';
 import { AiProviderProvider } from '@/context/AiProviderContext';
 import { WorkspaceProvider } from '@/context/WorkspaceContext';
 import { WorkspaceSettingsProvider } from '@/context/WorkspaceSettingsContext';
+import { SettingsModalHost } from '@/components/agents/shared/settings/SettingsModalHost';
 import { AgentToaster } from '@/components/agents/shared/notifications/AgentToaster';
 import { ConfirmDialogProvider } from '@/components/agents/shared/ConfirmDialog';
 import { AgentesShell } from '@/components/agents/harness/AgentesShell';
@@ -22,7 +23,9 @@ export default function AgentesLayout({
             <AiProviderProvider>
               <WorkspaceProvider>
                 <SidebarCollapsedProvider>
-                  <AgentesShell>{children}</AgentesShell>
+                  <SettingsModalHost>
+                    <AgentesShell>{children}</AgentesShell>
+                  </SettingsModalHost>
                 </SidebarCollapsedProvider>
               </WorkspaceProvider>
             </AiProviderProvider>

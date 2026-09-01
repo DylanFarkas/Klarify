@@ -145,7 +145,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-[15px] font-semibold tracking-tight text-foreground">GitHub</h4>
+          <h4 className="text-[13px] font-medium text-foreground">GitHub</h4>
           <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
             {isGithubConnected ? (
               <>
@@ -299,7 +299,7 @@ export function GitHubConnectionPanel({ reposListMaxHeight = 'max-h-48' }: { rep
                             href={repo.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group flex items-center gap-2 py-2 transition-colors hover:bg-surface-hover/40"
+                            className="group flex items-center gap-2 py-2 transition-colors hover:bg-surface-hover/30"
                           >
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-[13px] text-foreground">{name}</p>

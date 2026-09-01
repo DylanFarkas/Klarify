@@ -32,6 +32,7 @@ import {
   persistExecutionStories,
   persistExecutionStoryFields,
   persistExecutionWorkspaceMeta,
+  persistMembersOnly,
   persistSprintFilterOnly,
   persistSprintPlanOnly,
   persistStackOnly,
@@ -45,6 +46,7 @@ import {
   projectRef,
   type PersistSlice,
 } from '@/lib/project-store';
+import { executionStoriesCol } from '@/lib/project-store/paths';
 import { deleteProjectSlices } from '@/lib/project-store/cleanup';
 import type { ProjectDocument } from '@/lib/types/project';
 import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
@@ -125,7 +127,7 @@ import type {
   StoryExecution,
   ExecutionActivityEntry,
 } from '@/lib/types/execution';
-import { AVATAR_COLORS } from '@/lib/types/execution';
+import { generateMemberId, pickAvatarColor } from '@/lib/types/execution';
 import type { ProjectStack } from '@/lib/types/stack';
 import { mergeStackUpdate, prepareStackForFirestore } from '@/lib/stack/normalize';
 import type {
@@ -462,16 +464,39 @@ export interface UpdateEpicInput {
   description?: string;
 }
 
-function generateMemberId(members: ProjectMember[]): string {
-  const maxId = members.reduce((max, member) => {
-    const match = member.id.match(/^MEM-(\d+)$/i);
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-  return `MEM-${String(maxId + 1).padStart(3, '0')}`;
-}
+function applyMemberUpsert(
+  members: ProjectMember[],
+  memberInput: ProjectMemberInput
+): { members: ProjectMember[]; created: boolean } {
+  const existingIndex = memberInput.id
+    ? members.findIndex((m) => m.id === memberInput.id)
+    : -1;
 
-function pickAvatarColor(index: number): string {
-  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+  if (existingIndex >= 0) {
+    return {
+      created: false,
+      members: members.map((m, i) =>
+        i === existingIndex
+          ? {
+              ...m,
+              displayName: memberInput.displayName,
+              email: memberInput.email,
+              role: memberInput.role,
+            }
+          : m
+      ),
+    };
+  }
+
+  const newMember: ProjectMember = {
+    id: memberInput.id ?? generateMemberId(members),
+    displayName: memberInput.displayName,
+    email: memberInput.email,
+    role: memberInput.role,
+    avatarColor: pickAvatarColor(members.length),
+    createdAt: Date.now(),
+  };
+  return { created: true, members: [...members, newMember] };
 }
 
 async function saveExecutionState(
@@ -526,65 +551,65 @@ export async function initializeExecution(uid: string): Promise<UserWorkspace> {
 
 export async function upsertProjectMember(
   uid: string,
-  memberInput: ProjectMemberInput
-): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace: initialWorkspace } = await loadProjectWorkspace(uid);
-  let workspace = initialWorkspace;
-  let execution = workspace.execution;
-  if (!execution?.initializedAt) {
-    workspace = await ensureExecutionInitialized(uid);
-    execution = workspace.execution!;
-  }
-  const existingIndex = memberInput.id
-    ? execution.members.findIndex((m) => m.id === memberInput.id)
-    : -1;
+  memberInput: ProjectMemberInput,
+  clientProjectId?: string
+): Promise<UserWorkspace | null> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const [snap] = await Promise.all([
+    target.snapshot
+      ? Promise.resolve(target.snapshot)
+      : projectRef(uid, target.projectId).get(),
+    assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined),
+  ]);
+  const doc = assertProjectDocAccessible(snap);
+  let members = doc.workspaceMeta?.members ?? [];
 
-  let members: ProjectMember[];
-  if (existingIndex >= 0) {
-    members = execution.members.map((m, i) =>
-      i === existingIndex
-        ? {
-            ...m,
-            displayName: memberInput.displayName,
-            email: memberInput.email,
-            role: memberInput.role,
-          }
-        : m
-    );
-  } else {
-    await assertTeamMemberLimit(uid, execution.members.length);
-    const newMember: ProjectMember = {
-      id: generateMemberId(execution.members),
-      displayName: memberInput.displayName,
-      email: memberInput.email,
-      role: memberInput.role,
-      avatarColor: pickAvatarColor(execution.members.length),
-      createdAt: Date.now(),
-    };
-    members = [...execution.members, newMember];
+  if (!doc.workspaceMeta?.executionInitializedAt) {
+    const workspace = await ensureExecutionInitialized(uid);
+    members = workspace.execution?.members ?? [];
   }
 
-  return saveExecutionState(uid, { ...execution, members }, { projectId, workspace });
+  const next = applyMemberUpsert(members, memberInput);
+  if (next.created) {
+    await assertTeamMemberLimit(uid, members.length, target.userSnapshot ?? undefined);
+  }
+  await persistMembersOnly(uid, target.projectId, next.members);
+  return null;
 }
 
-export async function deleteProjectMember(uid: string, memberId: string): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
-  const execution = workspace.execution;
-  if (!execution?.initializedAt) {
-    return ensureExecutionInitialized(uid);
+export async function deleteProjectMember(
+  uid: string,
+  memberId: string,
+  clientProjectId?: string
+): Promise<UserWorkspace | null> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const [snap] = await Promise.all([
+    target.snapshot
+      ? Promise.resolve(target.snapshot)
+      : projectRef(uid, target.projectId).get(),
+    assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined),
+  ]);
+  const doc = assertProjectDocAccessible(snap);
+  if (!doc.workspaceMeta?.executionInitializedAt) {
+    return null;
   }
-  const members = execution.members.filter((m) => m.id !== memberId);
-  const stories = { ...execution.stories };
 
-  for (const [storyId, storyExec] of Object.entries(stories)) {
-    if (storyExec.assigneeId === memberId) {
-      stories[storyId] = { ...storyExec, assigneeId: null, updatedAt: Date.now() };
+  const members = (doc.workspaceMeta.members ?? []).filter((m) => m.id !== memberId);
+  await persistMembersOnly(uid, target.projectId, members);
+
+  const assigned = await executionStoriesCol(uid, target.projectId)
+    .where('assigneeId', '==', memberId)
+    .get();
+  if (!assigned.empty) {
+    const now = Date.now();
+    const fields: Record<string, FirebaseFirestore.DocumentData> = {};
+    for (const assignedDoc of assigned.docs) {
+      fields[assignedDoc.id] = { assigneeId: null, updatedAt: now };
     }
+    await persistExecutionStoryFields(uid, target.projectId, fields);
   }
 
-  return saveExecutionState(uid, { ...execution, members, stories }, { projectId, workspace });
+  return null;
 }
 
 export async function updateStoryExecution(

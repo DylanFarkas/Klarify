@@ -23,8 +23,6 @@ export function BoardWorkspace() {
     workspace,
     plan,
     initializeExecution,
-    upsertMember,
-    deleteMember,
     updateStoryExecution,
     bulkReorderExecutions,
     updateExecutionSprintFilter,
@@ -191,16 +189,7 @@ export function BoardWorkspace() {
           activeSprintId={activeSprint?.id ?? null}
           onChange={handleFilterChange}
         />
-        <TeamPanel
-          members={boardData.members}
-          maxMembers={maxMembers}
-          onUpsert={async (member) => {
-            await upsertMember(member);
-          }}
-          onDelete={async (memberId) => {
-            await deleteMember(memberId);
-          }}
-        />
+        <TeamPanel members={boardData.members} maxMembers={maxMembers} />
       </div>
 
       {boardData.stories.length === 0 ? (

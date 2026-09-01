@@ -1119,7 +1119,7 @@ export async function executeHarnessTool(
           const members = workspace.execution?.members ?? [];
           if (members.length === 0) {
             return toolError(
-              'No hay miembros en el equipo. Añádelos desde el tablero.',
+              'No hay miembros en el equipo. Añádelos desde Configuración → Equipo.',
               'MEMBER_NOT_FOUND'
             );
           }

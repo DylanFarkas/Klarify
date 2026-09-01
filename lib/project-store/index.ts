@@ -10,6 +10,7 @@ export {
   persistCanonicalStoryPatch,
   persistCanonicalEpicPatch,
   persistCanonicalBacklogWrite,
+  persistMembersOnly,
   persistSprintFilterOnly,
   persistSprintPlanOnly,
   persistStackOnly,

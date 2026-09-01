@@ -462,7 +462,7 @@ export default function ManualPage() {
                   <ManualStep
                     stepNumber={3}
                     title="Asigna el equipo"
-                    description="Añade miembros y roles (Product Owner, Developer, QA, Designer, Scrum Master) y asígnalos a historias."
+                    description="Añade personas desde Configuración → Equipo (también desde el atajo del tablero). Elige un rol (Product Owner, Developer, QA, Designer, Scrum Master) y asígnalas a historias."
                   />
                   <ManualStep
                     stepNumber={4}

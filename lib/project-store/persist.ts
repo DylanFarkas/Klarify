@@ -509,6 +509,21 @@ export async function readProjectStack(
   return data.workspaceMeta?.stack ?? data.workspace?.stack ?? null;
 }
 
+/** Escribe sólo los miembros del proyecto, sin reescribir historias de ejecución. */
+export async function persistMembersOnly(
+  uid: string,
+  projectId: string,
+  members: import('@/lib/types/execution').ProjectMember[]
+): Promise<void> {
+  await projectRef(uid, projectId).set(
+    {
+      workspaceMeta: { members: sanitize(members) },
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 /** Escribe sólo el filtro de sprint del tablero, sin cargar el workspace. */
 export async function persistSprintFilterOnly(
   uid: string,

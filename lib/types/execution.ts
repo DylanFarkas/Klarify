@@ -78,3 +78,15 @@ export const AVATAR_COLORS = [
   '#0ea5e9',
   '#64748b',
 ] as const;
+
+export function generateMemberId(members: { id: string }[]): string {
+  const maxId = members.reduce((max, member) => {
+    const match = member.id.match(/^MEM-(\d+)$/i);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `MEM-${String(maxId + 1).padStart(3, '0')}`;
+}
+
+export function pickAvatarColor(index: number): string {
+  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { memberInitials } from '@/lib/board/board-utils';
+import { useSettingsModal } from '@/context/SettingsModalContext';
 import {
 	MEMBER_ROLE_LABELS,
 	type ProjectMember,
@@ -55,6 +56,7 @@ export function AssigneeSelect({
 	variant = 'icon',
 }: AssigneeSelectProps) {
 	const isRow = variant === 'row';
+	const { openSettings } = useSettingsModal();
 	const [open, setOpen] = useState(false);
 	const [mounted, setMounted] = useState(false);
 	const [listStyle, setListStyle] = useState({ top: 0, left: 0, minWidth: 0 });
@@ -148,9 +150,19 @@ export function AssigneeSelect({
 							<span className="text-[12px] text-muted">Sin asignar</span>
 						</button>
 						{members.length === 0 ? (
-							<p className="px-2 py-2 text-[11px] text-subtle">
-								No hay miembros en el equipo.
-							</p>
+							<button
+								type="button"
+								onClick={() => {
+									setOpen(false);
+									openSettings('team');
+								}}
+								className="mt-0.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover"
+							>
+								<svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+									<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+								</svg>
+								Añadir equipo
+							</button>
 						) : (
 							members.map((member) => {
 								const isSelected = member.id === assignee?.id;

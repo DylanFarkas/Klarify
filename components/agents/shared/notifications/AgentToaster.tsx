@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
+import './agent-toaster.css';
 import { useAgentTheme } from '@/context/AgentThemeContext';
 import type { AgentTheme } from '@/lib/constants/agent-theme';
 
@@ -45,13 +47,26 @@ export function AgentToaster() {
     () => (sileoTheme === 'light' ? LIGHT_OPTIONS : DARK_OPTIONS),
     [sileoTheme]
   );
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <Toaster
-      position="top-right"
-      theme={sileoTheme}
-      offset={{ top: 16, right: 16 }}
-      options={options}
-    />
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="pointer-events-none fixed inset-0 isolate"
+      style={{ zIndex: 9999 }}
+    >
+      <Toaster
+        position="top-right"
+        theme={sileoTheme}
+        offset={{ top: 16, right: 16 }}
+        options={options}
+      />
+    </div>,
+    document.body
   );
 }

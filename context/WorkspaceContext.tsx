@@ -32,6 +32,7 @@ import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
 import type { ProjectStack } from '@/lib/types/stack';
 import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
+import { generateMemberId, pickAvatarColor } from '@/lib/types/execution';
 import { buildInitialExecutionState } from '@/lib/board/board-utils';
 import {
   buildAgent6InputFromAgent4,
@@ -184,6 +185,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const lastFetchedRouteKey = useRef<string | null>(null);
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
   const sprintFilterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintFilterRequestId = useRef(0);
   const lastSentSprintFilter = useRef<string | null>(null);
@@ -1201,16 +1204,84 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const upsertMember = useCallback(
     async (member: ProjectMemberInput) => {
-      const ws = await runActionWithWorkspace('upsertProjectMember', { member });
-      if (ws) setWorkspace(ws);
+      const previous = workspaceRef.current;
+      if (!previous?.execution) {
+        const ws = await runActionWithWorkspace('upsertProjectMember', { member });
+        if (ws) setWorkspace(ws);
+        return;
+      }
+      const execution = previous.execution;
+
+      const existingIndex = member.id
+        ? execution.members.findIndex((m) => m.id === member.id)
+        : -1;
+      const nextMember: ProjectMember =
+        existingIndex >= 0
+          ? {
+              ...execution.members[existingIndex],
+              displayName: member.displayName,
+              email: member.email,
+              role: member.role,
+            }
+          : {
+              id: member.id ?? generateMemberId(execution.members),
+              displayName: member.displayName,
+              email: member.email,
+              role: member.role,
+              avatarColor: pickAvatarColor(execution.members.length),
+              createdAt: Date.now(),
+            };
+      const members =
+        existingIndex >= 0
+          ? execution.members.map((m, i) => (i === existingIndex ? nextMember : m))
+          : [...execution.members, nextMember];
+
+      setWorkspace({
+        ...previous,
+        execution: { ...execution, members },
+      });
+
+      try {
+        await runActionWithWorkspace('upsertProjectMember', {
+          member: { ...member, id: nextMember.id },
+        });
+      } catch (error) {
+        setWorkspace(previous);
+        throw error;
+      }
     },
     [runActionWithWorkspace]
   );
 
   const deleteMember = useCallback(
     async (memberId: string) => {
-      const ws = await runActionWithWorkspace('deleteProjectMember', { memberId });
-      if (ws) setWorkspace(ws);
+      const previous = workspaceRef.current;
+      if (!previous?.execution) {
+        const ws = await runActionWithWorkspace('deleteProjectMember', { memberId });
+        if (ws) setWorkspace(ws);
+        return;
+      }
+      const execution = previous.execution;
+
+      const members = execution.members.filter((m) => m.id !== memberId);
+      const stories = { ...execution.stories };
+      for (const [storyId, storyExec] of Object.entries(stories)) {
+        if (storyExec.assigneeId === memberId) {
+          stories[storyId] = { ...storyExec, assigneeId: null, updatedAt: Date.now() };
+        }
+      }
+
+      setWorkspace({
+        ...previous,
+        execution: { ...execution, members, stories },
+      });
+
+      try {
+        await runActionWithWorkspace('deleteProjectMember', { memberId });
+      } catch (error) {
+        setWorkspace(previous);
+        throw error;
+      }
     },
     [runActionWithWorkspace]
   );
