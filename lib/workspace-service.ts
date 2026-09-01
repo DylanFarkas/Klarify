@@ -51,7 +51,6 @@ import { deleteProjectSlices } from '@/lib/project-store/cleanup';
 import type { ProjectDocument } from '@/lib/types/project';
 import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
 import type { PipelineMeta, WorkspaceScope } from '@/lib/types/project-schema';
-import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type {
   Agent2State,
@@ -75,6 +74,7 @@ import {
   removeStoryFromSprintPlan,
   buildAgent6InputFromAgent4,
   completeSprintInPlan,
+  createEmptySprintPlan,
   deleteEmptySprintFromPlan,
   isStoryInCompletedSprint,
   normalizeSprintPlan,
@@ -90,6 +90,7 @@ import {
   nextLiveEpicId,
   nextLiveWorkItemId,
 } from '@/lib/utils/live-backlog';
+import { DASHBOARD_PROGRESS, isProjectDashboardReady } from '@/lib/utils/pipeline-ready';
 import { generateSubtaskId, nextEpicIdFromIds, nextWorkItemIdFromIds } from '@/lib/utils/agent-2-ids';
 import { MAX_SUBTASKS_PER_STORY } from '@/lib/constants/agent-2';
 import {
@@ -130,14 +131,15 @@ import type {
 import { generateMemberId, pickAvatarColor } from '@/lib/types/execution';
 import type { ProjectStack } from '@/lib/types/stack';
 import { mergeStackUpdate, prepareStackForFirestore } from '@/lib/stack/normalize';
-import type {
-  UserWorkspace,
-  WorkspacePreferences,
-  WorkspaceResponse,
-  Agent3Input,
-  Agent4Input,
-  Agent5Input,
-  Agent6Input,
+import {
+  createEmptyWorkspace,
+  type UserWorkspace,
+  type WorkspacePreferences,
+  type WorkspaceResponse,
+  type Agent3Input,
+  type Agent4Input,
+  type Agent5Input,
+  type Agent6Input,
 } from '@/lib/types/workspace';
 
 const EMPTY_AGENT1: Agent1State = {
@@ -359,7 +361,7 @@ async function resolveCanonicalBacklogContext(
   const doc = assertProjectDocAccessible(snap);
   if (!meta) return null;
   if ((doc.schemaVersion ?? 1) < SCHEMA_VERSION_CURRENT || doc.workspace) return null;
-  if ((doc.pipelineStep ?? 0) < 6) return null;
+  if (!isProjectDashboardReady(doc)) return null;
 
   return {
     meta,
@@ -527,9 +529,14 @@ export function buildExecutionFromEpics(epics: Epic[]): ExecutionState {
 }
 
 /** Asegura que execution exista (migración lazy para proyectos legacy). */
-export async function ensureExecutionInitialized(uid: string): Promise<UserWorkspace> {
-  await assertExecutionBoardAllowed(uid);
-  const { projectId, workspace } = await loadProjectWorkspace(uid);
+export async function ensureExecutionInitialized(
+  uid: string,
+  clientProjectId?: string
+): Promise<UserWorkspace> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  await assertExecutionBoardAllowed(uid, target.userSnapshot ?? undefined);
+  const projectId = target.projectId;
+  const workspace = await getProjectWorkspace(uid, projectId);
   const agent6 = workspace.pipeline.agent6Input;
   if (!agent6) {
     throw new Error('PIPELINE_INCOMPLETE');
@@ -1129,9 +1136,13 @@ async function updateUserStoryAcrossWorkspaceLegacy(
 
 async function loadLiveStoryForSubtask(
   uid: string,
-  storyId: string
+  storyId: string,
+  clientProjectId?: string
 ): Promise<UserStory> {
-  const { workspace } = await getWorkspaceData(uid);
+  const { workspace } = await getWorkspaceData(uid, {
+    scope: 'shell',
+    projectId: clientProjectId,
+  });
   const story = getLiveBacklog(workspace).epics
     .flatMap((epic) => epic.userStories)
     .find((item) => item.id === storyId);
@@ -1145,9 +1156,10 @@ async function loadLiveStoryForSubtask(
 export async function createSubtaskAcrossWorkspace(
   uid: string,
   storyId: string,
-  title: string
+  title: string,
+  clientProjectId?: string
 ): Promise<{ workspace: UserWorkspace; subtask: StorySubtask }> {
-  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const story = await loadLiveStoryForSubtask(uid, storyId, clientProjectId);
   const current = normalizeSubtasks(story.subtasks);
   if (current.length >= MAX_SUBTASKS_PER_STORY) {
     throw new Error(`Máximo ${MAX_SUBTASKS_PER_STORY} subtareas por historia.`);
@@ -1161,9 +1173,17 @@ export async function createSubtaskAcrossWorkspace(
     title: trimmed,
     done: false,
   };
-  const workspace = await updateUserStoryAcrossWorkspace(uid, storyId, {
-    subtasks: [...current, subtask],
-  });
+  const workspace = await updateUserStoryAcrossWorkspace(
+    uid,
+    storyId,
+    {
+      subtasks: [...current, subtask],
+    },
+    undefined,
+    undefined,
+    undefined,
+    clientProjectId
+  );
   return { workspace, subtask };
 }
 
@@ -1171,9 +1191,10 @@ export async function updateSubtaskAcrossWorkspace(
   uid: string,
   storyId: string,
   subtaskId: string,
-  updates: { title?: string; done?: boolean }
+  updates: { title?: string; done?: boolean },
+  clientProjectId?: string
 ): Promise<{ workspace: UserWorkspace; subtask: StorySubtask }> {
-  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const story = await loadLiveStoryForSubtask(uid, storyId, clientProjectId);
   const current = normalizeSubtasks(story.subtasks);
   const index = current.findIndex((item) => item.id === subtaskId);
   if (index === -1) {
@@ -1191,25 +1212,42 @@ export async function updateSubtaskAcrossWorkspace(
   };
   const next = [...current];
   next[index] = subtask;
-  const workspace = await updateUserStoryAcrossWorkspace(uid, storyId, {
-    subtasks: next,
-  });
+  const workspace = await updateUserStoryAcrossWorkspace(
+    uid,
+    storyId,
+    {
+      subtasks: next,
+    },
+    undefined,
+    undefined,
+    undefined,
+    clientProjectId
+  );
   return { workspace, subtask };
 }
 
 export async function deleteSubtaskAcrossWorkspace(
   uid: string,
   storyId: string,
-  subtaskId: string
+  subtaskId: string,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const story = await loadLiveStoryForSubtask(uid, storyId, clientProjectId);
   const current = normalizeSubtasks(story.subtasks);
   if (!current.some((item) => item.id === subtaskId)) {
     throw new Error(`Subtarea no encontrada: ${subtaskId}`);
   }
-  return updateUserStoryAcrossWorkspace(uid, storyId, {
-    subtasks: current.filter((item) => item.id !== subtaskId),
-  });
+  return updateUserStoryAcrossWorkspace(
+    uid,
+    storyId,
+    {
+      subtasks: current.filter((item) => item.id !== subtaskId),
+    },
+    undefined,
+    undefined,
+    undefined,
+    clientProjectId
+  );
 }
 
 function resolveSprintPlan(workspace: UserWorkspace): SprintPlan | null {
@@ -1258,10 +1296,51 @@ async function resolveSprintPlanContext(
 }
 
 function requireSprintPlan(ctx: SprintPlanContext): SprintPlan {
-  if (!ctx.plan) {
-    throw new Error('No hay plan de sprints en el workspace.');
+  if (ctx.plan) return ctx.plan;
+  if (ctx.meta) return createEmptySprintPlan([]);
+  throw new Error('No hay plan de sprints en el workspace.');
+}
+
+/**
+ * Materializa el backlog canónico (agent6Input) sin pasar por Klark ni por el HITL.
+ * Un proyecto vacío o a medias queda visible igual en la web y en el CLI.
+ */
+export async function ensurePlatformLiveBacklog(
+  uid: string,
+  clientProjectId?: string
+): Promise<UserWorkspace> {
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const workspace = await getProjectWorkspace(uid, projectId);
+  if (isDashboardPhase(workspace)) {
+    return workspace;
   }
-  return ctx.plan;
+
+  const live = getLiveBacklog(workspace);
+  const agent6Input: Agent6Input = {
+    epics: live.epics,
+    estimations: live.estimations,
+    estimationMode: live.estimationMode,
+    priorities: live.priorities,
+    framework: live.framework ?? 'moscow',
+    plan: live.plan ?? createEmptySprintPlan(live.epics),
+    sourceWishIds: live.sourceWishIds,
+    approvedAt: Date.now(),
+  };
+
+  await saveProjectWorkspace(
+    uid,
+    projectId,
+    {
+      pipeline: {
+        ...workspace.pipeline,
+        agent6Input: sanitize(agent6Input),
+      },
+    },
+    workspace
+  );
+  await projectRef(uid, projectId).set({ ...DASHBOARD_PROGRESS }, { merge: true });
+  return getProjectWorkspace(uid, projectId);
 }
 
 /** Persiste el plan: una escritura en el modelo canónico, rematerialización en legacy. */
@@ -1300,9 +1379,10 @@ export async function updateSprintPlanAcrossWorkspace(
 
 export async function createSprintAcrossWorkspace(
   uid: string,
-  input?: { goal?: string }
+  input?: { goal?: string },
+  clientProjectId?: string
 ): Promise<{ workspace: UserWorkspace; sprintId: string; sprintGoal: string }> {
-  const ctx = await resolveSprintPlanContext(uid);
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
   const updatedPlan = addSprintToPlan(requireSprintPlan(ctx), input?.goal);
   const created = updatedPlan.sprints.at(-1);
   if (!created) {
@@ -1318,9 +1398,10 @@ export async function createSprintAcrossWorkspace(
 
 export async function deleteSprintAcrossWorkspace(
   uid: string,
-  sprintId: string
+  sprintId: string,
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const ctx = await resolveSprintPlanContext(uid);
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
   const plan = requireSprintPlan(ctx);
   const sprint = plan.sprints.find((item) => item.id === sprintId);
   if (!sprint) {
@@ -1342,9 +1423,10 @@ export async function deleteSprintAcrossWorkspace(
 export async function updateSprintAcrossWorkspace(
   uid: string,
   sprintId: string,
-  updates: { goal?: string; dates?: SprintDatePatch }
+  updates: { goal?: string; dates?: SprintDatePatch },
+  clientProjectId?: string
 ): Promise<UserWorkspace> {
-  const ctx = await resolveSprintPlanContext(uid);
+  const ctx = await resolveSprintPlanContext(uid, clientProjectId);
   let nextPlan = requireSprintPlan(ctx);
   const sprint = nextPlan.sprints.find((item) => item.id === sprintId);
   if (!sprint) {
@@ -1678,6 +1760,219 @@ export async function createEpicAcrossWorkspace(
   const updatedWorkspace = withCreatedEpic(workspace, epic);
   await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return { workspace: updatedWorkspace, epicId: epic.id };
+}
+
+export interface ImportBacklogStoryInput {
+  type?: WorkItemType;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  subtasks?: StorySubtask[] | string[];
+  severity?: BugSeverity;
+  stepsToReproduce?: string[];
+  technicalNotes?: string;
+  points?: number;
+  durationLabel?: string;
+  category?: FrameworkCategory;
+}
+
+export interface ImportBacklogEpicInput {
+  title: string;
+  description: string;
+  stories: ImportBacklogStoryInput[];
+}
+
+export interface ImportBacklogResult {
+  epics: Array<{ epicId: string; title: string; storyIds: string[] }>;
+  storyCount: number;
+}
+
+function defaultStoryPoints(type: WorkItemType): number {
+  return type === 'bug' ? 1 : 3;
+}
+
+/**
+ * Crea épicas + historias (+ subtareas, prioridad y estimación) en una sola persistencia.
+ * Pensado para agentes: un payload, un round-trip.
+ */
+export async function importBacklogAcrossWorkspace(
+  uid: string,
+  input: { epics: ImportBacklogEpicInput[] },
+  clientProjectId?: string
+): Promise<ImportBacklogResult> {
+  if (!input.epics.length) {
+    throw new Error('El import necesita al menos una épica.');
+  }
+
+  await ensurePlatformLiveBacklog(uid, clientProjectId);
+  const target = await resolveTargetProject(uid, clientProjectId);
+  const projectId = target.projectId;
+  const [ctx, ids, userPlan] = await Promise.all([
+    resolveCanonicalBacklogContext(uid, projectId, target.snapshot ?? undefined),
+    readBacklogIds(uid, projectId),
+    resolveUserPlan(uid, target.userSnapshot ?? undefined),
+  ]);
+
+  const incomingStories = input.epics.reduce((n, epic) => n + epic.stories.length, 0);
+  if (incomingStories === 0) {
+    throw new Error('Cada épica del import necesita al menos una historia.');
+  }
+  for (const epic of input.epics) {
+    if (epic.stories.length > userPlan.limits.maxStoriesPerEpic) {
+      throw new PlanLimitError(
+        `Tu plan ${userPlan.id} permite hasta ${userPlan.limits.maxStoriesPerEpic} historia(s) por épica.`,
+        'PLAN_STORY_LIMIT',
+        { upgradeTo: userPlan.id === 'free' ? 'starter' : userPlan.id === 'starter' ? 'pro' : undefined }
+      );
+    }
+  }
+  if (ids.epicIds.length + input.epics.length > userPlan.limits.maxEpics) {
+    throw new PlanLimitError(
+      `Tu plan ${userPlan.id} permite hasta ${userPlan.limits.maxEpics} épica(s).`,
+      'PLAN_EPIC_LIMIT',
+      { upgradeTo: userPlan.id === 'free' ? 'starter' : userPlan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+  if (ids.storyIds.length + incomingStories > userPlan.limits.maxStories) {
+    throw new PlanLimitError(
+      `Tu plan ${userPlan.id} permite hasta ${userPlan.limits.maxStories} historia(s).`,
+      'PLAN_STORY_LIMIT',
+      { upgradeTo: userPlan.id === 'free' ? 'starter' : userPlan.id === 'starter' ? 'pro' : undefined }
+    );
+  }
+
+  const epicIds = [...ids.epicIds];
+  const storyIds = [...ids.storyIds];
+  const created: ImportBacklogResult['epics'] = [];
+  const now = Date.now();
+
+  if (ctx) {
+    const storedEpics: Array<{
+      id: string;
+      title: string;
+      description: string;
+      source: 'manual';
+      isEdited: boolean;
+      createdAt: number;
+      storyIds: string[];
+    }> = [];
+    const storedStories: Array<UserStory & { epicId: string }> = [];
+    const estimations: Record<string, StoryEstimation> = {};
+    const prioritizations: Record<string, StoryPrioritization> = {};
+    const executions: Record<string, ReturnType<typeof createDefaultStoryExecution>> = {};
+
+    for (const epicInput of input.epics) {
+      const epicId = nextEpicIdFromIds(epicIds);
+      epicIds.push(epicId);
+      const epicStoryIds: string[] = [];
+
+      for (const storyInput of epicInput.stories) {
+        const storyCreate: CreateUserStoryInput = {
+          epicId,
+          type: storyInput.type,
+          title: storyInput.title,
+          description: storyInput.description,
+          acceptanceCriteria: storyInput.acceptanceCriteria,
+          subtasks: storyInput.subtasks,
+          severity: storyInput.severity,
+          stepsToReproduce: storyInput.stepsToReproduce,
+          technicalNotes: storyInput.technicalNotes,
+          points:
+            ctx.estimationMode === 'story_points'
+              ? storyInput.points ?? defaultStoryPoints(isWorkItemType(storyInput.type) ? storyInput.type : 'story')
+              : undefined,
+          durationLabel: ctx.estimationMode === 'time' ? storyInput.durationLabel ?? '1h' : undefined,
+          category: storyInput.category,
+        };
+        const draft = buildStoryDraft(storyCreate);
+        const storyId = nextWorkItemIdFromIds(draft.type, storyIds);
+        storyIds.push(storyId);
+        epicStoryIds.push(storyId);
+        const story = buildStoryFromDraft(storyCreate, storyId, draft);
+        storedStories.push({ ...story, epicId });
+        estimations[storyId] = buildStoryEstimation(storyCreate, draft.type, ctx.estimationMode);
+        const prioritization = buildStoryPrioritization(storyCreate);
+        if (prioritization) prioritizations[storyId] = prioritization;
+        if (ctx.executionInitialized) {
+          executions[storyId] = createDefaultStoryExecution(storyIds.length);
+        }
+      }
+
+      storedEpics.push({
+        id: epicId,
+        title: epicInput.title.trim(),
+        description: epicInput.description.trim(),
+        source: 'manual',
+        isEdited: false,
+        createdAt: now,
+        storyIds: epicStoryIds,
+      });
+      created.push({ epicId, title: epicInput.title.trim(), storyIds: epicStoryIds });
+    }
+
+    await persistCanonicalBacklogWrite(uid, projectId, {
+      epics: storedEpics,
+      stories: storedStories,
+      estimations,
+      ...(Object.keys(prioritizations).length > 0 ? { prioritizations } : {}),
+      ...(Object.keys(executions).length > 0 ? { executions } : {}),
+    });
+
+    return { epics: created, storyCount: incomingStories };
+  }
+
+  let workspace = await getProjectWorkspace(uid, projectId);
+  const previous = workspace;
+  const mode = getLiveBacklog(workspace).estimationMode;
+
+  for (const epicInput of input.epics) {
+    const epic: Epic = {
+      id: nextLiveEpicId(workspace),
+      title: epicInput.title.trim(),
+      description: epicInput.description.trim(),
+      userStories: [],
+      source: 'manual',
+      isEdited: false,
+      createdAt: now,
+    };
+    workspace = withCreatedEpic(workspace, epic);
+    const storyIdsCreated: string[] = [];
+
+    for (const storyInput of epicInput.stories) {
+      const storyCreate: CreateUserStoryInput = {
+        epicId: epic.id,
+        type: storyInput.type,
+        title: storyInput.title,
+        description: storyInput.description,
+        acceptanceCriteria: storyInput.acceptanceCriteria,
+        subtasks: storyInput.subtasks,
+        severity: storyInput.severity,
+        stepsToReproduce: storyInput.stepsToReproduce,
+        technicalNotes: storyInput.technicalNotes,
+        points:
+          mode === 'story_points'
+            ? storyInput.points ?? defaultStoryPoints(isWorkItemType(storyInput.type) ? storyInput.type : 'story')
+            : undefined,
+        durationLabel: mode === 'time' ? storyInput.durationLabel ?? '1h' : undefined,
+        category: storyInput.category,
+      };
+      const draft = buildStoryDraft(storyCreate);
+      const storyId = nextLiveWorkItemId(workspace, draft.type);
+      const story = buildStoryFromDraft(storyCreate, storyId, draft);
+      workspace = withCreatedUserStory(workspace, {
+        story,
+        epicId: epic.id,
+        estimation: buildStoryEstimation(storyCreate, draft.type, mode),
+        prioritization: buildStoryPrioritization(storyCreate),
+      });
+      storyIdsCreated.push(storyId);
+    }
+
+    created.push({ epicId: epic.id, title: epic.title, storyIds: storyIdsCreated });
+  }
+
+  await persistBacklogMutation(uid, projectId, previous, workspace);
+  return { epics: created, storyCount: incomingStories };
 }
 
 export async function updateEpicAcrossWorkspace(
@@ -2065,8 +2360,14 @@ export async function clearStackAcrossWorkspace(
   await persistStackOnly(uid, target.projectId, null);
 }
 
-/** Lee el stack del workspace activo. */
-export async function getStackFromWorkspace(uid: string): Promise<ProjectStack | null> {
-  const { workspace } = await getWorkspaceData(uid);
+/** Lee el stack del workspace (proyecto activo o `projectId`). */
+export async function getStackFromWorkspace(
+  uid: string,
+  clientProjectId?: string
+): Promise<ProjectStack | null> {
+  const { workspace } = await getWorkspaceData(uid, {
+    scope: 'shell',
+    projectId: clientProjectId,
+  });
   return workspace.stack ?? null;
 }

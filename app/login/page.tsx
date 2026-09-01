@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/landing/Navbar/Navbar";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -83,17 +83,26 @@ function DarkAtmosphere() {
   );
 }
 
-export default function LoginPage() {
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+    return "/agentes/proyectos";
+  }
+  return raw;
+}
+
+function LoginPageInner() {
   const { user, loading, signInWithGoogle, signInWithGithub, authError, clearAuthError } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const nextPath = safeNextPath(searchParams.get("next"));
 
   useEffect(() => {
     if (!loading && user) {
-      router.push("/agentes/proyectos");
+      router.push(nextPath);
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, nextPath]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -263,3 +272,18 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-screen items-center justify-center bg-[#000000] text-white">
+          <p className="text-sm text-white/50">Cargando…</p>
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+

@@ -16,6 +16,7 @@ import { applyWorkspaceScope } from '@/lib/project-store/scope';
 import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
 import { resolveSchemaVersion } from '@/lib/project-schema';
 import { assertProjectSlotAccessible } from '@/lib/plans/plan-service';
+import { DASHBOARD_PROGRESS, isProjectDashboardReady } from '@/lib/utils/pipeline-ready';
 
 export async function loadWorkspace(
   uid: string,
@@ -42,6 +43,10 @@ export async function loadWorkspace(
     }
   } else {
     workspace = await composeWorkspaceFromPhysical(uid, projectId, data, scope, pipelineAgent);
+  }
+
+  if (isProjectDashboardReady(data) && (data.pipelineStep ?? 0) < 6) {
+    await projectRef(uid, projectId).set({ ...DASHBOARD_PROGRESS }, { merge: true });
   }
 
   return applyWorkspaceScope(workspace, scope, pipelineAgent);

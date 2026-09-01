@@ -183,8 +183,11 @@ export function isStackEmpty(stack: ProjectStack | undefined | null): boolean {
   return countStackItems(stack) === 0 && !stack.productKind && !stack.architecturePattern;
 }
 
-export function normalizeStackFromToolArgs(raw: StackRecommendRaw): ProjectStack {
-  return prepareStackForFirestore(buildStackFromRecommendRaw(raw, 'ai'));
+export function normalizeStackFromToolArgs(
+  raw: StackRecommendRaw,
+  source: StackSource = 'ai'
+): ProjectStack {
+  return prepareStackForFirestore(buildStackFromRecommendRaw(raw, source));
 }
 
 function expandLayerItems(items: StackItem[], layer: StackLayerId): StackItem[] {

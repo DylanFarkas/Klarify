@@ -131,6 +131,10 @@ export function isHydratedAgent5(agent: Agent5State | undefined): boolean {
   return Boolean(agent && (agent.input != null || agent.plan != null));
 }
 
+function approvedIfIdle<T extends string>(status: T): T {
+  return status === 'idle' ? ('approved' as T) : status;
+}
+
 export function workspaceMetaFromWorkspace(workspace: UserWorkspace): WorkspaceMeta {
   const liveEpics =
     workspace.pipeline.agent6Input?.epics ??
@@ -138,6 +142,7 @@ export function workspaceMetaFromWorkspace(workspace: UserWorkspace): WorkspaceM
     workspace.agent4.input?.epics ??
     workspace.agent3.input?.epics ??
     workspace.agent2.epics;
+  const dashboard = Boolean(workspace.pipeline.agent6Input);
 
   return {
     agent1: {
@@ -150,27 +155,27 @@ export function workspaceMetaFromWorkspace(workspace: UserWorkspace): WorkspaceM
       transcription: null,
     },
     agent2: {
-      status: workspace.agent2.status,
+      status: dashboard ? approvedIfIdle(workspace.agent2.status) : workspace.agent2.status,
       error: workspace.agent2.error,
       epicCount: workspace.agent2.epics.length || liveEpics.length,
       storyCount: countStories(workspace.agent2.epics.length ? workspace.agent2.epics : liveEpics),
     },
     agent3: {
-      status: workspace.agent3.status,
+      status: dashboard ? approvedIfIdle(workspace.agent3.status) : workspace.agent3.status,
       error: workspace.agent3.error,
       estimationMode: workspace.agent3.estimationMode ?? null,
       epicCount: workspace.agent3.input?.epics.length ?? liveEpics.length,
       storyCount: countStories(workspace.agent3.input?.epics ?? liveEpics),
     },
     agent4: {
-      status: workspace.agent4.status,
+      status: dashboard ? approvedIfIdle(workspace.agent4.status) : workspace.agent4.status,
       error: workspace.agent4.error,
       framework: workspace.agent4.framework,
       epicCount: workspace.agent4.input?.epics.length ?? liveEpics.length,
       storyCount: countStories(workspace.agent4.input?.epics ?? liveEpics),
     },
     agent5: {
-      status: workspace.agent5.status,
+      status: dashboard ? approvedIfIdle(workspace.agent5.status) : workspace.agent5.status,
       error: workspace.agent5.error,
     },
     executionInitializedAt: workspace.execution?.initializedAt ?? null,

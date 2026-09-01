@@ -31,6 +31,7 @@ import {
   pipelineHistoryDoc,
   pipelineMetaDoc,
 } from '@/lib/project-store/paths';
+import { isProjectDashboardReady } from '@/lib/utils/pipeline-ready';
 import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
 import { normalizeEpics } from '@/lib/utils/work-item-validation';
 
@@ -172,7 +173,7 @@ function applyLiveBacklog(
   pipelineMeta: PipelineMeta | null,
   isDashboard: boolean
 ): UserWorkspace {
-  if (epics.length === 0 && !pipelineMeta) return workspace;
+  if (epics.length === 0 && !pipelineMeta && !isDashboard) return workspace;
 
   const estimations = pipelineMeta?.estimations ?? {};
   const priorities = pipelineMeta?.priorities ?? {};
@@ -281,9 +282,12 @@ export async function composeWorkspaceFromPhysical(
   const meta = data.workspaceMeta;
   let workspace = applyMetaToWorkspace(base, meta);
 
-  const isDashboard =
-    Boolean(workspace.pipeline.agent6Input) ||
-    (meta?.agent4.status === 'approved' && (data.pipelineStep ?? 0) >= 6);
+  const isDashboard = isProjectDashboardReady({
+    lastAgent: data.lastAgent,
+    pipelineStep: data.pipelineStep,
+    workspace: data.workspace,
+    workspaceMeta: meta,
+  });
 
   const pointer = meta?.agent1.transcription ?? null;
   const needsFullTranscription = scope === 'full' || scope === 'agent1' || pipelineAgent === '2';

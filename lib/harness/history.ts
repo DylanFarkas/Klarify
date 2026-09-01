@@ -8,6 +8,7 @@ import {
   HARNESS_HISTORY_LIMIT,
   type HarnessChatMessage,
 } from '@/lib/harness/types';
+import { isProjectDashboardReady } from '@/lib/utils/pipeline-ready';
 
 interface HarnessChatDoc {
   messages?: HarnessChatMessage[];
@@ -28,17 +29,17 @@ interface ProjectHarnessSnapshot {
     agent4?: { status?: string };
   };
   pipelineStep?: number;
+  lastAgent?: string;
 }
 
 /**
- * Klark se habilita al aprobar el Agente 4 (el 5 es opcional y hoy no se usa).
+ * Klark se habilita al llegar al dashboard: HITL web o backlog creado por CLI.
  *
  * Misma regla que `composeWorkspaceFromPhysical`: en schema v4 el campo legacy
  * `workspace.pipeline.agent6Input` ya no existe, así que se deriva del doc raíz.
  */
 export function resolvePipelineReady(data: ProjectHarnessSnapshot | undefined): boolean {
-  if (data?.workspace?.pipeline?.agent6Input) return true;
-  return data?.workspaceMeta?.agent4?.status === 'approved' && (data?.pipelineStep ?? 0) >= 6;
+  return isProjectDashboardReady(data);
 }
 
 export async function getHarnessHistory(

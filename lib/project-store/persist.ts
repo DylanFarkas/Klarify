@@ -39,6 +39,7 @@ import {
   projectRef,
 } from '@/lib/project-store/paths';
 import { getLiveBacklog, isDashboardPhase } from '@/lib/utils/live-backlog';
+import { DASHBOARD_PROGRESS } from '@/lib/utils/pipeline-ready';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import {
   getCachedPipelinePlan,
@@ -259,6 +260,9 @@ export async function persistWorkspace(
     completionPercentage: progress.completionPercentage,
     updatedAt: FieldValue.serverTimestamp(),
   };
+  if (dashboard) {
+    rootUpdate.lastAgent = DASHBOARD_PROGRESS.lastAgent;
+  }
   if (writeAll) {
     rootUpdate.workspace = FieldValue.delete();
     rootUpdate.stack = FieldValue.delete();
@@ -741,7 +745,10 @@ export async function persistCanonicalBacklogWrite(
 
   ops.push({
     ref: projectRef(uid, projectId),
-    data: { updatedAt: FieldValue.serverTimestamp() },
+    data: {
+      ...DASHBOARD_PROGRESS,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
   });
 
   await commitOps(ops);

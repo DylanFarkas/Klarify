@@ -18,6 +18,14 @@ export function computePipelineProgress(workspace: UserWorkspace): {
   pipelineLabel: string;
   completionPercentage: number;
 } {
+  if (workspace.pipeline.agent6Input) {
+    return {
+      pipelineStep: 6,
+      pipelineLabel: 'Dashboard',
+      completionPercentage: 100,
+    };
+  }
+
   let lastActive = 1;
   let completed = 0;
 

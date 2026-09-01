@@ -1,0 +1,55 @@
+{
+  "name": "@klarify/cli",
+  "version": "0.1.1",
+  "description": "CLI y TUI de Klarify para agentes de código y terminal. No envuelve a Klark.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "klarify": "bin/klarify.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanFarkas/Klarify.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://klarify.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/DylanFarkas/Klarify/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "tsx src/bin.ts",
+    "klarify": "tsx src/bin.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "klarify",
+    "cli",
+    "tui",
+    "backlog",
+    "agents"
+  ],
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "citty": "^0.2.2",
+    "ink": "^7.1.1",
+    "react": "^19.2.4",
+    "tsx": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19.2.18",
+    "typescript": "^5"
+  }
+}

@@ -15,12 +15,13 @@ Klarify ayuda a Product Owners, equipos de producto y startups a pasar de reuni�
 | ASR | OpenAI (`gpt-4o-mini-transcribe`) |
 | Integraciones | GitHub (Issues / Projects), proveedor de IA (BYOK) |
 | Export | JSON, Markdown, XLSX |
+| CLI / TUI | `packages/cli` (`citty` + Ink 7; `fetch` sobre `/api/v1`) |
 
 Sin `DEEPSEEK_API_KEY` ni BYOK del usuario, los agentes usan adapters mock. La transcripción de audio sigue necesitando `OPENAI_API_KEY`.
 
 ## Requisitos
 
-- Node.js 20+
+- Node.js 20+ (app web). El CLI/TUI (`@klarify/cli`) requiere Node.js 22+.
 - Cuenta Firebase (Auth + Firestore)
 - `DEEPSEEK_API_KEY` (default de Klarify) y `AI_PROVIDER_ENCRYPTION_KEY` (para guardar BYOK)
 - OpenAI opcional (ASR); Gemini/OpenAI/DeepSeek opcionales como BYOK del usuario
@@ -75,6 +76,7 @@ Abre [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Build de producción |
 | `npm start` | Sirve el build |
 | `npm run lint` | ESLint |
+| `npm run klarify -- <cmd>` | CLI de plataforma (backlog, no Klark) |
 
 ## Pipeline de agentes
 
@@ -127,10 +129,12 @@ lib/
   adapters/          # Adaptadores por agente (LLM unificado + mocks + ASR)
   services/          # Lógica de negocio
   harness/           # Klark (chat de edición de backlog)
+  platform/          # API v1 para CLI / agentes de código
   github/            # Export a GitHub
   export/            # JSON / Markdown / XLSX
   plans/             # Límites y guards por plan
   board/             # Utilidades Kanban
+packages/cli/        # Binario `klarify` (cliente HTTP; no importa server-only)
 context/             # Auth, workspace, tema
 hooks/
 firestore.rules
@@ -146,9 +150,37 @@ firestore.rules
 | `/api/agentes/4/prioritize` | Priorización |
 | `/api/agentes/5/plan` | Sprints |
 | `/api/harness/chat` | Klark |
+| `/api/v1/*` | API de plataforma (CLI, PAT `klf_…`, device login) |
 | `/api/ai-provider` | BYOK + modelo activo |
 | `/api/workspace` · `/api/projects` | Workspace y proyectos |
 | `/api/github/connect` · `/repos` · `/projects` · `/export` | GitHub |
+
+## CLI (agentes de código)
+
+El CLI **no es Klark**. No llama al chat ni al pipeline HITL. Lee y escribe el mismo backlog que la web (`/api/v1`).
+
+**Instalación global** (comando `klarify` en el PATH):
+
+```bash
+npm install -g ./packages/cli
+# o desde la raíz: npm run klarify:link
+```
+
+```bash
+klarify          # TUI (humanos, terminal interactiva)
+klarify login
+klarify projects create "Mi app"
+klarify backlog import --file backlog.json --rm
+klarify context --format md
+```
+
+`--rm` borra el JSON temporal. No lo dejes en el repo.
+
+- Tokens: Configuración → Integraciones, o `klarify login` (device flow en `/cli/device`).
+- TUI: `klarify` o `klarify tui` (Windows Terminal). Los agentes no la usan.
+- Skill para Cursor/Codex: `.agents/skills/klarify-cli/`.
+- MCP opcional: `klarify mcp` (ver `packages/cli/mcp.example.json`).
+- `klarify status` usa el tablero Kanban (planes Starter / Pro).
 
 ## Notas para desarrollo
 

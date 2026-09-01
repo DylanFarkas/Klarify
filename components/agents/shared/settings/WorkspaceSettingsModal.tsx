@@ -9,6 +9,7 @@ import { GitHubConnectionPanel } from '@/components/agents/shared/settings/GitHu
 import { AiProviderConnectionPanel } from '@/components/agents/shared/settings/AiProviderConnectionPanel';
 import { GeneralSettingsPanel } from '@/components/agents/shared/settings/GeneralSettingsPanel';
 import { TeamSettingsPanel } from '@/components/agents/shared/settings/TeamSettingsPanel';
+import { CliTokensPanel } from '@/components/agents/shared/settings/CliTokensPanel';
 import { GitHubExportUpgradeGate } from '@/components/agents/github/GitHubExportUpgradeGate';
 import { useWorkspace } from '@/hooks/useWorkspace';
 
@@ -210,6 +211,7 @@ export function WorkspaceSettingsModal({
                       <GitHubExportUpgradeGate compact />
                     )}
                   </div>
+                  <CliTokensPanel />
                 </div>
               )}
 
