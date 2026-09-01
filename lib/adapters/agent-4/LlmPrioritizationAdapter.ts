@@ -20,14 +20,11 @@ import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
 import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
-
-interface RawPrioritizationResponse {
-  suggestions: Array<{
-    storyId: string;
-    suggestedCategory: string;
-    justification: string;
-  }>;
-}
+import { parseLlmJson } from '@/lib/schemas/llm/parse';
+import {
+  llmPrioritizationResponseSchema,
+  llmPrioritySuggestionSchema,
+} from '@/lib/schemas/llm/agent-4';
 
 export class LlmPrioritizationAdapter implements IPrioritizationAdapter {
   constructor(private credentials: LlmCredentials) {}
@@ -111,25 +108,19 @@ ${JSON.stringify(epics, null, 2)}`;
     responseText: string,
     framework: PrioritizationFramework
   ): Agent4SuggestionItem[] {
-    const raw = JSON.parse(responseText) as RawPrioritizationResponse;
-
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.suggestions)) {
-      throw new Error(
-        'Gemini no devolvió un objeto con la forma { suggestions: SuggestionItem[] }'
-      );
-    }
+    const raw = parseLlmJson(
+      responseText,
+      llmPrioritizationResponseSchema,
+      'Gemini no devolvió un objeto con la forma { suggestions: SuggestionItem[] }'
+    );
 
     const validCategories = getFrameworkCategories(framework);
 
     return raw.suggestions
-      .filter(
-        (sug) =>
-          sug &&
-          typeof sug.storyId === 'string' &&
-          typeof sug.suggestedCategory === 'string' &&
-          typeof sug.justification === 'string' &&
-          validCategories.includes(sug.suggestedCategory)
-      )
+      .map((sug) => llmPrioritySuggestionSchema.safeParse(sug))
+      .filter((result) => result.success)
+      .map((result) => result.data)
+      .filter((sug) => validCategories.includes(sug.suggestedCategory))
       .map((sug) => ({
         storyId: sug.storyId.trim(),
         suggestedCategory: sug.suggestedCategory as FrameworkCategory,

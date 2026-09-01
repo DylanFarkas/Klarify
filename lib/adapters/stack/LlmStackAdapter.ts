@@ -7,6 +7,8 @@ import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
 import type { StackRecommendRaw } from '@/lib/types/stack';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { parseLlmJson, tryParseLlmJson } from '@/lib/schemas/llm/parse';
+import { llmStackRecommendSchema } from '@/lib/schemas/llm/stack';
 
 export interface StackRecommendContext {
   projectSummary: string;
@@ -97,21 +99,18 @@ Recomienda el stack tecnológico más adecuado para implementar este proyecto. S
   }
 
   private parseResponse(text: string): StackRecommendRaw {
-    let parsed: StackRecommendRaw;
-    try {
-      parsed = JSON.parse(text) as StackRecommendRaw;
-    } catch {
+    let parsed = tryParseLlmJson(text, llmStackRecommendSchema);
+    if (!parsed) {
       const match = text.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('Respuesta del LLM no es JSON válido');
-      parsed = JSON.parse(match[0]) as StackRecommendRaw;
+      parsed = parseLlmJson(match[0], llmStackRecommendSchema, 'JSON de stack incompleto');
     }
 
-    if (!parsed.productKind || !parsed.architecturePattern || !parsed.layers) {
-      throw new Error('JSON de stack incompleto');
-    }
-    if (!parsed.rationale) parsed.rationale = '';
-
-    return parsed;
+    return {
+      ...parsed,
+      layers: parsed.layers as StackRecommendRaw['layers'],
+      rationale: parsed.rationale ?? '',
+    };
   }
 }
 

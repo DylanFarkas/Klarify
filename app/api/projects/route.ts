@@ -18,8 +18,20 @@ import {
   listProjects,
   switchProject,
 } from '@/lib/project-service';
+import { parseApiBody, isApiBodyError, isZodError, firstZodErrorMessage } from '@/lib/schemas/parse';
+import {
+  projectsCreateBodySchema,
+  projectsPatchBodySchema,
+} from '@/lib/schemas/misc-api';
 
 function handleError(error: unknown, fallback: string): NextResponse {
+  if (isZodError(error)) {
+    return NextResponse.json({ error: firstZodErrorMessage(error) }, { status: 400 });
+  }
+  if (isApiBodyError(error)) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
 
   if (message === 'UNAUTHORIZED') {
@@ -74,12 +86,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json().catch(() => ({}))) as { name?: string };
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) {
-      return NextResponse.json({ error: 'El nombre del proyecto es obligatorio' }, { status: 400 });
-    }
-    const project = await createProject(uid, name);
+    const body = parseApiBody(
+      projectsCreateBodySchema,
+      await request.json().catch(() => ({}))
+    );
+    const project = await createProject(uid, body.name);
     const plan = await resolveUserPlan(uid);
     const { slots } = await listProjects(uid);
 
@@ -97,16 +108,9 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as {
-      projectId?: string;
-      action?: 'activate';
-      projectIds?: string[];
-    };
+    const body = parseApiBody(projectsPatchBodySchema, await request.json());
 
-    if (body.action === 'activate') {
-      if (!body.projectIds?.length) {
-        return NextResponse.json({ error: 'projectIds es requerido' }, { status: 400 });
-      }
+    if ('action' in body && body.action === 'activate') {
       const result = await activateProjectSlots(uid, body.projectIds);
       const plan = await resolveUserPlan(uid);
       return NextResponse.json({
@@ -115,7 +119,7 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    if (!body.projectId) {
+    if (!('projectId' in body)) {
       return NextResponse.json({ error: 'projectId es requerido' }, { status: 400 });
     }
 

@@ -28,6 +28,7 @@ import type {
 } from '@/lib/types/agent-4';
 import type { KanbanStatus, ProjectMember } from '@/lib/types/execution';
 import { resolveWorkItemType } from '@/lib/utils/work-item-validation';
+import { parseWorkItemFields } from '@/lib/schemas/work-item';
 import type { SprintOption } from '@/lib/utils/backlog-story-navigation';
 import type { DashboardSprintStoryRow } from './dashboardMetrics';
 import { notifySuccess } from '@/lib/notifications/toast';
@@ -134,18 +135,28 @@ export function DashboardStoryEditForm({
     estimationMode === 'story_points' && !isAllowedStoryPoint(parsedPoints);
   const isInvalidDuration =
     estimationMode === 'time' && !tryParseDurationLabel(durationLabel);
-  const storyCriteriaOk =
-    workItemType !== 'story' || criteria.some((c) => c.trim());
-  const bugStepsOk = workItemType !== 'bug' || steps.some((s) => s.trim());
+  const workItemError = parseWorkItemFields({
+    type: workItemType,
+    title,
+    description,
+    acceptanceCriteria: criteria,
+    subtasks,
+    severity,
+    stepsToReproduce: steps,
+    technicalNotes,
+  });
   const isSaveDisabled =
-    !title.trim() ||
-    !description.trim() ||
+    Boolean(workItemError) ||
     !epicId ||
     isInvalidPoints ||
     isInvalidDuration ||
-    !storyCriteriaOk ||
-    !bugStepsOk ||
     isSaving;
+  const saveHint = isSaving
+    ? null
+    : workItemError ??
+      (!epicId ? 'Selecciona una épica.' : null) ??
+      (isInvalidPoints ? 'Los Story Points deben ser de la escala Fibonacci.' : null) ??
+      (isInvalidDuration ? 'Revisa el formato de la duración.' : null);
   const hasEpicChange = epicId !== row.epicId;
   const hasSprintChange =
     !sprintAssignmentLocked && (sprintId || null) !== row.sprintId;
@@ -301,7 +312,13 @@ export function DashboardStoryEditForm({
             />
           </div>
 
-          <div className="mt-10 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-6">
+          <div className="mt-10 flex flex-col items-end gap-2 border-t border-border pt-6">
+            {saveHint ? (
+              <p role="alert" className="w-full text-[12px] text-danger">
+                {saveHint}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-end gap-2">
             {onCancel ? (
               <button
                 type="button"
@@ -325,6 +342,7 @@ export function DashboardStoryEditForm({
             >
               {isSaving ? 'Guardando…' : 'Guardar cambios'}
             </button>
+            </div>
           </div>
         </div>
       </div>

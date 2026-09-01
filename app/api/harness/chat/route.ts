@@ -14,12 +14,8 @@ import { runHarnessTurn } from '@/lib/harness/runtime';
 import type { HarnessConfirmedAction } from '@/lib/harness/types';
 import { isPlanLimitError, planErrorToJson } from '@/lib/plans/plan-errors';
 import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
-
-interface ChatBody {
-  message?: string;
-  confirmedAction?: HarnessConfirmedAction;
-  projectId?: string;
-}
+import { parseApiBody } from '@/lib/schemas/parse';
+import { harnessChatBodySchema } from '@/lib/schemas/misc-api';
 
 function assertPipelineReady(ready: boolean): void {
   if (!ready) {
@@ -75,17 +71,13 @@ export async function DELETE(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as ChatBody;
-    const message = typeof body.message === 'string' ? body.message : '';
-    const confirmedAction = body.confirmedAction;
+    const body = parseApiBody(harnessChatBodySchema, await request.json());
+    const message = body.message ?? '';
+    const confirmedAction = body.confirmedAction as HarnessConfirmedAction | undefined;
     const bodyProjectId =
       typeof body.projectId === 'string' && body.projectId.trim()
         ? body.projectId.trim()
         : null;
-
-    if (!message.trim() && !confirmedAction) {
-      return NextResponse.json({ error: 'Mensaje vacío' }, { status: 400 });
-    }
 
     const { stream, send, close } = createNdjsonStream();
 

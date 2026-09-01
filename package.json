@@ -26,7 +26,8 @@
     "server-only": "^0.0.1",
     "sileo": "^0.1.5",
     "three": "^0.185.1",
-    "write-excel-file": "^4.1.1"
+    "write-excel-file": "^4.1.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

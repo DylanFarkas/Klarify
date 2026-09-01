@@ -12,20 +12,13 @@ import type { AiGenerationConfig } from '@/lib/plans/types';
 import { backlogDetailPrompt, defaultAiConfig } from '@/lib/plans/ai-config';
 import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
-
-interface RawBacklogResponse {
-  epics: Array<{
-    title: string;
-    description: string;
-    userStories: Array<{
-      title: string;
-      description: string;
-      acceptanceCriteria: string[];
-      sourceWishIds: string[];
-      subtasks?: unknown;
-    }>;
-  }>;
-}
+import type { infer as ZodInfer } from 'zod';
+import { parseLlmJson } from '@/lib/schemas/llm/parse';
+import {
+  llmBacklogResponseSchema,
+  llmRawEpicSchema,
+  llmRawStorySchema,
+} from '@/lib/schemas/llm/agent-2';
 
 export class LlmBacklogAdapter implements IBacklogLLMAdapter {
   constructor(private credentials: LlmCredentials) {}
@@ -132,43 +125,41 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
   }
 
   private parseBacklogResponse(responseText: string): Epic[] {
-    const raw = JSON.parse(responseText) as RawBacklogResponse;
+    const raw = parseLlmJson(
+      responseText,
+      llmBacklogResponseSchema,
+      'Gemini no devolvió un objeto con la forma { epics: Epic[] }'
+    );
 
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.epics)) {
-      throw new Error('Gemini no devolvió un objeto con la forma { epics: Epic[] }');
-    }
+    const validEpics: {
+      rawEpic: ZodInfer<typeof llmRawEpicSchema>;
+      validStories: UserStory[];
+    }[] = [];
 
-    const validEpics: { rawEpic: RawBacklogResponse['epics'][number]; validStories: UserStory[] }[] = [];
-
-    for (const rawEpic of raw.epics) {
-      if (
-        !rawEpic ||
-        typeof rawEpic !== 'object' ||
-        typeof rawEpic.title !== 'string' ||
-        rawEpic.title.trim().length === 0 ||
-        typeof rawEpic.description !== 'string' ||
-        !Array.isArray(rawEpic.userStories)
-      ) {
-        console.warn('[LlmBacklogAdapter] Épica inválida descartada:', rawEpic?.title ?? rawEpic);
+    for (const candidate of raw.epics) {
+      const epicResult = llmRawEpicSchema.safeParse(candidate);
+      if (!epicResult.success) {
+        const title =
+          candidate && typeof candidate === 'object' && 'title' in candidate
+            ? (candidate as { title?: unknown }).title
+            : candidate;
+        console.warn('[LlmBacklogAdapter] Épica inválida descartada:', title);
         continue;
       }
+      const rawEpic = epicResult.data;
 
       const validStories: UserStory[] = [];
-      for (const rawStory of rawEpic.userStories) {
-        if (
-          !rawStory ||
-          typeof rawStory !== 'object' ||
-          typeof rawStory.title !== 'string' ||
-          rawStory.title.trim().length === 0 ||
-          typeof rawStory.description !== 'string' ||
-          rawStory.description.trim().length === 0 ||
-          !Array.isArray(rawStory.acceptanceCriteria) ||
-          rawStory.acceptanceCriteria.length < 1 ||
-          !Array.isArray(rawStory.sourceWishIds)
-        ) {
-          console.warn('[LlmBacklogAdapter] Historia inválida descartada:', rawStory?.title ?? rawStory);
+      for (const storyCandidate of rawEpic.userStories) {
+        const storyResult = llmRawStorySchema.safeParse(storyCandidate);
+        if (!storyResult.success) {
+          const title =
+            storyCandidate && typeof storyCandidate === 'object' && 'title' in storyCandidate
+              ? (storyCandidate as { title?: unknown }).title
+              : storyCandidate;
+          console.warn('[LlmBacklogAdapter] Historia inválida descartada:', title);
           continue;
         }
+        const rawStory = storyResult.data;
 
         const cleanCriteria = rawStory.acceptanceCriteria
           .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
@@ -192,7 +183,9 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
           description: rawStory.description.trim(),
           acceptanceCriteria: cleanCriteria,
           subtasks: assignSubtaskIds(cleanSubtaskTitles),
-          sourceWishIds: rawStory.sourceWishIds,
+          sourceWishIds: rawStory.sourceWishIds.filter(
+            (id): id is string => typeof id === 'string'
+          ),
           source: 'auto',
           isEdited: false,
           createdAt: Date.now(),

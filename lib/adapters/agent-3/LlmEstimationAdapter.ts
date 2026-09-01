@@ -16,22 +16,12 @@ import { defaultAiConfig } from '@/lib/plans/ai-config';
 import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
 import { isAllowedStoryPoint, parseDurationLabel } from '@/lib/utils/estimation';
-
-interface RawPointsResponse {
-  suggestions: Array<{
-    storyId: string;
-    suggestedPoints: number;
-    justification: string;
-  }>;
-}
-
-interface RawTimeResponse {
-  suggestions: Array<{
-    storyId: string;
-    suggestedDuration: string;
-    justification: string;
-  }>;
-}
+import { parseLlmJson } from '@/lib/schemas/llm/parse';
+import {
+  llmEstimationResponseSchema,
+  llmPointsSuggestionSchema,
+  llmTimeSuggestionSchema,
+} from '@/lib/schemas/llm/agent-3';
 
 export class LlmEstimationAdapter implements IEstimationAdapter {
   constructor(private credentials: LlmCredentials) {}
@@ -151,21 +141,17 @@ ${JSON.stringify(epics, null, 2)}`;
     responseText: string,
     mode: EstimationMode
   ): Agent3SuggestionItem[] {
-    const raw = JSON.parse(responseText) as RawPointsResponse | RawTimeResponse;
-
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.suggestions)) {
-      throw new Error('El modelo no devolvió un objeto con la forma { suggestions: SuggestionItem[] }');
-    }
+    const raw = parseLlmJson(
+      responseText,
+      llmEstimationResponseSchema,
+      'El modelo no devolvió un objeto con la forma { suggestions: SuggestionItem[] }'
+    );
 
     if (mode === 'time') {
-      return (raw.suggestions as RawTimeResponse['suggestions'])
-        .filter(
-          (sug) =>
-            sug &&
-            typeof sug.storyId === 'string' &&
-            typeof sug.suggestedDuration === 'string' &&
-            typeof sug.justification === 'string'
-        )
+      return raw.suggestions
+        .map((sug) => llmTimeSuggestionSchema.safeParse(sug))
+        .filter((result) => result.success)
+        .map((result) => result.data)
         .flatMap((sug) => {
           try {
             const parsed = parseDurationLabel(sug.suggestedDuration);
@@ -183,15 +169,11 @@ ${JSON.stringify(epics, null, 2)}`;
         });
     }
 
-    return (raw.suggestions as RawPointsResponse['suggestions'])
-      .filter(
-        (sug) =>
-          sug &&
-          typeof sug.storyId === 'string' &&
-          typeof sug.suggestedPoints === 'number' &&
-          typeof sug.justification === 'string' &&
-          isAllowedStoryPoint(sug.suggestedPoints)
-      )
+    return raw.suggestions
+      .map((sug) => llmPointsSuggestionSchema.safeParse(sug))
+      .filter((result) => result.success)
+      .map((result) => result.data)
+      .filter((sug) => isAllowedStoryPoint(sug.suggestedPoints))
       .map((sug) => ({
         storyId: sug.storyId.trim(),
         suggestedPoints: sug.suggestedPoints,

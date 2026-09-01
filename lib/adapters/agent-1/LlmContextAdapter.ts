@@ -22,18 +22,11 @@ import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
 import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
-
-interface RawAnalyzeResponse {
-  isSufficient: boolean;
-  summary: string;
-  gaps: string[];
-  questions: Array<{
-    id: string;
-    question: string;
-    category: string;
-    options: Array<{ id: string; label: string }>;
-  }>;
-}
+import { parseLlmJson } from '@/lib/schemas/llm/parse';
+import {
+  llmAnalyzeResponseSchema,
+  llmWishesArraySchema,
+} from '@/lib/schemas/llm/agent-1';
 
 export class LlmContextAdapter implements ILLMAdapter {
   constructor(private credentials: LlmCredentials) {}
@@ -95,7 +88,11 @@ ${transcription.fullText}
         onThought,
       });
 
-      const raw: RawAnalyzeResponse = JSON.parse(responseText);
+      const raw = parseLlmJson(
+        responseText,
+        llmAnalyzeResponseSchema,
+        'El modelo no devolvió un objeto de análisis válido'
+      );
       const questions = this.normalizeQuestions(raw.questions ?? []);
 
       return {
@@ -163,11 +160,11 @@ ${contextBlock}
         onThought,
       });
 
-      const rawWishes: string[] = JSON.parse(responseText);
-
-      if (!Array.isArray(rawWishes)) {
-        throw new Error('El modelo no devolvió un array JSON válido');
-      }
+      const rawWishes = parseLlmJson(
+        responseText,
+        llmWishesArraySchema,
+        'El modelo no devolvió un array JSON válido'
+      );
 
       const wishes: Wish[] = [];
       for (const text of rawWishes) {
@@ -192,7 +189,7 @@ ${contextBlock}
   }
 
   private normalizeQuestions(
-    rawQuestions: RawAnalyzeResponse['questions']
+    rawQuestions: unknown[]
   ): ClarifyingQuestion[] {
     const validCategories = new Set([
       'platform',
@@ -204,20 +201,28 @@ ${contextBlock}
 
     return rawQuestions
       .slice(0, MAX_CLARIFY_QUESTIONS)
-      .map((q, index) => ({
-        id: q.id || `q-${index + 1}`,
-        question: q.question?.trim() ?? '',
-        category: validCategories.has(q.category)
-          ? (q.category as ClarifyingQuestion['category'])
-          : 'scope',
-        options: (q.options ?? [])
-          .slice(0, MAX_OPTIONS_PER_QUESTION)
-          .map((opt, optIndex) => ({
-            id: opt.id || `opt-${optIndex + 1}`,
-            label: opt.label?.trim() ?? '',
-          }))
-          .filter((opt) => opt.label.length > 0),
-      }))
+      .map((raw, index) => {
+        const q = (raw && typeof raw === 'object' ? raw : {}) as {
+          id?: string;
+          question?: string;
+          category?: string;
+          options?: Array<{ id?: string; label?: string }>;
+        };
+        return {
+          id: q.id || `q-${index + 1}`,
+          question: q.question?.trim() ?? '',
+          category: validCategories.has(q.category ?? '')
+            ? (q.category as ClarifyingQuestion['category'])
+            : 'scope',
+          options: (q.options ?? [])
+            .slice(0, MAX_OPTIONS_PER_QUESTION)
+            .map((opt, optIndex) => ({
+              id: opt.id || `opt-${optIndex + 1}`,
+              label: opt.label?.trim() ?? '',
+            }))
+            .filter((opt) => opt.label.length > 0),
+        };
+      })
       .filter((q) => q.question.length > 0 && q.options.length >= MIN_OPTIONS_PER_QUESTION);
   }
 }

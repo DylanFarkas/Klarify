@@ -30,19 +30,12 @@ import type { AiGenerationConfig } from '@/lib/plans/types';
 import { defaultAiConfig } from '@/lib/plans/ai-config';
 import { generateJson } from '@/lib/llm/generate';
 import type { LlmCredentials } from '@/lib/llm/types';
-
-interface RawSprintPlanResponse {
-  sprints: Array<{
-    sprintGoal: string;
-    storyIds: string[];
-  }>;
-  dependencies: Array<{
-    storyId: string;
-    dependsOnStoryId: string;
-    reason: string;
-  }>;
-  unassignedStoryIds: string[];
-}
+import { tryParseLlmJson } from '@/lib/schemas/llm/parse';
+import {
+  llmRawSprintSchema,
+  llmSprintDependencySchema,
+  llmSprintPlanResponseSchema,
+} from '@/lib/schemas/llm/agent-5';
 
 export class LlmSprintPlanningAdapter implements ISprintPlanningAdapter {
   constructor(private credentials: LlmCredentials) {}
@@ -155,14 +148,8 @@ ${JSON.stringify(stories, null, 2)}`;
   ): SprintPlan {
     const fallbackPlan = () => mockPlanSprints(stories, config, framework);
 
-    let raw: RawSprintPlanResponse;
-    try {
-      raw = JSON.parse(responseText) as RawSprintPlanResponse;
-    } catch {
-      return fallbackPlan();
-    }
-
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.sprints)) {
+    const raw = tryParseLlmJson(responseText, llmSprintPlanResponseSchema);
+    if (!raw) {
       return fallbackPlan();
     }
 
@@ -170,7 +157,11 @@ ${JSON.stringify(stories, null, 2)}`;
     const allStoryIds = stories.map((story) => story.id);
     const capacity = config.sprintCapacitySp;
     const validRawStoryIds = raw.sprints
-      .flatMap((s) => (Array.isArray(s.storyIds) ? s.storyIds : []))
+      .flatMap((s) => {
+        if (!s || typeof s !== 'object' || !('storyIds' in s)) return [];
+        const ids = (s as { storyIds?: unknown }).storyIds;
+        return Array.isArray(ids) ? ids : [];
+      })
       .filter((storyId): storyId is string => typeof storyId === 'string' && storyMap.has(storyId));
     const hasDuplicateAssignments = validRawStoryIds.length !== new Set(validRawStoryIds).size;
     const seenStoryIds = new Set<string>();
@@ -183,7 +174,9 @@ ${JSON.stringify(stories, null, 2)}`;
     };
 
     const sprints: PlannedSprint[] = raw.sprints
-      .filter((s) => s && typeof s.sprintGoal === 'string' && Array.isArray(s.storyIds))
+      .map((s) => llmRawSprintSchema.safeParse(s))
+      .filter((result) => result.success)
+      .map((result) => result.data)
       .map((s, idx) => {
         const uniqueStoryIds: string[] = [];
 
@@ -229,13 +222,9 @@ ${JSON.stringify(stories, null, 2)}`;
 
     const llmDependencies: StoryDependency[] = sanitizeDependencies(
       (raw.dependencies ?? [])
-        .filter(
-          (d) =>
-            d &&
-            typeof d.storyId === 'string' &&
-            typeof d.dependsOnStoryId === 'string' &&
-            typeof d.reason === 'string'
-        )
+        .map((d) => llmSprintDependencySchema.safeParse(d))
+        .filter((result) => result.success)
+        .map((result) => result.data)
         .map((d) => ({
           storyId: d.storyId.trim(),
           dependsOnStoryId: d.dependsOnStoryId.trim(),
@@ -260,7 +249,10 @@ ${JSON.stringify(stories, null, 2)}`;
       sprints: scheduled,
       dependencies,
       config,
-      unassignedStoryIds: unassigned.length > 0 ? unassigned : (raw.unassignedStoryIds ?? []),
+      unassignedStoryIds:
+        unassigned.length > 0
+          ? unassigned
+          : (raw.unassignedStoryIds ?? []).filter((id): id is string => typeof id === 'string'),
     };
   }
 }

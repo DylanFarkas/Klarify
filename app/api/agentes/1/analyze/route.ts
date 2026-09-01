@@ -7,6 +7,7 @@
  */
 
 import { type NextRequest } from 'next/server';
+import { handleApiError } from '@/lib/api-error';
 import {
   analyzeContextStream,
   extractWishesFromContextStream,
@@ -25,6 +26,8 @@ import {
   createNdjsonStream,
   ndjsonStreamResponse,
 } from '@/lib/utils/llm-stream';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { agent1AnalyzeBodySchema } from '@/lib/schemas/agent-inputs';
 
 async function runExtraction(
   uid: string,
@@ -67,14 +70,10 @@ export async function POST(request: NextRequest) {
     const uid = await verifyRequestUser(request);
     const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
-    const body = (await request.json()) as Agent1AnalyzeRequest;
-
-    if (!body.transcription?.fullText?.trim()) {
-      return Response.json(
-        { error: 'Se requiere una transcripción con texto.', code: 'VALIDATION_ERROR' } satisfies Agent1ErrorResponse,
-        { status: 400 }
-      );
-    }
+    const body = parseApiBody(
+      agent1AnalyzeBodySchema,
+      await request.json()
+    ) as unknown as Agent1AnalyzeRequest;
 
     const { stream, send, close } = createNdjsonStream();
 
@@ -144,13 +143,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'No autorizado', code: 'PROCESSING_ERROR' } satisfies Agent1ErrorResponse, { status: 401 });
     }
 
-    console.error('[Agent 1 Analyze] Error:', error);
-    return Response.json(
-      {
-        error: error instanceof Error ? error.message : 'Error interno al analizar el contexto.',
-        code: 'PROCESSING_ERROR',
-      } satisfies Agent1ErrorResponse,
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error interno al analizar el contexto.');
   }
 }

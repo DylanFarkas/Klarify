@@ -24,29 +24,25 @@ import {
   createNdjsonStream,
   ndjsonStreamResponse,
 } from '@/lib/utils/llm-stream';
+import { handleApiError } from '@/lib/api-error';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { agent1ExtractBodySchema } from '@/lib/schemas/agent-inputs';
+import type { ClarificationAnswer, ContextDiscovery } from '@/lib/types/agent-1';
 
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
     const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
 
-    const body = (await request.json()) as Agent1ExtractRequest;
+    const parsed = parseApiBody(agent1ExtractBodySchema, await request.json());
+    const body = {
+      transcription: parsed.transcription as unknown as Agent1ExtractRequest['transcription'],
+      discovery: parsed.discovery as unknown as ContextDiscovery,
+      answers: (parsed.answers ?? []) as unknown as ClarificationAnswer[],
+      skipped: parsed.skipped ?? false,
+    } satisfies Agent1ExtractRequest;
     const skipped = body.skipped ?? false;
     const answers = body.answers ?? [];
-
-    if (!body.transcription?.fullText?.trim()) {
-      return Response.json(
-        { error: 'Se requiere una transcripción con texto.', code: 'VALIDATION_ERROR' } satisfies Agent1ErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    if (!body.discovery) {
-      return Response.json(
-        { error: 'Se requiere el objeto discovery.', code: 'VALIDATION_ERROR' } satisfies Agent1ErrorResponse,
-        { status: 400 }
-      );
-    }
 
     const validation = validateClarificationAnswers(body.discovery, answers, skipped);
     if (!validation.valid) {
@@ -109,13 +105,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'No autorizado', code: 'PROCESSING_ERROR' } satisfies Agent1ErrorResponse, { status: 401 });
     }
 
-    console.error('[Agent 1 Extract] Error:', error);
-    return Response.json(
-      {
-        error: error instanceof Error ? error.message : 'Error interno al extraer deseos.',
-        code: 'PROCESSING_ERROR',
-      } satisfies Agent1ErrorResponse,
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error interno al extraer deseos.');
   }
 }

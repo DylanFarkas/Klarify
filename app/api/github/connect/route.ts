@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { verifyRequestUser } from "@/lib/firebase-admin";
 import { handleApiError } from "@/lib/api-error";
 import { getGithubIntegration, removeGithubIntegration, saveGithubToken } from "@/lib/github-integration";
+import { parseApiBody } from "@/lib/schemas/parse";
+import { githubConnectBodySchema } from "@/lib/schemas/misc-api";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,12 +28,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as { accessToken?: string };
-
-    if (!body.accessToken) {
-      return NextResponse.json({ error: "accessToken is required" }, { status: 400 });
-    }
-
+    const body = parseApiBody(githubConnectBodySchema, await request.json());
     const username = await saveGithubToken(uid, body.accessToken);
     return NextResponse.json({ username });
   } catch (error) {

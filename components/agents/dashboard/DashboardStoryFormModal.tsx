@@ -13,6 +13,7 @@ import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 import { TimeDurationInput } from '@/components/agents/shared/TimeDurationInput';
 import type { EstimationMode } from '@/lib/types/agent-3';
 import { defaultDurationLabel, tryParseDurationLabel } from '@/lib/utils/estimation';
+import { parseWorkItemFields } from '@/lib/schemas/work-item';
 import type { CreateDashboardUserStoryInput } from '@/context/WorkspaceContext';
 import type { BugSeverity, Epic, WorkItemType } from '@/lib/types/agent-2';
 import type {
@@ -90,18 +91,24 @@ export function DashboardCreateStoryModal({
     }
   }, [workItemType]);
 
-  const storyCriteriaOk =
-    workItemType !== 'story' || criteria.some((c) => c.trim());
-  const bugStepsOk =
-    workItemType !== 'bug' || steps.some((s) => s.trim());
+  const workItemError = parseWorkItemFields({
+    type: workItemType,
+    title,
+    description,
+    acceptanceCriteria: criteria,
+    severity,
+    stepsToReproduce: steps,
+    technicalNotes,
+  });
+  const durationInvalid =
+    estimationMode === 'time' && !tryParseDurationLabel(durationLabel);
   const isSaveDisabled =
-    !epicId ||
-    !title.trim() ||
-    !description.trim() ||
-    !storyCriteriaOk ||
-    !bugStepsOk ||
-    (estimationMode === 'time' && !tryParseDurationLabel(durationLabel)) ||
-    isSaving;
+    Boolean(workItemError) || !epicId || durationInvalid || isSaving;
+  const saveHint = isSaving
+    ? null
+    : workItemError ??
+      (!epicId ? 'Selecciona una épica.' : null) ??
+      (durationInvalid ? 'Revisa el formato de la duración.' : null);
 
   const typeLabel = WORK_ITEM_TYPE_LABELS[workItemType];
 
@@ -150,7 +157,13 @@ export function DashboardCreateStoryModal({
         onCategoryChange={setCategory}
       />
 
-      <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+      <div className="mt-5 flex flex-col items-end gap-2 border-t border-border pt-4">
+        {saveHint ? (
+          <p role="alert" className="w-full text-[12px] text-danger">
+            {saveHint}
+          </p>
+        ) : null}
+        <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={onClose}
@@ -195,6 +208,7 @@ export function DashboardCreateStoryModal({
         >
           {isSaving ? 'Creando…' : `Crear ${typeLabel.toLowerCase()}`}
         </button>
+        </div>
       </div>
     </DetailModal>
   );

@@ -27,13 +27,19 @@ import type {
   Agent4PrioritizationResponse,
   Agent4PrioritizeRequest,
 } from '@/lib/types/agent-4';
+import { handleApiError } from '@/lib/api-error';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { agent4PrioritizeBodySchema } from '@/lib/schemas/agent-inputs';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as Agent4PrioritizeRequest & { isRegeneration?: boolean };
+    const body = parseApiBody(
+      agent4PrioritizeBodySchema,
+      await request.json()
+    ) as Agent4PrioritizeRequest & { isRegeneration?: boolean };
 
     await assertAiRegenerationAllowed(uid, 'agent4', body.isRegeneration);
     const aiConfig = getAiConfig((await resolveUserPlan(uid)).id);
@@ -123,14 +129,6 @@ export async function POST(request: NextRequest) {
       return Response.json(planErrorToJson(error), { status: 403 });
     }
 
-    console.error('[Agent 4 Prioritize] Critical Error:', error);
-    return Response.json(
-      {
-        error:
-          error instanceof Error ? error.message : 'Error interno del servidor.',
-        code: 'PROCESSING_ERROR',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error interno del servidor.');
   }
 }

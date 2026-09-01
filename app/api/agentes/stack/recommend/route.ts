@@ -17,13 +17,16 @@ import {
   ndjsonStreamResponse,
 } from '@/lib/utils/llm-stream';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
-
-type RecommendBody = { isRegeneration?: boolean };
+import { parseApiBody } from '@/lib/schemas/parse';
+import { stackRecommendBodySchema } from '@/lib/schemas/agent-inputs';
 
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json().catch(() => ({}))) as RecommendBody;
+    const body = parseApiBody(
+      stackRecommendBodySchema,
+      await request.json().catch(() => ({}))
+    );
 
     const { workspace } = await getWorkspaceData(uid);
     if (!workspace.pipeline.agent6Input) {

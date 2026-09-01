@@ -18,6 +18,11 @@ import {
   getAiProviderPublicStatus,
   updateAiProvider,
 } from '@/lib/llm/resolve';
+import { parseApiBody } from '@/lib/schemas/parse';
+import {
+  aiProviderConnectBodySchema,
+  aiProviderUpdateBodySchema,
+} from '@/lib/schemas/misc-api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,27 +39,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as {
-      provider?: string;
-      apiKey?: string;
-      model?: string;
-    };
-
-    if (!isAiProviderId(body.provider)) {
-      return NextResponse.json(
-        { error: 'Proveedor inválido. Usa deepseek, openai o gemini.' },
-        { status: 400 }
-      );
-    }
-
-    if (!body.apiKey || typeof body.apiKey !== 'string') {
-      return NextResponse.json({ error: 'apiKey es requerida' }, { status: 400 });
-    }
+    const body = parseApiBody(aiProviderConnectBodySchema, await request.json());
 
     const status = await connectAiProvider(uid, {
       provider: body.provider,
       apiKey: body.apiKey,
-      model: typeof body.model === 'string' ? body.model : undefined,
+      model: body.model,
     });
 
     return NextResponse.json(status);
@@ -85,22 +75,11 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as {
-      model?: string;
-      active?: boolean;
-      provider?: string;
-    };
-
-    if (
-      body.provider !== undefined &&
-      !isAiProviderId(body.provider)
-    ) {
-      return NextResponse.json({ error: 'Proveedor inválido' }, { status: 400 });
-    }
+    const body = parseApiBody(aiProviderUpdateBodySchema, await request.json());
 
     const status = await updateAiProvider(uid, {
-      model: typeof body.model === 'string' ? body.model : undefined,
-      active: typeof body.active === 'boolean' ? body.active : undefined,
+      model: body.model,
+      active: body.active,
       provider: isAiProviderId(body.provider) ? body.provider : undefined,
     });
 

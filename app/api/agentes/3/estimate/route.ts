@@ -21,6 +21,9 @@ import {
   createNdjsonStream,
   ndjsonStreamResponse,
 } from '@/lib/utils/llm-stream';
+import { handleApiError } from '@/lib/api-error';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { agent3EstimateBodySchema } from '@/lib/schemas/agent-inputs';
 
 // Forzar a Next.js a no cachear la ruta para evaluar variables de entorno en cada petición
 export const dynamic = 'force-dynamic';
@@ -36,7 +39,10 @@ export type { Agent3EstimationResponse, Agent3SuggestionItem, LocalEpic };
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as Agent3Input & {
+    const body = parseApiBody(
+      agent3EstimateBodySchema,
+      await request.json()
+    ) as unknown as Agent3Input & {
       isRegeneration?: boolean;
       estimationMode?: EstimationMode;
     };
@@ -119,13 +125,6 @@ export async function POST(request: NextRequest) {
       return Response.json(planErrorToJson(error), { status: 403 });
     }
 
-    console.error('[Agent 3 Estimate] Critical Error:', error);
-    return Response.json(
-      {
-        error: error instanceof Error ? error.message : 'Error interno del servidor.',
-        code: 'PROCESSING_ERROR',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error interno del servidor.');
   }
 }
