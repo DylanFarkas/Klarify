@@ -90,7 +90,8 @@ export class LlmPrioritizationAdapter implements IPrioritizationAdapter {
 REGLAS CRÍTICAS:
 - 'suggestedCategory' debe ser exactamente uno de: ${validCategories.join(', ')}.
 - Evalúa el valor de negocio, dependencias, riesgo y esfuerzo estimado de cada historia.
-- La justificación debe ser clara y profesional (máximo ${MAX_PRIORITIZATION_JUSTIFICATION_LENGTH} caracteres).`;
+- La justificación debe ser clara y profesional (máximo ${MAX_PRIORITIZATION_JUSTIFICATION_LENGTH} caracteres).
+- Prioriza solo cada historia (storyId HU-XXX / BUG-XXX / TASK-XXX). Las subtareas son contexto: no emitas categorías por subtarea.`;
 
     const userPrompt = `Eres un Product Owner experto en priorización ágil usando la metodología ${frameworkInfo.label}.
 

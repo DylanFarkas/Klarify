@@ -136,6 +136,61 @@ export function UserStoryDetailContent({
           )}
         </DetailSection>
 
+        <DetailSection label="Subtareas">
+          {(story.subtasks ?? []).length > 0 ? (
+            <ol>
+              {(story.subtasks ?? []).map((subtask, idx) => (
+                <li
+                  key={subtask.id}
+                  className={[
+                    'flex items-center gap-2.5 py-2.5',
+                    idx > 0 ? 'border-t border-border/50' : '',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border',
+                      subtask.done
+                        ? 'border-foreground bg-foreground text-background'
+                        : 'border-border',
+                    ].join(' ')}
+                    aria-hidden="true"
+                  >
+                    {subtask.done ? (
+                      <svg
+                        className="size-2.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.5 12.75l6 6 9-13.5"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-[11px] font-medium leading-none tabular-nums text-subtle">
+                    {subtask.id}
+                  </span>
+                  <p
+                    className={[
+                      'min-w-0 flex-1 text-sm leading-relaxed text-foreground',
+                      subtask.done ? 'text-muted line-through' : '',
+                    ].join(' ')}
+                  >
+                    {subtask.title}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="py-4 text-center text-sm text-muted">Sin subtareas.</p>
+          )}
+        </DetailSection>
+
         {story.sourceWishIds.length > 0 ? (
           <DetailSection label="Trazabilidad">
             <p className="font-mono text-[12px] text-subtle">

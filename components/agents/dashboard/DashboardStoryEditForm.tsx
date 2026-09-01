@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AcceptanceCriteriaEditor } from '@/components/agents/agent-2/AcceptanceCriteriaEditor';
+import { SubtasksEditor } from '@/components/agents/shared/SubtasksEditor';
 import { CategorySelect } from '@/components/agents/agent-4/CategorySelect';
 import {
   WorkItemTypeBadge,
@@ -18,7 +19,7 @@ import { FIBONACCI_SCALE } from '@/lib/constants/agent-3';
 import type { EstimationMode } from '@/lib/types/agent-3';
 import { defaultDurationLabel, tryParseDurationLabel } from '@/lib/utils/estimation';
 import type { UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
-import type { BugSeverity, Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
+import type { BugSeverity, Epic, StorySubtask, UserStory, WorkItemType } from '@/lib/types/agent-2';
 import type { StoryEstimation } from '@/lib/types/agent-3';
 import type {
   FrameworkCategory,
@@ -60,6 +61,7 @@ interface DashboardStoryEditFormProps {
   ) => Promise<void>;
   onUpdateStoryStatus?: (storyId: string, status: KanbanStatus) => Promise<void>;
   onUpdateStoryAssignee?: (storyId: string, assigneeId: string | null) => Promise<void>;
+  onCancel?: () => void;
 }
 
 export function DashboardStoryEditForm({
@@ -74,11 +76,13 @@ export function DashboardStoryEditForm({
   onSave,
   onUpdateStoryStatus,
   onUpdateStoryAssignee,
+  onCancel,
 }: DashboardStoryEditFormProps) {
   const workItemType = resolveWorkItemType(row.story);
   const [title, setTitle] = useState(row.story.title);
   const [description, setDescription] = useState(row.story.description);
   const [criteria, setCriteria] = useState(row.story.acceptanceCriteria);
+  const [subtasks, setSubtasks] = useState<StorySubtask[]>(row.story.subtasks ?? []);
   const [severity, setSeverity] = useState<BugSeverity>(row.story.severity ?? 'medium');
   const [steps, setSteps] = useState(row.story.stepsToReproduce ?? []);
   const [technicalNotes, setTechnicalNotes] = useState(row.story.technicalNotes ?? '');
@@ -111,6 +115,7 @@ export function DashboardStoryEditForm({
     setTitle(row.story.title);
     setDescription(row.story.description);
     setCriteria(row.story.acceptanceCriteria);
+    setSubtasks(row.story.subtasks ?? []);
     setSeverity(row.story.severity ?? 'medium');
     setSteps(row.story.stepsToReproduce ?? []);
     setTechnicalNotes(row.story.technicalNotes ?? '');
@@ -163,6 +168,7 @@ export function DashboardStoryEditForm({
         title: title.trim(),
         description: description.trim(),
         acceptanceCriteria: criteria,
+        subtasks,
       };
       if (workItemType === 'bug') {
         updates.severity = severity;
@@ -287,7 +293,25 @@ export function DashboardStoryEditForm({
             </div>
           ) : null}
 
+          <div className="mt-8">
+            <p className={`${fieldLabelClass} mb-2`}>Subtareas</p>
+            <SubtasksEditor
+              subtasks={subtasks}
+              onChange={setSubtasks}
+            />
+          </div>
+
           <div className="mt-10 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-6">
+            {onCancel ? (
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isSaving}
+                className="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={isSaveDisabled}

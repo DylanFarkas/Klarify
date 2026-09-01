@@ -45,6 +45,7 @@ export function UserStoryItem({
     setTimeout(() => onDelete(story.id), 200);
   };
 
+  const subtaskCount = story.subtasks?.length ?? 0;
   const sourceHint =
     story.source === 'manual' || story.isEdited
       ? [story.source === 'manual' ? 'Manual' : null, story.isEdited ? 'Editado' : null]
@@ -109,12 +110,15 @@ export function UserStoryItem({
         <div className="min-w-0">
           <p className="text-[13px] font-medium leading-snug text-foreground">{story.title}</p>
           <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{story.description}</p>
-          {(sourceHint || story.acceptanceCriteria.length > 0) ? (
+          {(sourceHint || story.acceptanceCriteria.length > 0 || subtaskCount > 0) ? (
             <p className="mt-1 text-[11px] text-subtle">
               {[
                 sourceHint,
                 story.acceptanceCriteria.length > 0
                   ? `${story.acceptanceCriteria.length} criterio${story.acceptanceCriteria.length !== 1 ? 's' : ''}`
+                  : null,
+                subtaskCount > 0
+                  ? `${subtaskCount} subtarea${subtaskCount !== 1 ? 's' : ''}`
                   : null,
               ]
                 .filter(Boolean)

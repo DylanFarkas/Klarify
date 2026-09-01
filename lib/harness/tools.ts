@@ -28,6 +28,9 @@ import {
   updateStoryExecution,
   updateUserStoryAcrossWorkspace,
   saveStackAcrossWorkspace,
+  createSubtaskAcrossWorkspace,
+  updateSubtaskAcrossWorkspace,
+  deleteSubtaskAcrossWorkspace,
 } from '@/lib/workspace-service';
 import { buildStackContextSummary } from '@/lib/services/stack-service';
 import {
@@ -39,6 +42,7 @@ import { normalizeStackFromToolArgs, countStackItems } from '@/lib/stack/normali
 import { validateStackCompatibility } from '@/lib/stack/compatibility';
 import type { StackRecommendRaw } from '@/lib/types/stack';
 import { getLiveBacklog, listLiveStories } from '@/lib/utils/live-backlog';
+import { normalizeSubtasks } from '@/lib/utils/work-item-validation';
 import {
   defaultDurationLabel,
   DurationParseError,
@@ -106,7 +110,11 @@ export function buildBacklogIndex(workspace: UserWorkspace): string {
       epic.userStories.length === 0
         ? '(sin historias)'
         : epic.userStories
-            .map((s) => `${s.id}[${s.type ?? 'story'}] «${truncate(s.title)}»`)
+            .map((s) => {
+              const stCount = s.subtasks?.length ?? 0;
+              const stHint = stCount > 0 ? ` (${stCount} ST)` : '';
+              return `${s.id}[${s.type ?? 'story'}] «${truncate(s.title)}»${stHint}`;
+            })
             .join('; ');
     return `- ${epic.id} «${truncate(epic.title)}»: ${stories}`;
   });
@@ -187,6 +195,12 @@ function asNumber(value: unknown): number | undefined {
 
 function asBoolean(value: unknown): boolean {
   return value === true;
+}
+
+function canonicalizeSubtaskId(raw: string): string {
+  const match = raw.trim().match(/^(?:ST[\s_-]*)?0*(\d+)$/i);
+  if (match) return `ST-${String(Number(match[1])).padStart(3, '0')}`;
+  return raw.trim().toUpperCase();
 }
 
 /** Extrae el número de un ID tipo HU-028, BUG-012, TASK-003, "hu 28", "28". */
@@ -414,6 +428,11 @@ function summarizeBacklog(workspace: UserWorkspace) {
           title: story.title,
           description: story.description,
           acceptanceCriteria: story.acceptanceCriteria,
+          subtasks: (story.subtasks ?? []).map((subtask) => ({
+            id: subtask.id,
+            title: subtask.title,
+            done: subtask.done,
+          })),
           severity: story.severity ?? null,
           stepsToReproduce: story.stepsToReproduce ?? null,
           technicalNotes: story.technicalNotes ?? null,
@@ -501,6 +520,12 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
           items: { type: 'string' },
           description: 'Obligatorio para story (≥1). Opcional para bug/task.',
         },
+        subtasks: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Títulos de subtareas de implementación (opcional). No son TASK-XXX de backlog.',
+        },
         severity: {
           type: 'string',
           description: 'Solo bug: low|medium|high|critical. Default medium.',
@@ -551,6 +576,11 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         title: { type: 'string' },
         description: { type: 'string' },
         acceptanceCriteria: { type: 'array', items: { type: 'string' } },
+        subtasks: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Reemplazo completo de subtareas (array de títulos).',
+        },
         severity: {
           type: 'string',
           enum: ['low', 'medium', 'high', 'critical'],
@@ -579,6 +609,50 @@ export const HARNESS_TOOL_DECLARATIONS: LlmToolDefinition[] = [
         },
       },
       required: ['storyId'],
+    },
+  },
+  {
+    name: 'create_subtask',
+    description:
+      'Añade una subtarea de implementación a una historia (HU/bug/task). Empieza con un verbo. No crea un TASK-XXX de backlog.',
+    parameters: {
+      type: 'object',
+      properties: {
+        storyId: { type: 'string', description: 'ID de la historia padre (HU-XXX / BUG-XXX / TASK-XXX).' },
+        title: {
+          type: 'string',
+          description: 'Título concreto y accionable. Preferir verbo de acción.',
+        },
+      },
+      required: ['storyId', 'title'],
+    },
+  },
+  {
+    name: 'update_subtask',
+    description:
+      'Actualiza el título o el estado done de una subtarea (ST-XXX) de una historia.',
+    parameters: {
+      type: 'object',
+      properties: {
+        storyId: { type: 'string' },
+        subtaskId: { type: 'string', description: 'ID de la subtarea (ST-001).' },
+        title: { type: 'string' },
+        done: { type: 'boolean', description: 'Marcar como hecha o pendiente.' },
+      },
+      required: ['storyId', 'subtaskId'],
+    },
+  },
+  {
+    name: 'delete_subtask',
+    description:
+      'Elimina una subtarea de una historia. No requiere confirmación.',
+    parameters: {
+      type: 'object',
+      properties: {
+        storyId: { type: 'string' },
+        subtaskId: { type: 'string', description: 'ID de la subtarea (ST-001).' },
+      },
+      required: ['storyId', 'subtaskId'],
     },
   },
   {
@@ -923,12 +997,14 @@ export async function executeHarnessTool(
             'INVALID_ARGS'
           );
         }
+        const subtasks = asStringArray(args.subtasks);
         const { workspace, storyId } = await createUserStoryAcrossWorkspace(ctx.uid, {
           epicId,
           type,
           title,
           description,
           acceptanceCriteria,
+          subtasks,
           severity,
           stepsToReproduce,
           technicalNotes,
@@ -973,6 +1049,7 @@ export async function executeHarnessTool(
           title?: string;
           description?: string;
           acceptanceCriteria?: string[];
+          subtasks?: import('@/lib/types/agent-2').StorySubtask[];
           severity?: 'low' | 'medium' | 'high' | 'critical';
           stepsToReproduce?: string[];
           technicalNotes?: string;
@@ -980,12 +1057,14 @@ export async function executeHarnessTool(
         const title = asString(args.title);
         const description = asString(args.description);
         const acceptanceCriteria = asStringArray(args.acceptanceCriteria);
+        const subtasks = asStringArray(args.subtasks);
         const severityRaw = asString(args.severity)?.toLowerCase();
         const stepsToReproduce = asStringArray(args.stepsToReproduce);
         const technicalNotes = asString(args.technicalNotes);
         if (title) updates.title = title;
         if (description) updates.description = description;
         if (acceptanceCriteria) updates.acceptanceCriteria = acceptanceCriteria;
+        if (subtasks) updates.subtasks = normalizeSubtasks(subtasks);
         if (
           severityRaw === 'low' ||
           severityRaw === 'medium' ||
@@ -1080,6 +1159,112 @@ export async function executeHarnessTool(
             mutated: true,
           }
         );
+      }
+
+      case 'create_subtask': {
+        const rawStoryId = asString(args.storyId);
+        const title = asString(args.title);
+        if (!rawStoryId || !title) {
+          return toolError('Faltan storyId o title.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveStoryId(workspace, rawStoryId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'STORY_NOT_FOUND');
+        }
+        try {
+          const { subtask } = await createSubtaskAcrossWorkspace(
+            ctx.uid,
+            resolved.storyId,
+            title
+          );
+          return toolSuccess(
+            `Subtarea ${subtask.id} creada en ${resolved.storyId}: ${subtask.title}`,
+            {
+              data: { storyId: resolved.storyId, subtask },
+              mutated: true,
+            }
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'No se pudo crear la subtarea.';
+          const code = message.includes('no encontrada') ? 'STORY_NOT_FOUND' : 'INVALID_ARGS';
+          return toolError(message, code);
+        }
+      }
+
+      case 'update_subtask': {
+        const rawStoryId = asString(args.storyId);
+        const rawSubtaskId = asString(args.subtaskId);
+        if (!rawStoryId || !rawSubtaskId) {
+          return toolError('Faltan storyId o subtaskId.', 'INVALID_ARGS');
+        }
+        const title = asString(args.title);
+        const hasDone = Object.prototype.hasOwnProperty.call(args, 'done');
+        if (!title && !hasDone) {
+          return toolError('Indica title o done para actualizar la subtarea.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveStoryId(workspace, rawStoryId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'STORY_NOT_FOUND');
+        }
+        try {
+          const { subtask } = await updateSubtaskAcrossWorkspace(
+            ctx.uid,
+            resolved.storyId,
+            canonicalizeSubtaskId(rawSubtaskId),
+            {
+              ...(title ? { title } : {}),
+              ...(hasDone ? { done: asBoolean(args.done) } : {}),
+            }
+          );
+          return toolSuccess(
+            `Subtarea ${subtask.id} de ${resolved.storyId} actualizada.`,
+            {
+              data: { storyId: resolved.storyId, subtask },
+              mutated: true,
+            }
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'No se pudo actualizar la subtarea.';
+          const code = message.includes('no encontrada')
+            ? message.startsWith('Subtarea')
+              ? 'SUBTASK_NOT_FOUND'
+              : 'STORY_NOT_FOUND'
+            : 'INVALID_ARGS';
+          return toolError(message, code);
+        }
+      }
+
+      case 'delete_subtask': {
+        const rawStoryId = asString(args.storyId);
+        const rawSubtaskId = asString(args.subtaskId);
+        if (!rawStoryId || !rawSubtaskId) {
+          return toolError('Faltan storyId o subtaskId.', 'INVALID_ARGS');
+        }
+        const { workspace } = await getWorkspaceData(ctx.uid);
+        const resolved = resolveStoryId(workspace, rawStoryId);
+        if (!resolved.ok) {
+          return toolError(resolved.summary, 'STORY_NOT_FOUND');
+        }
+        try {
+          const subtaskId = canonicalizeSubtaskId(rawSubtaskId);
+          await deleteSubtaskAcrossWorkspace(ctx.uid, resolved.storyId, subtaskId);
+          return toolSuccess(`Subtarea ${subtaskId} eliminada de ${resolved.storyId}.`, {
+            data: { storyId: resolved.storyId, subtaskId },
+            mutated: true,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'No se pudo eliminar la subtarea.';
+          const code = message.includes('no encontrada')
+            ? message.startsWith('Subtarea')
+              ? 'SUBTASK_NOT_FOUND'
+              : 'STORY_NOT_FOUND'
+            : 'INVALID_ARGS';
+          return toolError(message, code);
+        }
       }
 
       case 'delete_story': {

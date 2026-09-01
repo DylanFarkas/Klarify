@@ -108,6 +108,13 @@ export function buildStoryIssueBody(exportable: ExportableStory, allStories: Exp
       ? story.acceptanceCriteria.map((criterion) => `- [ ] ${criterion}`)
       : ['- [ ] Sin criterios definidos'];
 
+  const subtaskLines =
+    (story.subtasks ?? []).length > 0
+      ? (story.subtasks ?? []).map(
+          (subtask) => `- [${subtask.done ? 'x' : ' '}] ${subtask.id} ${subtask.title}`
+        )
+      : ['- Sin subtareas'];
+
   const dependencyLines =
     dependencies.length > 0
       ? dependencies.map((dep) => {
@@ -148,6 +155,9 @@ export function buildStoryIssueBody(exportable: ExportableStory, allStories: Exp
     '',
     '## Criterios de aceptación',
     ...acceptanceLines,
+    '',
+    '## Subtareas',
+    ...subtaskLines,
     '',
     '## Dependencias',
     ...dependencyLines,

@@ -6,15 +6,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { UserStory } from '@/lib/types/agent-2';
-import { MAX_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
+import type { StorySubtask, UserStory } from '@/lib/types/agent-2';
+import { MAX_ACCEPTANCE_CRITERIA, MAX_SUBTASKS_PER_STORY } from '@/lib/constants/agent-2';
 import { DetailModal } from '@/components/agents/shared/DetailModal';
+import { SubtasksEditor } from '@/components/agents/shared/SubtasksEditor';
 import { AcceptanceCriteriaEditor } from './AcceptanceCriteriaEditor';
 
 export interface UserStoryFormValues {
   title: string;
   description: string;
   acceptanceCriteria: string[];
+  subtasks: StorySubtask[];
 }
 
 interface UserStoryFormModalProps {
@@ -40,12 +42,14 @@ export function UserStoryFormModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [criteria, setCriteria] = useState<string[]>([]);
+  const [subtasks, setSubtasks] = useState<StorySubtask[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setTitle(story?.title ?? '');
     setDescription(story?.description ?? '');
     setCriteria(story?.acceptanceCriteria ?? []);
+    setSubtasks(story?.subtasks ?? []);
   }, [open, story]);
 
   const isSaveDisabled = !title.trim() || !description.trim();
@@ -56,6 +60,7 @@ export function UserStoryFormModal({
       title: title.trim(),
       description: description.trim(),
       acceptanceCriteria: criteria,
+      subtasks,
     });
   };
 
@@ -126,6 +131,20 @@ export function UserStoryFormModal({
             criteria={criteria}
             onChange={setCriteria}
             disabled={false}
+            hideCount
+          />
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-baseline justify-between gap-3">
+            <p className={fieldLabelClass}>Subtareas</p>
+            <span className="text-[11px] tabular-nums text-subtle">
+              {subtasks.length}/{MAX_SUBTASKS_PER_STORY}
+            </span>
+          </div>
+          <SubtasksEditor
+            subtasks={subtasks}
+            onChange={setSubtasks}
             hideCount
           />
         </div>

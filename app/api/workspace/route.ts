@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
           title?: string;
           description?: string;
           acceptanceCriteria?: string[];
+          subtasks?: import('@/lib/types/agent-2').StorySubtask[] | string[];
           points?: number;
           durationLabel?: string;
           category?: FrameworkCategory;
@@ -277,6 +278,7 @@ export async function POST(request: NextRequest) {
             title: payload.title,
             description: payload.description,
             acceptanceCriteria: payload.acceptanceCriteria ?? [],
+            subtasks: payload.subtasks,
             points: payload.points,
             durationLabel: payload.durationLabel,
             category: payload.category,

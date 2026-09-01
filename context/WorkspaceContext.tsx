@@ -67,6 +67,7 @@ export interface CreateDashboardUserStoryInput {
   title: string;
   description: string;
   acceptanceCriteria: string[];
+  subtasks?: import('@/lib/types/agent-2').StorySubtask[];
   points?: number;
   durationLabel?: string;
   category?: FrameworkCategory;
@@ -1068,6 +1069,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         title: input.title,
         description: input.description,
         acceptanceCriteria: input.acceptanceCriteria,
+        subtasks: input.subtasks ?? [],
         ...(input.type === 'bug'
           ? {
               severity: input.severity ?? 'medium',

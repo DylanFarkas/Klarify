@@ -110,6 +110,9 @@ export function BacklogStoryDetailPage() {
         estimationMode={metrics.estimationMode}
         members={members}
         canEditStatus={executionBoardEnabled}
+        onCancel={() => {
+          router.push('/agentes/backlog');
+        }}
         onSave={async (updates, estimationUpdates, options, prioritizationUpdates) => {
           await updateUserStory(
             row.story.id,

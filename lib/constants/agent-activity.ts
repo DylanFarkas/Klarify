@@ -21,7 +21,8 @@ export const AGENT_ACTIVITY = {
   PHASE_GENERATE: { id: 'generate', label: 'Generando backlog' },
   ACTION_READ_WISHES: { id: 'read-wishes', label: 'Leyendo deseos aprobados' },
   ACTION_GROUP_EPICS: { id: 'group-epics', label: 'Agrupando en épicas temáticas' },
-  ACTION_GENERATE_STORIES: { id: 'generate-stories', label: 'Generando historias de usuario' },
+  ACTION_GENERATE_STORIES: { id: 'generate-stories', label: 'Generando historias y subtareas' },
+  ACTION_GENERATE_SUBTASKS: { id: 'generate-subtasks', label: 'Desglosando subtareas' },
 
   // Agente 4 — prioritize
   PHASE_PRIORITIZE: { id: 'prioritize', label: 'Priorizando backlog' },

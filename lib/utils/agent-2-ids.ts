@@ -2,10 +2,11 @@
  * @fileoverview Generadores de IDs del Agente 2 (seguros para cliente).
  */
 
-import type { Epic, UserStory, WorkItemType } from '@/lib/types/agent-2';
+import type { Epic, StorySubtask, UserStory, WorkItemType } from '@/lib/types/agent-2';
 import {
   BUG_ID_PREFIX,
   EPIC_ID_PREFIX,
+  SUBTASK_ID_PREFIX,
   TASK_ID_PREFIX,
   USER_STORY_ID_PREFIX,
 } from '@/lib/constants/agent-2';
@@ -62,4 +63,27 @@ export function generateWorkItemId(
     workItemIdPrefix(type),
     existing.map((item) => item.id)
   );
+}
+
+/** Genera el siguiente ST-XXX a partir de las subtareas de una misma historia. */
+export function generateSubtaskId(existing: StorySubtask[] = []): string {
+  return nextIdForPrefix(
+    SUBTASK_ID_PREFIX,
+    existing.map((item) => item.id)
+  );
+}
+
+/** Asigna IDs y `done: false` a títulos de subtarea (salida del LLM o input de tools). */
+export function assignSubtaskIds(titles: string[]): StorySubtask[] {
+  const result: StorySubtask[] = [];
+  for (const title of titles) {
+    const trimmed = title.trim();
+    if (!trimmed) continue;
+    result.push({
+      id: generateSubtaskId(result),
+      title: trimmed,
+      done: false,
+    });
+  }
+  return result;
 }

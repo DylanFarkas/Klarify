@@ -91,6 +91,7 @@ function buildStoryRows(
         storyTitle: story.title,
         storyDescription: story.description,
         acceptanceCriteria: story.acceptanceCriteria,
+        subtasks: story.subtasks ?? [],
         severity: story.severity ?? null,
         stepsToReproduce: story.stepsToReproduce ?? [],
         technicalNotes: story.technicalNotes ?? null,

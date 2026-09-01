@@ -398,6 +398,7 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
     { key: 'wishes', label: 'Deseos origen', width: 18 },
     { key: 'kanban', label: 'Estado', width: 14, align: 'center' },
     { key: 'assignee', label: 'Asignado a', width: 18 },
+    { key: 'subtasks', label: 'Subtareas', width: 42, wrap: true },
   ];
 
   const rawRows = payload.stories.map((row) => {
@@ -426,6 +427,9 @@ function buildStoriesSheet(payload: ProjectExportPayload): {
       row.sourceWishIds.join(' · '),
       emptyValue(row.kanbanStatusLabel),
       emptyValue(row.assigneeName),
+      row.subtasks
+        .map((subtask) => `${subtask.done ? '[x]' : '[ ]'} ${subtask.id} ${subtask.title}`)
+        .join('\n'),
     ];
   });
 

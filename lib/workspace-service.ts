@@ -56,6 +56,7 @@ import type {
   Agent2Input,
   BugSeverity,
   Epic,
+  StorySubtask,
   UserStory,
   WorkItemType,
 } from '@/lib/types/agent-2';
@@ -87,7 +88,8 @@ import {
   nextLiveEpicId,
   nextLiveWorkItemId,
 } from '@/lib/utils/live-backlog';
-import { nextEpicIdFromIds, nextWorkItemIdFromIds } from '@/lib/utils/agent-2-ids';
+import { generateSubtaskId, nextEpicIdFromIds, nextWorkItemIdFromIds } from '@/lib/utils/agent-2-ids';
+import { MAX_SUBTASKS_PER_STORY } from '@/lib/constants/agent-2';
 import {
   buildManualEstimation,
   getEffortValue,
@@ -97,6 +99,7 @@ import {
 import {
   isBugSeverity,
   isWorkItemType,
+  normalizeSubtasks,
   normalizeUserStory,
   resolveWorkItemType,
   validateWorkItemFields,
@@ -190,6 +193,7 @@ export interface CreateUserStoryInput {
   severity?: import('@/lib/types/agent-2').BugSeverity;
   stepsToReproduce?: string[];
   technicalNotes?: string;
+  subtasks?: StorySubtask[] | string[];
 }
 
 /**
@@ -906,6 +910,7 @@ function normalizeUserStoryPatch(
       stepsToReproduce:
         safeUpdates.stepsToReproduce ?? current.stepsToReproduce ?? [],
       technicalNotes: safeUpdates.technicalNotes ?? current.technicalNotes,
+      subtasks: safeUpdates.subtasks ?? current.subtasks,
     },
     { partial: false }
   );
@@ -914,6 +919,9 @@ function normalizeUserStoryPatch(
   }
 
   const normalizedPatch: Partial<UserStory> = { ...safeUpdates };
+  if (safeUpdates.subtasks !== undefined) {
+    normalizedPatch.subtasks = normalizeSubtasks(safeUpdates.subtasks);
+  }
   if (type === 'bug') {
     if (safeUpdates.severity !== undefined) {
       normalizedPatch.severity = isBugSeverity(safeUpdates.severity)
@@ -1092,6 +1100,91 @@ async function updateUserStoryAcrossWorkspaceLegacy(
 
   await persistBacklogMutation(uid, projectId, workspace, updatedWorkspace);
   return updatedWorkspace;
+}
+
+async function loadLiveStoryForSubtask(
+  uid: string,
+  storyId: string
+): Promise<UserStory> {
+  const { workspace } = await getWorkspaceData(uid);
+  const story = getLiveBacklog(workspace).epics
+    .flatMap((epic) => epic.userStories)
+    .find((item) => item.id === storyId);
+  if (!story) {
+    throw new Error(`Historia no encontrada: ${storyId}`);
+  }
+  assertStoryNotInCompletedSprint(getLiveBacklog(workspace).plan, storyId);
+  return normalizeUserStory(story);
+}
+
+export async function createSubtaskAcrossWorkspace(
+  uid: string,
+  storyId: string,
+  title: string
+): Promise<{ workspace: UserWorkspace; subtask: StorySubtask }> {
+  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const current = normalizeSubtasks(story.subtasks);
+  if (current.length >= MAX_SUBTASKS_PER_STORY) {
+    throw new Error(`Máximo ${MAX_SUBTASKS_PER_STORY} subtareas por historia.`);
+  }
+  const trimmed = title.trim();
+  if (!trimmed) {
+    throw new Error('Cada subtarea necesita un título.');
+  }
+  const subtask: StorySubtask = {
+    id: generateSubtaskId(current),
+    title: trimmed,
+    done: false,
+  };
+  const workspace = await updateUserStoryAcrossWorkspace(uid, storyId, {
+    subtasks: [...current, subtask],
+  });
+  return { workspace, subtask };
+}
+
+export async function updateSubtaskAcrossWorkspace(
+  uid: string,
+  storyId: string,
+  subtaskId: string,
+  updates: { title?: string; done?: boolean }
+): Promise<{ workspace: UserWorkspace; subtask: StorySubtask }> {
+  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const current = normalizeSubtasks(story.subtasks);
+  const index = current.findIndex((item) => item.id === subtaskId);
+  if (index === -1) {
+    throw new Error(`Subtarea no encontrada: ${subtaskId}`);
+  }
+  const nextTitle =
+    updates.title !== undefined ? updates.title.trim() : current[index].title;
+  if (!nextTitle) {
+    throw new Error('Cada subtarea necesita un título.');
+  }
+  const subtask: StorySubtask = {
+    ...current[index],
+    title: nextTitle,
+    done: updates.done !== undefined ? updates.done : current[index].done,
+  };
+  const next = [...current];
+  next[index] = subtask;
+  const workspace = await updateUserStoryAcrossWorkspace(uid, storyId, {
+    subtasks: next,
+  });
+  return { workspace, subtask };
+}
+
+export async function deleteSubtaskAcrossWorkspace(
+  uid: string,
+  storyId: string,
+  subtaskId: string
+): Promise<UserWorkspace> {
+  const story = await loadLiveStoryForSubtask(uid, storyId);
+  const current = normalizeSubtasks(story.subtasks);
+  if (!current.some((item) => item.id === subtaskId)) {
+    throw new Error(`Subtarea no encontrada: ${subtaskId}`);
+  }
+  return updateUserStoryAcrossWorkspace(uid, storyId, {
+    subtasks: current.filter((item) => item.id !== subtaskId),
+  });
 }
 
 function resolveSprintPlan(workspace: UserWorkspace): SprintPlan | null {
@@ -1308,6 +1401,7 @@ function buildStoryDraft(input: CreateUserStoryInput): {
   stepsToReproduce?: string[];
   acceptanceCriteria: string[];
   technicalNotes?: string;
+  subtasks: StorySubtask[];
 } {
   const type = isWorkItemType(input.type) ? input.type : 'story';
   const severity =
@@ -1323,6 +1417,7 @@ function buildStoryDraft(input: CreateUserStoryInput): {
     type === 'task' && typeof input.technicalNotes === 'string'
       ? input.technicalNotes.trim()
       : undefined;
+  const subtasks = normalizeSubtasks(input.subtasks);
 
   const validationError = validateWorkItemFields({
     type,
@@ -1332,12 +1427,13 @@ function buildStoryDraft(input: CreateUserStoryInput): {
     severity,
     stepsToReproduce,
     technicalNotes,
+    subtasks,
   });
   if (validationError) {
     throw new Error(validationError);
   }
 
-  return { type, severity, stepsToReproduce, acceptanceCriteria, technicalNotes };
+  return { type, severity, stepsToReproduce, acceptanceCriteria, technicalNotes, subtasks };
 }
 
 function buildStoryFromDraft(
@@ -1351,6 +1447,7 @@ function buildStoryFromDraft(
     title: input.title.trim(),
     description: input.description.trim(),
     acceptanceCriteria: draft.acceptanceCriteria,
+    subtasks: draft.subtasks,
     ...(draft.type === 'bug'
       ? {
           severity: draft.severity ?? 'medium',

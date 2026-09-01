@@ -39,7 +39,7 @@ export function buildHarnessSystemPrompt(
   const indexBlock = backlogIndex?.trim()
     ? `
 ## Índice del backlog (IDs reales del proyecto)
-Solo estos IDs existen ahora. No inventes HU/BUG/TASK/EPIC fuera de esta lista.
+Solo estos IDs existen ahora. No inventes HU/BUG/TASK/EPIC/ST fuera de esta lista.
 ${backlogIndex.trim()}
 `
     : '';
@@ -97,8 +97,9 @@ ${categoryLines}
 - ${buildPriorityToolHint(framework)}
 ${indexBlock}${stackBlock}
 ## Capacidades (solo mediante tools)
-- Consultar el backlog (list_backlog) o un ítem (get_story).
+- Consultar el backlog (list_backlog) o un ítem (get_story). get_story y list_backlog incluyen subtasks (ST-XXX).
 - Crear, actualizar y eliminar ítems de backlog: historias (type=story), bugs (type=bug) y tasks (type=task) vía create_story / update_story / delete_story.
+- Crear, actualizar y eliminar subtareas de una historia: create_subtask / update_subtask / delete_subtask. Las subtareas NO son TASK-XXX de backlog.
 - Crear, actualizar y eliminar épicas.
 - Crear sprints (create_sprint), editar goal/fechas (update_sprint) y eliminar sprints vacíos (delete_sprint).
 - Iniciar (start_sprint) y cerrar (complete_sprint) el ciclo del sprint.
@@ -121,8 +122,9 @@ ${indexBlock}${stackBlock}
    - should: valor claro, no bloqueante para el primer release.
    - could: nice-to-have / mejora incremental.
    - wont: fuera de alcance ahora.
-5. IDs canónicos: historias HU-XXX, bugs BUG-XXX, tasks TASK-XXX, épicas EPIC-XXX, sprints SPRINT-XXX. NUNCA inventes prefijos como STORY- o US-. Si el usuario dice "hu 28" o "la 28", usa storyId "HU-028" (o el ID exacto del índice / list_backlog). Si dice "bug 3", usa "BUG-003". Si dice "sprint 2", usa sprintId "SPRINT-002" o el ID del índice. Si el ID no está en el índice, dilo o llama list_backlog; no inventes confirmaciones de borrado.
-5b. create_story: type=story exige acceptanceCriteria (≥1). type=bug exige stepsToReproduce (≥1) y severity (default medium). type=task no exige CA. No cambies el type de un ítem existente.
+5. IDs canónicos: historias HU-XXX, bugs BUG-XXX, tasks TASK-XXX, subtareas ST-XXX (scoped a la HU padre), épicas EPIC-XXX, sprints SPRINT-XXX. NUNCA inventes prefijos como STORY- o US-. Si el usuario dice "hu 28" o "la 28", usa storyId "HU-028" (o el ID exacto del índice / list_backlog). Si dice "bug 3", usa "BUG-003". Si dice "sprint 2", usa sprintId "SPRINT-002" o el ID del índice. Si dice "st 2" o "la subtarea 2", usa subtaskId "ST-002" junto al storyId padre. Si el ID no está en el índice, dilo o llama list_backlog; no inventes confirmaciones de borrado.
+5b. create_story: type=story exige acceptanceCriteria (≥1). type=bug exige stepsToReproduce (≥1) y severity (default medium). type=task no exige CA. No cambies el type de un ítem existente. create_story/update_story pueden pasar subtasks como array de títulos (reemplazo completo). Prefiere create_subtask / update_subtask / delete_subtask para cambios puntuales.
+5c. Subtareas: concretas, accionables, con verbo; trazables a los CA de la HU. No inventes requisitos ni funcionalidades nuevas. No las estimes, priorices ni asignes a sprint. delete_subtask no pide confirmación.
 6. Para delete_story, delete_epic y delete_sprint: llama a la tool SIN confirm=true. El runtime pedirá confirmación al usuario si la entidad existe y se puede borrar. NO inventes confirmaciones en texto. NO digas que algo se eliminó salvo status=success y mutated=true. Si la tool devuelve STORY_NOT_FOUND / EPIC_NOT_FOUND / SPRINT_NOT_FOUND, informa ese error y NO pidas confirmación ni reintentes el delete.
 7. delete_sprint NUNCA borra un sprint con historias asignadas. Si devuelve SPRINT_NOT_EMPTY, informa las HU y ofrece reasignarlas o dejarlas sin sprint; no reintentes el delete.
 8. Solo un sprint puede estar active. Si start_sprint falla porque ya hay uno activo, sugiere cerrarlo primero con complete_sprint.

@@ -17,6 +17,7 @@ export interface ProjectExportStoryRow {
   storyTitle: string;
   storyDescription: string;
   acceptanceCriteria: string[];
+  subtasks: import('@/lib/types/agent-2').StorySubtask[];
   severity: import('@/lib/types/agent-2').BugSeverity | null;
   stepsToReproduce: string[];
   technicalNotes: string | null;

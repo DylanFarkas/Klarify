@@ -103,7 +103,8 @@ REGLAS CRÍTICAS:
   - 1d-2d: solo si hay complejidad técnica sustancial, incertidumbre alta o varias capas importantes.
 - Evita inflar por dominio: que sea un juego, e-commerce o SaaS NO implica más tiempo por sí mismo; estima la historia concreta.
 - Si dudas entre dos valores cercanos, elige el menor razonable.
-- La justificación debe ser clara, profesional y técnica (máximo ${MAX_JUSTIFICATION_LENGTH} caracteres).`;
+- La justificación debe ser clara, profesional y técnica (máximo ${MAX_JUSTIFICATION_LENGTH} caracteres).
+- Estima solo cada historia (storyId HU-XXX / BUG-XXX / TASK-XXX). Las subtareas son contexto de alcance: no emitas sugerencias por subtarea.`;
 
       const userPrompt = `Eres un Scrum Master y Arquitecto de Software experto en estimación de esfuerzo.
 A partir del siguiente backlog estructurado por el Agente 2, estima el tiempo de implementación de cada historia de usuario con criterio pragmático y sin sobreestimar tareas comunes.
@@ -134,7 +135,8 @@ ${JSON.stringify(epics, null, 2)}`;
 REGLAS CRÍTICAS:
 - 'suggestedPoints' debe ser un número entero que pertenezca ESTRICTAMENTE a la escala Fibonacci: ${FIBONACCI_SCALE_LABEL}.
 - Evalúa la complejidad basándote en persistencia de datos, seguridad, lógica frontend y backend de la historia de usuario.
-- La justificación debe ser clara, profesional y técnica (máximo ${MAX_JUSTIFICATION_LENGTH} caracteres).`;
+- La justificación debe ser clara, profesional y técnica (máximo ${MAX_JUSTIFICATION_LENGTH} caracteres).
+- Estima solo cada historia (storyId HU-XXX / BUG-XXX / TASK-XXX). Las subtareas son contexto de alcance: no emitas sugerencias por subtarea.`;
 
     const userPrompt = `Eres un Scrum Master y Arquitecto de Software experto en estimación ágil.
 A partir del siguiente backlog estructurado por el Agente 2, calcula los Story Points correspondientes para cada una de las historias de usuario.

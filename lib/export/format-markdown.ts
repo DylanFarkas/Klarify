@@ -24,6 +24,13 @@ function formatAcceptanceCriteria(criteria: string[]): string {
   return criteria.map((criterion) => `- [ ] ${criterion}`).join('\n');
 }
 
+function formatSubtasks(subtasks: ProjectExportStoryRow['subtasks']): string {
+  if (subtasks.length === 0) return '_Sin subtareas_';
+  return subtasks
+    .map((subtask) => `- [${subtask.done ? 'x' : ' '}] ${subtask.id} ${subtask.title}`)
+    .join('\n');
+}
+
 export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectExportResult {
   const lines: string[] = [
     `# ${payload.projectName}`,
@@ -105,6 +112,10 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
         '**Criterios de aceptación**',
         '',
         formatAcceptanceCriteria(row.acceptanceCriteria),
+        '',
+        '**Subtareas**',
+        '',
+        formatSubtasks(row.subtasks),
         ''
       );
 

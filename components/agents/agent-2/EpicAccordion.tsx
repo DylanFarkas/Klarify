@@ -59,6 +59,7 @@ export function EpicAccordion({
         title: values.title,
         description: values.description,
         acceptanceCriteria: values.acceptanceCriteria,
+        subtasks: values.subtasks,
         sourceWishIds: [],
       });
     } else if (formStory) {

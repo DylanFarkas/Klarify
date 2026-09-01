@@ -5,7 +5,8 @@
 import { IBacklogLLMAdapter } from './IBacklogLLMAdapter';
 import type { Wish, TranscriptionResult } from '@/lib/types/agent-1';
 import type { Epic, UserStory } from '@/lib/types/agent-2';
-import { generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
+import { MAX_SUBTASKS_PER_STORY } from '@/lib/constants/agent-2';
+import { assignSubtaskIds, generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
 import type { AiGenerationConfig } from '@/lib/plans/types';
 import { backlogDetailPrompt, defaultAiConfig } from '@/lib/plans/ai-config';
@@ -21,6 +22,7 @@ interface RawBacklogResponse {
       description: string;
       acceptanceCriteria: string[];
       sourceWishIds: string[];
+      subtasks?: unknown;
     }>;
   }>;
 }
@@ -85,7 +87,11 @@ export class LlmBacklogAdapter implements IBacklogLLMAdapter {
             "Criterio 1 en formato dado/cuando/entonces",
             "Criterio 2"
           ],
-          "sourceWishIds": ["DESEO-001"]
+          "sourceWishIds": ["DESEO-001"],
+          "subtasks": [
+            "Implementar el flujo principal descrito en los criterios",
+            "Cubrir el caso de error cuando falte un dato obligatorio"
+          ]
         }
       ]
     }
@@ -93,11 +99,12 @@ export class LlmBacklogAdapter implements IBacklogLLMAdapter {
 }
 
 REGLAS CRÍTICAS:
-- NO incluyas campos "id", "source", "isEdited" ni "createdAt" en ningún objeto. Estos campos serán generados por el sistema después.
+- NO incluyas campos "id", "source", "isEdited", "createdAt" ni "done" en ningún objeto. Estos campos serán generados por el sistema después.
 - Genera como máximo ${config.maxEpics} épicas y como máximo ${config.maxStories} historias en total.
 - Cada épica debe tener entre 1 y ${config.maxStoriesPerEpic} historias de usuario.
 - Cada historia debe tener entre 1 y 5 criterios de aceptación.
 - Cada historia debe incluir al menos un elemento en sourceWishIds referenciando un ID de deseo válido.
+- subtasks es un array de strings (solo el título). Máximo ${MAX_SUBTASKS_PER_STORY} por historia. 0 es válido si no hace falta desglose.
 - ${detailHint}`;
 
     const userPrompt = `Eres un Product Owner experto en gestión ágil de proyectos.
@@ -111,7 +118,11 @@ REGLAS:
 5. Los criterios de aceptación deben ser verificables (formato dado/cuando/entonces o checklist).
 6. En sourceWishIds, referencia los IDs exactos de los deseos que originaron cada HU (ej: "DESEO-001").
 7. Si hay transcripción de la reunión, úsala como contexto adicional para enriquecer las HU.
-8. ${detailHint}
+8. Tras definir cada HU y sus criterios, genera únicamente las subtareas necesarias para implementarla y validarla por completo.
+9. Subtareas: concretas, accionables y verificables; empiezan con un verbo de acción; técnicas cuando corresponda; alcance manejable sin micro-dividir.
+10. Cada subtarea debe ser trazable a los criterios de aceptación existentes. No inventes requisitos, detalles de implementación innecesarios ni funcionalidades nuevas.
+11. Cuando aplique, considera desarrollo, integración, validaciones, manejo de errores y pruebas. No dupliques subtareas ni fuerces una cantidad fija. Si la HU es trivial, 1-2; si no hace falta desglose, usa [].
+12. ${detailHint}
 
 DESEOS APROBADOS:
 ${wishes.map((w) => `- ${w.id}: ${w.text}`).join('\n')}
@@ -168,12 +179,19 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
           continue;
         }
 
+        const rawSubtasks = Array.isArray(rawStory.subtasks) ? rawStory.subtasks : [];
+        const cleanSubtaskTitles = rawSubtasks
+          .map(extractSubtaskTitle)
+          .filter((title): title is string => Boolean(title))
+          .slice(0, MAX_SUBTASKS_PER_STORY);
+
         validStories.push({
           id: '',
           type: 'story',
           title: rawStory.title.trim(),
           description: rawStory.description.trim(),
           acceptanceCriteria: cleanCriteria,
+          subtasks: assignSubtaskIds(cleanSubtaskTitles),
           sourceWishIds: rawStory.sourceWishIds,
           source: 'auto',
           isEdited: false,
@@ -212,4 +230,16 @@ ${transcription ? `\nTRANSCRIPCIÓN DE LA REUNIÓN:\n"""\n${transcription.fullTe
 
     return result;
   }
+}
+
+function extractSubtaskTitle(item: unknown): string | null {
+  if (typeof item === 'string') {
+    const title = item.trim();
+    return title.length > 0 ? title : null;
+  }
+  if (item && typeof item === 'object' && 'title' in item) {
+    const title = (item as { title?: unknown }).title;
+    if (typeof title === 'string' && title.trim()) return title.trim();
+  }
+  return null;
 }

@@ -2,8 +2,13 @@
  * @fileoverview Validación y normalización de ítems de backlog (story | bug | task).
  */
 
-import type { BugSeverity, UserStory, WorkItemType } from '@/lib/types/agent-2';
-import { MIN_ACCEPTANCE_CRITERIA } from '@/lib/constants/agent-2';
+import type { BugSeverity, StorySubtask, UserStory, WorkItemType } from '@/lib/types/agent-2';
+import {
+  MAX_SUBTASKS_PER_STORY,
+  MIN_ACCEPTANCE_CRITERIA,
+  SUBTASK_ID_PREFIX,
+} from '@/lib/constants/agent-2';
+import { generateSubtaskId } from '@/lib/utils/agent-2-ids';
 
 export const WORK_ITEM_TYPES: WorkItemType[] = ['story', 'bug', 'task'];
 export const BUG_SEVERITIES: BugSeverity[] = [
@@ -34,6 +39,68 @@ export function resolveWorkItemType(
   return story?.type && isWorkItemType(story.type) ? story.type : 'story';
 }
 
+export function normalizeSubtasks(value: unknown): StorySubtask[] {
+  if (!Array.isArray(value)) return [];
+
+  const result: StorySubtask[] = [];
+  for (const item of value) {
+    if (result.length >= MAX_SUBTASKS_PER_STORY) break;
+
+    if (typeof item === 'string') {
+      const title = item.trim();
+      if (!title) continue;
+      result.push({
+        id: generateSubtaskId(result),
+        title,
+        done: false,
+      });
+      continue;
+    }
+
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as { id?: unknown; title?: unknown; done?: unknown };
+    const title = typeof raw.title === 'string' ? raw.title.trim() : '';
+    if (!title) continue;
+
+    const candidateId =
+      typeof raw.id === 'string' && raw.id.startsWith(`${SUBTASK_ID_PREFIX}-`)
+        ? raw.id
+        : generateSubtaskId(result);
+    const id = result.some((subtask) => subtask.id === candidateId)
+      ? generateSubtaskId(result)
+      : candidateId;
+
+    result.push({
+      id,
+      title,
+      done: raw.done === true,
+    });
+  }
+  return result;
+}
+
+export function validateSubtasks(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return 'Las subtareas deben ser una lista.';
+  if (value.length > MAX_SUBTASKS_PER_STORY) {
+    return `Máximo ${MAX_SUBTASKS_PER_STORY} subtareas por historia.`;
+  }
+  for (const item of value) {
+    if (typeof item === 'string') {
+      if (!item.trim()) return 'Cada subtarea necesita un título.';
+      continue;
+    }
+    if (!item || typeof item !== 'object') {
+      return 'Formato de subtarea inválido.';
+    }
+    const title = (item as { title?: unknown }).title;
+    if (typeof title !== 'string' || !title.trim()) {
+      return 'Cada subtarea necesita un título.';
+    }
+  }
+  return null;
+}
+
 export function normalizeUserStory(story: UserStory): UserStory {
   const type = resolveWorkItemType(story);
   const normalized: UserStory = {
@@ -42,6 +109,7 @@ export function normalizeUserStory(story: UserStory): UserStory {
     acceptanceCriteria: Array.isArray(story.acceptanceCriteria)
       ? story.acceptanceCriteria
       : [],
+    subtasks: normalizeSubtasks(story.subtasks),
   };
 
   if (type === 'bug') {
@@ -87,6 +155,7 @@ export interface WorkItemFieldInput {
   title?: string;
   description?: string;
   acceptanceCriteria?: string[];
+  subtasks?: StorySubtask[] | string[];
   severity?: BugSeverity;
   stepsToReproduce?: string[];
   technicalNotes?: string;
@@ -117,6 +186,11 @@ export function validateWorkItemFields(
     ) {
       return 'Se requiere al menos un criterio de aceptación.';
     }
+  }
+
+  if (input.subtasks !== undefined) {
+    const subtaskError = validateSubtasks(input.subtasks);
+    if (subtaskError) return subtaskError;
   }
 
   if (type === 'bug') {

@@ -113,7 +113,7 @@ export class LlmSprintPlanningAdapter implements ISprintPlanningAdapter {
 }
 
 REGLAS CRÍTICAS:
-- Asigna cada historia a EXACTAMENTE un sprint.
+- Asigna cada historia a EXACTAMENTE un sprint. Las subtareas no se planifican ni se asignan a sprints.
 - Respeta el orden de prioridad del framework ${frameworkLabel}: ${priorityOrder}.
 - La suma de Story Points por sprint NO debe exceder ${config.sprintCapacitySp} SP.
 - Detecta dependencias funcionales REALES entre historias (storyId depende de dependsOnStoryId).
