@@ -29,8 +29,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "tsx src/bin.ts",
-    "klarify": "tsx src/bin.ts",
+    "start": "tsx --tsconfig tsconfig.json src/bin.ts",
+    "klarify": "tsx --tsconfig tsconfig.json src/bin.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

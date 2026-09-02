@@ -11,7 +11,7 @@ import type { PlanId } from '@/lib/plans/types';
 import { PlanLimitError } from '@/lib/plans/plan-errors';
 import type { ProjectDocument, ProjectSlotsInfo, ProjectSummary, ProjectsListResponse } from '@/lib/types/project';
 import type { GithubExportRecord } from '@/lib/types/github-export';
-import { SCHEMA_VERSION_CURRENT } from '@/lib/types/project-schema';
+import { SCHEMA_VERSION_CURRENT, type WorkspaceScope } from '@/lib/types/project-schema';
 import { createEmptyWorkspace, type UserWorkspace } from '@/lib/types/workspace';
 import { computePipelineProgress } from '@/lib/utils/project-progress';
 import { normalizeWorkspace, workspaceMetaFromWorkspace } from '@/lib/project-schema';
@@ -426,7 +426,8 @@ export async function createProject(uid: string, name: string): Promise<ProjectS
 
 export async function switchProject(
   uid: string,
-  projectId: string
+  projectId: string,
+  options?: { workspaceScope?: WorkspaceScope }
 ): Promise<{
   project: ProjectSummary;
   workspace: UserWorkspace;
@@ -452,11 +453,14 @@ export async function switchProject(
     { merge: true }
   );
 
-  const plan = await resolveUserPlan(uid);
+  const [plan, workspace] = await Promise.all([
+    resolveUserPlan(uid),
+    loadWorkspace(uid, projectId, options?.workspaceScope ?? 'full'),
+  ]);
 
   return {
     project: toSummary(projectId, data),
-    workspace: await loadWorkspace(uid, projectId, 'full'),
+    workspace,
     preferences: { lastAgent },
     plan,
   };

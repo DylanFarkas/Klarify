@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, Text } from 'ink';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 
 export function SelectList<T>({
   items,
@@ -16,12 +16,13 @@ export function SelectList<T>({
   focused: boolean;
   height: number;
   getKey: (item: T, index: number) => string;
-  renderRow: (item: T, selected: boolean) => ReactNode;
+  renderRow: (item: T, selected: boolean, focused: boolean) => ReactNode;
   empty: string;
 }) {
+  const { colors } = useTheme();
   if (items.length === 0) {
     return (
-      <Box paddingY={1}>
+      <Box paddingY={1} paddingX={1}>
         <Text color={colors.muted}>{empty}</Text>
       </Box>
     );
@@ -36,14 +37,13 @@ export function SelectList<T>({
       {visible.map((item, offset) => {
         const index = start + offset;
         const selected = index === selectedIndex;
-        const bg = selected && focused ? colors.primary : undefined;
-        const fg = selected && focused ? colors.ink : colors.ink;
         return (
-          <Box key={getKey(item, index)} flexDirection="row" backgroundColor={bg}>
-            <Text color={selected && focused ? colors.ink : fg} wrap="truncate">
-              {selected ? '> ' : '  '}
-            </Text>
-            {renderRow(item, selected)}
+          <Box
+            key={getKey(item, index)}
+            flexDirection="row"
+            backgroundColor={selected && focused ? colors.surfaceHi : selected ? colors.surface : undefined}
+          >
+            {renderRow(item, selected, focused)}
           </Box>
         );
       })}

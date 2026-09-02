@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useWindowSize } from 'ink';
 import { Spinner, TextInput } from '@inkjs/ui';
-import { configPath, loadConfig } from '../../core/config';
+import { loadConfig } from '../../core/config';
 import {
   finishDeviceLogin,
   loginWithToken,
@@ -9,10 +9,15 @@ import {
   startDeviceLogin,
 } from '../../core/services';
 import type { DeviceStart } from '../../core/types';
-import { colors } from '../theme';
+import { Hints, Landing, Tip } from '../components/Landing';
+import { useTheme } from '../theme';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function spacedCode(code: string): string {
+  return code.replace(/[-]/g, ' · ').toUpperCase();
 }
 
 export function LoginScreen({
@@ -22,6 +27,8 @@ export function LoginScreen({
   onLoggedIn: () => void;
   onQuit: () => void;
 }) {
+  const { colors } = useTheme();
+  const { columns, rows } = useWindowSize();
   const [mode, setMode] = useState<'device' | 'token'>('device');
   const [device, setDevice] = useState<DeviceStart | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +66,7 @@ export function LoginScreen({
             return;
           }
           if (poll.status === 'expired') {
-            setError('El código caducó. Pulsa t para pegar un PAT o reinicia.');
+            setError('El código caducó. Pulsa t para pegar un PAT.');
             return;
           }
         }
@@ -76,33 +83,11 @@ export function LoginScreen({
     };
   }, [mode, onLoggedIn]);
 
-  return (
-    <Box flexDirection="column" padding={1} gap={1}>
-      <Text bold color={colors.primaryHi}>
-        Entrar a Klarify
-      </Text>
-      <Text color={colors.muted}>Los agentes siguen usando `klarify login --token` / env.</Text>
-      {error ? <Text color={colors.danger}>{error}</Text> : null}
-
-      {mode === 'device' ? (
-        <Box flexDirection="column" gap={1}>
-          {busy && !device ? <Spinner label="Pidiendo código…" /> : null}
-          {device ? (
-            <>
-              <Text color={colors.muted}>Abre en el navegador:</Text>
-              <Text color={colors.primaryHi}>{device.verificationUriComplete}</Text>
-              <Text color={colors.muted}>Código</Text>
-              <Text bold color={colors.ink}>
-                {device.userCode}
-              </Text>
-              <Spinner label="Esperando autorización…" />
-            </>
-          ) : null}
-          <Text color={colors.faint}>t pegar PAT · q salir</Text>
-        </Box>
-      ) : (
-        <Box flexDirection="column" gap={1}>
-          <Text color={colors.muted}>PAT (klf_…) · se guarda en {configPath()}</Text>
+  const body =
+    mode === 'token' ? (
+      <Box flexDirection="column">
+        <Text color={colors.muted}>Pega tu PAT de Klarify</Text>
+        <Box marginTop={1} width={Math.min(48, columns - 10)}>
           <TextInput
             placeholder="klf_…"
             onSubmit={(value) => {
@@ -117,9 +102,58 @@ export function LoginScreen({
               })();
             }}
           />
-          <Text color={colors.faint}>enter guardar · esc volver al código</Text>
         </Box>
-      )}
-    </Box>
+      </Box>
+    ) : (
+      <Box flexDirection="column">
+        {busy && !device ? <Spinner label="Pidiendo código…" /> : null}
+        {device ? (
+          <>
+            <Text bold color={colors.white}>
+              {spacedCode(device.userCode)}
+            </Text>
+            <Box marginTop={2}>
+              <Text color={colors.muted}>Abre este enlace en el navegador</Text>
+            </Box>
+            <Box marginTop={1} width={Math.min(columns - 8, 80)} overflow="hidden">
+              <Text color={colors.accent} wrap="wrap">
+                {device.verificationUriComplete}
+              </Text>
+            </Box>
+            <Box marginTop={2}>
+              <Spinner label="Esperando autorización" />
+            </Box>
+          </>
+        ) : null}
+      </Box>
+    );
+
+  return (
+    <Landing
+      columns={columns}
+      rows={rows}
+      title={mode === 'token' ? 'Token de acceso' : 'Iniciar sesión'}
+      meta={
+        mode === 'token'
+          ? 'El token se guarda en ~/.klarify/config.json'
+          : 'Autoriza este dispositivo para entrar al workspace.'
+      }
+      error={error}
+      showPath={false}
+      hints={
+        mode === 'token' ? (
+          <Hints items={[['enter', 'guardar'], ['esc', 'código']]} />
+        ) : (
+          <Hints items={[['t', 'PAT'], ['q', 'salir']]} />
+        )
+      }
+      tip={
+        mode === 'token' ? (
+          <Tip>Los agentes también pueden usar klarify login --token</Tip>
+        ) : undefined
+      }
+    >
+      {body}
+    </Landing>
   );
 }

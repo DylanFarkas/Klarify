@@ -1,6 +1,7 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useWindowSize } from 'ink';
 import { ConfirmInput } from '@inkjs/ui';
-import { colors } from '../theme';
+import { clampWidth } from '../layout';
+import { useTheme } from '../theme';
 
 export function ConfirmModal({
   title,
@@ -13,6 +14,9 @@ export function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { colors } = useTheme();
+  const { columns } = useWindowSize();
+  const width = clampWidth(56, columns);
   return (
     <Box
       flexDirection="column"
@@ -20,12 +24,17 @@ export function ConfirmModal({
       borderColor={colors.danger}
       paddingX={2}
       paddingY={1}
-      width={56}
+      width={width}
+      overflow="hidden"
     >
-      <Text bold color={colors.danger}>
+      <Text bold color={colors.danger} wrap="truncate">
         {title}
       </Text>
-      {detail ? <Text color={colors.muted}>{detail}</Text> : null}
+      {detail ? (
+        <Text color={colors.muted} wrap="wrap">
+          {detail}
+        </Text>
+      ) : null}
       <Box marginTop={1} gap={1}>
         <Text color={colors.ink}>Confirmar</Text>
         <ConfirmInput
@@ -35,7 +44,9 @@ export function ConfirmModal({
           onCancel={onCancel}
         />
       </Box>
-      <Text color={colors.faint}>y sí · n no · enter según el default (n)</Text>
+      <Text color={colors.faint} wrap="truncate">
+        y sí · n no · enter según el default (n)
+      </Text>
     </Box>
   );
 }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { importBacklog } from '../../core/services';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 
 type Preview = { epics: number; stories: number; path: string; payload: unknown };
 
@@ -18,6 +18,7 @@ export function ImportScreen({
   onCancel: () => void;
   onError: (message: string) => void;
 }) {
+  const { colors } = useTheme();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [rmAfter, setRmAfter] = useState(true);
 
@@ -46,7 +47,9 @@ export function ImportScreen({
       <Text bold color={colors.primaryHi}>
         Importar backlog
       </Text>
-      <Text color={colors.muted}>JSON con {'{ "epics": [...] }'}. Equivale a `klarify backlog import`.</Text>
+      <Text color={colors.muted} wrap="wrap">
+        JSON con {'{ "epics": [...] }'}. Equivale a `klarify backlog import`.
+      </Text>
       {!preview ? (
         <>
           <TextInput

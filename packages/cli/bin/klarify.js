@@ -13,7 +13,8 @@ const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const entry = join(pkgRoot, 'src', 'bin.ts');
 const tsxCli = require.resolve('tsx/cli');
 
-const result = spawnSync(process.execPath, [tsxCli, entry, ...process.argv.slice(2)], {
+const tsconfig = join(pkgRoot, 'tsconfig.json');
+const result = spawnSync(process.execPath, [tsxCli, '--tsconfig', tsconfig, entry, ...process.argv.slice(2)], {
   stdio: 'inherit',
   env: process.env,
   windowsHide: true,

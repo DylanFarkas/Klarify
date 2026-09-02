@@ -21,17 +21,22 @@ export interface ProjectSummary {
   id: string;
   name: string;
   pipelineLabel: string;
+  status?: 'active' | 'locked';
+  updatedAt?: number;
+  pipelineStep?: number;
+  completionPercentage?: number;
 }
 
 export interface ProjectList {
   projects: ProjectSummary[];
   activeProjectId: string | null;
+  plan?: { id: string; limits?: { maxProjects?: number } };
 }
 
 export interface Whoami {
   uid: string;
   activeProjectId: string | null;
-  plan: { id: string; limits?: unknown };
+  plan: { id: string; limits?: { maxProjects?: number } };
   projectCount: number;
   email: string | null;
 }
@@ -80,6 +85,12 @@ export interface LiveBacklog {
   sprints: BacklogSprint[];
   unassignedStoryIds: string[];
   stack: unknown;
+}
+
+export interface UseProjectResult {
+  project: { id: string; name?: string };
+  activeProjectId: string;
+  backlog?: LiveBacklog;
 }
 
 export interface CompactStory {

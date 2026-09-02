@@ -15,6 +15,7 @@ import type {
   ProjectList,
   SprintRollover,
   UpdateStoryInput,
+  UseProjectResult,
   Whoami,
 } from './types';
 
@@ -38,9 +39,12 @@ export async function createProject(name: string): Promise<{ project: { id: stri
   })) as { project: { id: string; name?: string } };
 }
 
-export async function useProject(projectId: string): Promise<void> {
-  await api(`/api/v1/projects/${encodeURIComponent(projectId)}/use`, { method: 'POST' });
+export async function useProject(projectId: string): Promise<UseProjectResult> {
+  const body = (await api(`/api/v1/projects/${encodeURIComponent(projectId)}/use`, {
+    method: 'POST',
+  })) as UseProjectResult;
   await saveConfig({ projectId });
+  return body;
 }
 
 export async function getContext(

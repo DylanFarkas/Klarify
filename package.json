@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "klarify": "tsx packages/cli/src/bin.ts",
+    "klarify": "tsx --tsconfig packages/cli/tsconfig.json packages/cli/src/bin.ts",
     "klarify:link": "npm install -g ./packages/cli"
   },
   "dependencies": {

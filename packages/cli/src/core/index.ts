@@ -27,6 +27,7 @@ export type {
   SprintRollover,
   StorySubtask,
   UpdateStoryInput,
+  UseProjectResult,
   Whoami,
   WorkItemType,
 } from './types';

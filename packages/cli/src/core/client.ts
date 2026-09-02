@@ -32,7 +32,13 @@ function errorMessage(status: number, body: unknown): string {
   return `HTTP ${status}`;
 }
 
-export async function api(
+const inflightGets = new Map<string, Promise<unknown>>();
+
+function getMethod(init: RequestInit): string {
+  return (init.method ?? 'GET').toUpperCase();
+}
+
+async function request(
   path: string,
   init: RequestInit & { config?: KlarifyConfig; json?: unknown } = {}
 ): Promise<unknown> {
@@ -54,6 +60,22 @@ export async function api(
     throw new ApiError(errorMessage(response.status, body), response.status, body);
   }
   return body;
+}
+
+export async function api(
+  path: string,
+  init: RequestInit & { config?: KlarifyConfig; json?: unknown } = {}
+): Promise<unknown> {
+  if (getMethod(init) !== 'GET') {
+    return request(path, init);
+  }
+  const existing = inflightGets.get(path);
+  if (existing) return existing;
+  const pending = request(path, init).finally(() => {
+    inflightGets.delete(path);
+  });
+  inflightGets.set(path, pending);
+  return pending;
 }
 
 export async function apiPublic(

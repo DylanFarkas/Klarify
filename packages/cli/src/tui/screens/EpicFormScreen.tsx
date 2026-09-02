@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { useState } from 'react';
 import { createEpic } from '../../core/services';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 
 export function EpicFormScreen({
   projectId,
@@ -15,6 +15,7 @@ export function EpicFormScreen({
   onCancel: () => void;
   onError: (message: string) => void;
 }) {
+  const { colors } = useTheme();
   const [step, setStep] = useState<'title' | 'description'>('title');
   const [title, setTitle] = useState('');
 

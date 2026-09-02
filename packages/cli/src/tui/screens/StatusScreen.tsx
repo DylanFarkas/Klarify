@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { setStatus } from '../../core/services';
 import { KANBAN_LABELS, KANBAN_STATUSES, type KanbanStatus } from '../../core/types';
-import { colors, statusColor } from '../theme';
+import { useTheme } from '../theme';
 
 export function StatusScreen({
   projectId,
@@ -15,14 +15,16 @@ export function StatusScreen({
   projectId: string;
   storyId: string;
   current: KanbanStatus | null;
-  onDone: () => void;
+  onDone: (status: KanbanStatus) => void;
   onCancel: () => void;
   onError: (message: string) => void;
 }) {
+  const { colors, statusColor } = useTheme();
   const initial = Math.max(0, KANBAN_STATUSES.indexOf(current ?? 'todo'));
   const [index, setIndex] = useState(initial);
 
   useInput((input, key) => {
+    if (key.ctrl) return;
     if (key.escape || input === 'q') {
       onCancel();
       return;
@@ -32,7 +34,7 @@ export function StatusScreen({
     if (key.return) {
       const status = KANBAN_STATUSES[index]!;
       void setStatus(projectId, storyId, status)
-        .then(() => onDone())
+        .then(() => onDone(status))
         .catch((err: unknown) => onError(err instanceof Error ? err.message : String(err)));
     }
   });
@@ -43,7 +45,7 @@ export function StatusScreen({
         Estado de {storyId}
       </Text>
       {KANBAN_STATUSES.map((status, i) => (
-        <Text key={status} color={i === index ? colors.ink : colors.muted} backgroundColor={i === index ? colors.primary : undefined}>
+        <Text key={status} color={i === index ? colors.onAccent : colors.muted} backgroundColor={i === index ? colors.accent : undefined}>
           {i === index ? '> ' : '  '}
           <Text color={statusColor[status]}>{KANBAN_LABELS[status]}</Text>
           {status === current ? <Text color={colors.faint}>  (actual)</Text> : null}

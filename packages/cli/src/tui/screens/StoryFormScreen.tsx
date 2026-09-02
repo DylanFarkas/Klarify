@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput } from '@inkjs/ui';
 import { createStory, getStory, updateStory } from '../../core/services';
-import type { BacklogEpic, CreateStoryInput } from '../../core/types';
-import { colors } from '../theme';
+import type { BacklogEpic, BacklogStory, CreateStoryInput } from '../../core/types';
+import { useTheme } from '../theme';
 
 type Field = 'epic' | 'title' | 'description' | 'ac' | 'subtasks' | 'category' | 'points' | 'save';
 
@@ -15,6 +15,7 @@ export function StoryFormScreen({
   epics,
   mode,
   storyId,
+  story,
   defaultEpicId,
   onDone,
   onCancel,
@@ -24,40 +25,45 @@ export function StoryFormScreen({
   epics: BacklogEpic[];
   mode: 'create' | 'edit';
   storyId?: string;
+  story?: BacklogStory;
   defaultEpicId?: string;
   onDone: () => void;
   onCancel: () => void;
   onError: (message: string) => void;
 }) {
+  const { colors } = useTheme();
   const [field, setField] = useState<Field>(mode === 'create' ? 'epic' : 'title');
   const [epicIndex, setEpicIndex] = useState(() => {
-    const idx = epics.findIndex((epic) => epic.id === defaultEpicId);
+    const idx = epics.findIndex((epic) => epic.id === (story?.epicId ?? defaultEpicId));
     return idx >= 0 ? idx : 0;
   });
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [ac, setAc] = useState<string[]>([]);
+  const [title, setTitle] = useState(story?.title ?? '');
+  const [description, setDescription] = useState(story?.description ?? '');
+  const [ac, setAc] = useState<string[]>(story?.acceptanceCriteria ?? []);
   const [acDraft, setAcDraft] = useState('');
-  const [subtasks, setSubtasks] = useState<string[]>([]);
+  const [subtasks, setSubtasks] = useState<string[]>((story?.subtasks ?? []).map((item) => item.title));
   const [subDraft, setSubDraft] = useState('');
-  const [categoryIndex, setCategoryIndex] = useState(0);
-  const [points, setPoints] = useState('');
-  const [loaded, setLoaded] = useState(mode === 'create');
+  const [categoryIndex, setCategoryIndex] = useState(() => {
+    const cat = CATEGORIES.indexOf(story?.priority ?? '');
+    return cat >= 0 ? cat : 0;
+  });
+  const [points, setPoints] = useState(story?.points != null ? String(story.points) : '');
+  const [loaded, setLoaded] = useState(mode === 'create' || Boolean(story));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (mode !== 'edit' || !storyId || loaded) return;
     void getStory(projectId, storyId)
-      .then(({ story }) => {
-        if (!story) return;
-        setTitle(story.title);
-        setDescription(story.description);
-        setAc(story.acceptanceCriteria ?? []);
-        setSubtasks((story.subtasks ?? []).map((item) => item.title));
-        const cat = CATEGORIES.indexOf(story.priority ?? '');
+      .then(({ story: fetched }) => {
+        if (!fetched) return;
+        setTitle(fetched.title);
+        setDescription(fetched.description);
+        setAc(fetched.acceptanceCriteria ?? []);
+        setSubtasks((fetched.subtasks ?? []).map((item) => item.title));
+        const cat = CATEGORIES.indexOf(fetched.priority ?? '');
         setCategoryIndex(cat >= 0 ? cat : 0);
-        setPoints(story.points != null ? String(story.points) : '');
-        const idx = epics.findIndex((epic) => epic.id === story.epicId);
+        setPoints(fetched.points != null ? String(fetched.points) : '');
+        const idx = epics.findIndex((epic) => epic.id === fetched.epicId);
         if (idx >= 0) setEpicIndex(idx);
         setLoaded(true);
       })
@@ -262,7 +268,9 @@ export function StoryFormScreen({
         <Text color={colors.ink}>    {points || '—'}</Text>
       )}
       {label('save', saving ? 'Guardando…' : 'Guardar')}
-      <Text color={colors.faint}>tab campo · enter en criterio/subtarea añade · ctrl+s guarda · esc cancela</Text>
+      <Text color={colors.faint} wrap="wrap">
+        tab campo · enter en criterio/subtarea añade · ctrl+s guarda · esc cancela
+      </Text>
     </Box>
   );
 }

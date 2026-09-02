@@ -55,6 +55,7 @@ import {
   updateSubtaskAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
 } from '@/lib/workspace-service';
+import { ensureUserAccount, resolveUserPlan } from '@/lib/plans/plan-service';
 import { createProject, listProjects, switchProject } from '@/lib/project-service';
 import { getLiveBacklog } from '@/lib/utils/live-backlog';
 import { normalizeSubtasks } from '@/lib/utils/work-item-validation';
@@ -68,8 +69,7 @@ import {
 import type { StackRecommendRaw } from '@/lib/types/stack';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
-import { adminDb } from '@/lib/firebase-admin';
-import { projectRef } from '@/lib/project-store/paths';
+import { projectRef, projectsColRef } from '@/lib/project-store/paths';
 
 async function loadWorkspace(uid: string, projectId: string): Promise<UserWorkspace> {
   const data = await getWorkspaceData(uid, { scope: 'shell', projectId });
@@ -86,13 +86,17 @@ async function prepareWrite(uid: string, projectId: string): Promise<UserWorkspa
 }
 
 export async function platformWhoami(uid: string) {
-  const userSnap = await adminDb.collection('users').doc(uid).get();
-  const { projects, activeProjectId, plan } = await listProjects(uid);
+  const [userSnap, countSnap] = await Promise.all([
+    ensureUserAccount(uid),
+    projectsColRef(uid).where('status', 'in', ['active', 'locked']).count().get(),
+  ]);
+  const plan = await resolveUserPlan(uid, userSnap);
+  const prefs = userSnap.data()?.preferences as { activeProjectId?: string } | undefined;
   return {
     uid,
-    activeProjectId,
+    activeProjectId: prefs?.activeProjectId ?? null,
     plan: { id: plan.id, limits: plan.limits },
-    projectCount: projects.length,
+    projectCount: countSnap.data().count,
     email: userSnap.data()?.email ?? null,
   };
 }
@@ -138,8 +142,12 @@ export async function platformCreateProject(uid: string, name: string) {
 }
 
 export async function platformUseProject(uid: string, projectId: string) {
-  const result = await switchProject(uid, projectId);
-  return { project: result.project, activeProjectId: result.project.id };
+  const result = await switchProject(uid, projectId, { workspaceScope: 'shell' });
+  return {
+    project: result.project,
+    activeProjectId: result.project.id,
+    backlog: serializeLiveBacklog(result.workspace),
+  };
 }
 
 export async function platformContext(

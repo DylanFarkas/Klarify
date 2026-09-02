@@ -4,7 +4,7 @@ import { TextInput } from '@inkjs/ui';
 import { completeSprint, createSprint, deleteSprint, startSprint } from '../../core/services';
 import type { BacklogSprint, SprintRollover } from '../../core/types';
 import { SelectList } from '../components/SelectList';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 
 export function SprintsScreen({
   projectId,
@@ -23,11 +23,13 @@ export function SprintsScreen({
   onError: (message: string) => void;
   onAskConfirm: (title: string, detail: string, action: () => Promise<void>) => void;
 }) {
+  const { colors } = useTheme();
   const [index, setIndex] = useState(0);
   const [creating, setCreating] = useState(false);
 
   useInput((input, key) => {
     if (creating) return;
+    if (key.ctrl) return;
     if (key.escape || input === 'q' || input === 'b') {
       onBack();
       return;
