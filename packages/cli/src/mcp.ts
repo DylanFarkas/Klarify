@@ -329,7 +329,7 @@ export async function runMcpStdio(): Promise<void> {
         result(id, {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {}, resources: {} },
-          serverInfo: { name: 'klarify', version: '0.1.0' },
+          serverInfo: { name: 'klarify', version: '0.1.3' },
         });
         continue;
       }

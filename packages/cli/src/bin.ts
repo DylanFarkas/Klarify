@@ -7,7 +7,7 @@ import { shouldLaunchTuiBare } from './tui/detect';
 const main = defineCommand({
   meta: {
     name: 'klarify',
-    version: '0.1.1',
+    version: '0.1.3',
     description:
       'Controla Klarify desde la terminal. TUI para humanos; subcomandos para agentes de código. No es Klark.',
   },
