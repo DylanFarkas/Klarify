@@ -100,15 +100,45 @@ export async function listCliTokens(uid: string): Promise<CliTokenRecord[]> {
 
 export async function createCliToken(
   uid: string,
-  name: string
+  name: string,
+  options?: { replaceOldestIfFull?: boolean }
 ): Promise<{ token: string; record: CliTokenRecord }> {
   const trimmed = name.trim() || 'CLI';
-  const existing = await tokensCol(uid).get();
+  let existing = await tokensCol(uid).get();
   if (existing.size >= MAX_CLI_TOKENS_PER_USER) {
-    throw platformInvalid(
-      `Máximo ${MAX_CLI_TOKENS_PER_USER} tokens CLI. Revoca uno para crear otro.`,
-      'TOKEN_LIMIT'
-    );
+    if (!options?.replaceOldestIfFull) {
+      throw platformInvalid(
+        `Máximo ${MAX_CLI_TOKENS_PER_USER} tokens CLI. Revoca uno para crear otro.`,
+        'TOKEN_LIMIT'
+      );
+    }
+    const ranked = existing.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: typeof data.name === 'string' ? data.name : 'Token',
+          createdAt: typeof data.createdAt === 'number' ? data.createdAt : 0,
+        };
+      })
+      .sort((a, b) => a.createdAt - b.createdAt);
+    const preferred =
+      ranked.find((item) => item.name === 'CLI device' || item.name.startsWith('CLI device')) ??
+      ranked[0];
+    if (!preferred) {
+      throw platformInvalid(
+        `Máximo ${MAX_CLI_TOKENS_PER_USER} tokens CLI. Revoca uno para crear otro.`,
+        'TOKEN_LIMIT'
+      );
+    }
+    await revokeCliToken(uid, preferred.id);
+    existing = await tokensCol(uid).get();
+    if (existing.size >= MAX_CLI_TOKENS_PER_USER) {
+      throw platformInvalid(
+        `Máximo ${MAX_CLI_TOKENS_PER_USER} tokens CLI. Revoca uno para crear otro.`,
+        'TOKEN_LIMIT'
+      );
+    }
   }
 
   const token = generateCliToken();

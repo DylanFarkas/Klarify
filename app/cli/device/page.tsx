@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { authFetch } from '@/lib/api-client';
+import { normalizeUserCode } from '@/lib/platform/user-code';
 
 export default function CliDevicePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [userCode, setUserCode] = useState(searchParams.get('user_code') ?? '');
+  const [userCode, setUserCode] = useState(() =>
+    normalizeUserCode(searchParams.get('user_code') ?? '')
+  );
   const [status, setStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -24,13 +27,15 @@ export default function CliDevicePage() {
     if (!user) return;
     setStatus('saving');
     setMessage(null);
+    const normalized = normalizeUserCode(userCode);
+    setUserCode(normalized);
     try {
       const response = await authFetch('/api/v1/auth/device/authorize', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userCode }),
+        body: JSON.stringify({ userCode: normalized }),
       });
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as { error?: string; code?: string };
       if (!response.ok) throw new Error(data.error ?? 'No se pudo autorizar');
       setStatus('ok');
     } catch (error) {
@@ -69,17 +74,27 @@ export default function CliDevicePage() {
             Código
             <input
               value={userCode}
-              onChange={(event) => setUserCode(event.target.value.toUpperCase())}
+              onChange={(event) => setUserCode(normalizeUserCode(event.target.value))}
               className="mt-1 w-full rounded-lg border border-border bg-input px-3 py-2 font-mono text-sm tracking-[0.2em] text-foreground"
               placeholder="ABCD-WXYZ"
               autoComplete="off"
               autoCapitalize="characters"
+              spellCheck={false}
             />
           </label>
-          {message ? <p className="text-[12px] text-danger">{message}</p> : null}
+          {message ? (
+            <div className="space-y-1">
+              <p className="text-[12px] text-danger">{message}</p>
+              {message.includes('Máximo') ? (
+                <p className="text-[12px] text-muted">
+                  Abre el workspace → Configuración → Integraciones y revoca un token CLI.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <button
             type="submit"
-            disabled={status === 'saving' || userCode.trim().length < 8}
+            disabled={status === 'saving' || normalizeUserCode(userCode).replace(/-/g, '').length !== 8}
             className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
           >
             {status === 'saving' ? 'Autorizando…' : 'Autorizar CLI'}

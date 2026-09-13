@@ -7,12 +7,14 @@ import 'server-only';
 import { randomBytes } from 'crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
-import { createCliToken } from '@/lib/platform/tokens';
+import { createCliToken, revokeCliToken } from '@/lib/platform/tokens';
 import { platformInvalid, platformNotFound } from '@/lib/platform/errors';
+import { normalizeUserCode } from '@/lib/platform/user-code';
 
 const DEVICE_TTL_MS = 10 * 60 * 1000;
 const POLL_INTERVAL_SECONDS = 3;
 const USER_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DEVICE_TOKEN_NAME = 'CLI device';
 
 export type DeviceAuthStatus = 'pending' | 'authorized' | 'consumed' | 'expired';
 
@@ -21,6 +23,7 @@ interface DeviceDoc {
   status: DeviceAuthStatus;
   expiresAt: number;
   token?: string;
+  tokenId?: string;
   tokenName?: string;
   uid?: string;
 }
@@ -37,6 +40,8 @@ function randomUserCode(): string {
   }
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
+
+export { normalizeUserCode } from '@/lib/platform/user-code';
 
 export function originFromRequest(request: Request): string {
   const url = new URL(request.url);
@@ -80,11 +85,20 @@ export async function startDeviceAuth(origin: string): Promise<{
 }
 
 async function findByUserCode(userCode: string): Promise<{ id: string; data: DeviceDoc } | null> {
-  const normalized = userCode.trim().toUpperCase();
+  const normalized = normalizeUserCode(userCode);
   const snap = await deviceCol().where('userCode', '==', normalized).limit(1).get();
   if (snap.empty) return null;
   const doc = snap.docs[0];
   return { id: doc.id, data: doc.data() as DeviceDoc };
+}
+
+async function revokeDeviceToken(data: DeviceDoc): Promise<void> {
+  if (!data.uid || !data.tokenId) return;
+  try {
+    await revokeCliToken(data.uid, data.tokenId);
+  } catch {
+    // Ya revocado o inexistente.
+  }
 }
 
 export async function authorizeDevice(uid: string, userCode: string): Promise<{ userCode: string }> {
@@ -94,6 +108,7 @@ export async function authorizeDevice(uid: string, userCode: string): Promise<{ 
   }
   const { id, data } = found;
   if (data.expiresAt < Date.now()) {
+    await revokeDeviceToken(data);
     await deviceCol().doc(id).delete();
     throw platformInvalid('El código ha caducado. Vuelve a ejecutar klarify login.', 'DEVICE_EXPIRED');
   }
@@ -101,13 +116,17 @@ export async function authorizeDevice(uid: string, userCode: string): Promise<{ 
     throw platformInvalid('Este código ya se usó.', 'DEVICE_ALREADY_USED');
   }
 
-  const { token } = await createCliToken(uid, 'CLI device');
+  // Device login puede rotar el token más viejo "CLI device" si el cupo está lleno.
+  const { token, record } = await createCliToken(uid, DEVICE_TOKEN_NAME, {
+    replaceOldestIfFull: true,
+  });
   await deviceCol().doc(id).set(
     {
       status: 'authorized',
       uid,
       token,
-      tokenName: 'CLI device',
+      tokenId: record.id,
+      tokenName: DEVICE_TOKEN_NAME,
     },
     { merge: true }
   );
@@ -129,6 +148,7 @@ export async function pollDeviceAuth(deviceCode: string): Promise<{
   }
   const data = snap.data() as DeviceDoc;
   if (data.expiresAt < Date.now()) {
+    await revokeDeviceToken(data);
     await snap.ref.delete();
     return { status: 'expired' };
   }
