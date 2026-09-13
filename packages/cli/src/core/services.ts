@@ -1,4 +1,5 @@
 import { api, apiPublic, projectPath } from './client';
+import { resolveApiUrl } from './api-urls';
 import { loadConfig, requireProject, saveConfig, type KlarifyConfig } from './config';
 import type {
   BacklogEpic,
@@ -253,21 +254,23 @@ export async function saveStack(
 }
 
 export async function startDeviceLogin(apiUrl: string): Promise<DeviceStart> {
-  return (await apiPublic(apiUrl, '/api/v1/auth/device', { method: 'POST' })) as DeviceStart;
+  return (await apiPublic(resolveApiUrl(apiUrl), '/api/v1/auth/device', {
+    method: 'POST',
+  })) as DeviceStart;
 }
 
 export async function pollDeviceLogin(apiUrl: string, deviceCode: string): Promise<DevicePoll> {
   return (await apiPublic(
-    apiUrl,
+    resolveApiUrl(apiUrl),
     `/api/v1/auth/device?device_code=${encodeURIComponent(deviceCode)}`
   )) as DevicePoll;
 }
 
 export async function loginWithToken(token: string, apiUrl?: string): Promise<KlarifyConfig> {
-  const resolved = apiUrl || (await loadConfig()).apiUrl;
+  const resolved = resolveApiUrl(apiUrl || (await loadConfig()).apiUrl);
   return saveConfig({ apiUrl: resolved, token });
 }
 
 export async function finishDeviceLogin(apiUrl: string, token: string): Promise<KlarifyConfig> {
-  return saveConfig({ apiUrl, token });
+  return saveConfig({ apiUrl: resolveApiUrl(apiUrl), token });
 }

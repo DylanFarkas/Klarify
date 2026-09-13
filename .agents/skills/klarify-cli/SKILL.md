@@ -29,4 +29,4 @@ klarify backlog import --file backlog.json --rm
 2. Implementar
 3. `klarify status` / subtareas
 
-Variables: `KLARIFY_TOKEN`, `KLARIFY_API_URL`, `KLARIFY_PROJECT`.
+Variables: `KLARIFY_TOKEN`, `KLARIFY_PROJECT`. API default: Cloud (`https://klarify.vercel.app`). Local solo con `--local` o `KLARIFY_API_URL=http://localhost:3000`.

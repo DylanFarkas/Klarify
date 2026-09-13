@@ -16,18 +16,37 @@ export class ApiError extends Error {
   }
 }
 
+function looksLikeHtml(text: string): boolean {
+  const head = text.trimStart().slice(0, 32).toLowerCase();
+  return head.startsWith('<!doctype') || head.startsWith('<html');
+}
+
 function parseBody(text: string): unknown {
   if (!text) return null;
   try {
     return JSON.parse(text) as unknown;
   } catch {
+    if (looksLikeHtml(text)) {
+      return { error: 'html' };
+    }
     return { error: text };
   }
 }
 
-function errorMessage(status: number, body: unknown): string {
+function errorMessage(status: number, body: unknown, apiUrl?: string): string {
   if (body && typeof body === 'object' && 'error' in body) {
-    return String((body as { error: string }).error);
+    const err = String((body as { error: string }).error);
+    if (err === 'html' || err.trimStart().toLowerCase().startsWith('<!doctype')) {
+      const host = apiUrl ?? 'esta API';
+      if (status === 404) {
+        return (
+          `La API CLI no está desplegada en ${host} (HTTP 404). ` +
+          `En local funciona; sube/mergea a main (o al branch que despliega Vercel) y vuelve a intentar.`
+        );
+      }
+      return `La API en ${host} devolvió HTML en vez de JSON (HTTP ${status}). ¿Está desplegada la ruta /api/v1?`;
+    }
+    return err;
   }
   return `HTTP ${status}`;
 }
@@ -57,7 +76,10 @@ async function request(
   });
   const body = parseBody(await response.text());
   if (!response.ok) {
-    throw new ApiError(errorMessage(response.status, body), response.status, body);
+    throw new ApiError(errorMessage(response.status, body, config.apiUrl), response.status, body);
+  }
+  if (body && typeof body === 'object' && 'error' in body && (body as { error: string }).error === 'html') {
+    throw new ApiError(errorMessage(response.status || 200, body, config.apiUrl), response.status || 200, body);
   }
   return body;
 }
@@ -83,17 +105,21 @@ export async function apiPublic(
   path: string,
   init: RequestInit & { json?: unknown } = {}
 ): Promise<unknown> {
+  const base = apiUrl.replace(/\/$/, '');
   const headers = new Headers(init.headers);
   if (init.json !== undefined) headers.set('Content-Type', 'application/json');
   const { json, ...fetchInit } = init;
-  const response = await fetch(`${apiUrl.replace(/\/$/, '')}${path}`, {
+  const response = await fetch(`${base}${path}`, {
     ...fetchInit,
     headers,
     body: json !== undefined ? JSON.stringify(json) : fetchInit.body,
   });
   const body = parseBody(await response.text());
   if (!response.ok) {
-    throw new ApiError(errorMessage(response.status, body), response.status, body);
+    throw new ApiError(errorMessage(response.status, body, base), response.status, body);
+  }
+  if (body && typeof body === 'object' && 'error' in body && (body as { error: string }).error === 'html') {
+    throw new ApiError(errorMessage(response.status || 200, body, base), response.status || 200, body);
   }
   return body;
 }

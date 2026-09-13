@@ -85,24 +85,37 @@ klarify use <projectId>
 klarify context --format md
 ```
 
-`klarify login` abre el device flow en la web. También puedes pasar un PAT (`klf_…`) generado en Configuración → Integraciones:
+`klarify login` abre el device flow en **Cloud** (`https://klarify.vercel.app`). También puedes pasar un PAT (`klf_…`) generado en Configuración → Integraciones:
 
 ```bash
+klarify login
 klarify login --token klf_…
 ```
 
-Por defecto la API es `http://localhost:3000`. En producción:
+Eso es lo que usan las personas y los agentes. No hace falta pasar URL.
+
+Si desarrollas Klarify en esta máquina:
 
 ```bash
-klarify login --apiUrl https://klarify.vercel.app
+klarify login --local
+# desde packages/cli:
+npm run login:local
 ```
 
+Con `npm run klarify …` hace falta `--` para pasar flags:
+
+```bash
+npm run klarify -- login --local
+npm run klarify -- login --prod
+```
+
+`klarify login` sin flags reutiliza el entorno de `~/.klarify/config.json` si ya hay sesión.
 ## Variables de entorno
 
 | Variable | Descripción |
 |---|---|
 | `KLARIFY_TOKEN` | PAT o token de sesión |
-| `KLARIFY_API_URL` | URL de la API |
+| `KLARIFY_API_URL` | Opcional. Default Cloud. Solo cambia a `http://localhost:3000` si desarrollas Klarify |
 | `KLARIFY_PROJECT` | Proyecto activo |
 | `KLARIFY_NO_TUI` | `1` — nunca lanza la TUI (útil en scripts) |
 
@@ -110,7 +123,7 @@ La sesión se guarda en `~/.klarify/config.json`.
 
 ## TUI
 
-Pantalla completa para personas: backlog en tres columnas, formularios (sin `;;`), Kanban, sprints e import JSON. Teclado: `j`/`k`, `tab`, `n` nueva HU, `e` editar, `s` estado, `i` importar, `?` ayuda, `q` salir. Confirmaciones destructivas piden `y`/`n`.
+Pantalla completa para personas: al entrar eliges **Cloud** (por defecto) o **Local** (desarrollo), luego backlog en tres columnas, formularios (sin `;;`), Kanban, sprints e import JSON. Teclado: `j`/`k`, `tab`, `n` nueva HU, `e` editar, `s` estado, `i` importar, `?` ayuda, `q` salir. Confirmaciones destructivas piden `y`/`n`.
 
 Los agentes **no** deben usar la TUI. Siguen con subcomandos y `--json`.
 

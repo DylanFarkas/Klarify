@@ -1,5 +1,16 @@
 export { ApiError, api, apiPublic, projectPath } from './client';
 export {
+  API_ENVIRONMENTS,
+  DEFAULT_API_URL,
+  LOCAL_API_URL,
+  PROD_API_URL,
+  environmentForApiUrl,
+  isAllowedApiUrl,
+  normalizeApiUrl,
+  resolveApiUrl,
+  type ApiEnvironmentId,
+} from './api-urls';
+export {
   clearConfig,
   configPath,
   loadConfig,

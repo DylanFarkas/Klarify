@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { chmod, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
+import { DEFAULT_API_URL, resolveApiUrl } from './api-urls';
 import {
   DEFAULT_TUI_ACCENT,
   DEFAULT_TUI_THEME,
@@ -22,14 +23,30 @@ export interface KlarifyConfig {
 const CONFIG_DIR = join(homedir(), '.klarify');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 
-const DEFAULT_API_URL = process.env.KLARIFY_API_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+const RESOLVED_DEFAULT_API_URL = (() => {
+  try {
+    return process.env.KLARIFY_API_URL ? resolveApiUrl(process.env.KLARIFY_API_URL) : DEFAULT_API_URL;
+  } catch {
+    return DEFAULT_API_URL;
+  }
+})();
 
 let storedCache: Partial<KlarifyConfig> | null = null;
 let storedCachePromise: Promise<Partial<KlarifyConfig>> | null = null;
 
+function safeApiUrl(raw: string | undefined): string {
+  try {
+    return resolveApiUrl(raw || DEFAULT_API_URL);
+  } catch {
+    return DEFAULT_API_URL;
+  }
+}
+
 function applyEnv(stored: Partial<KlarifyConfig>): KlarifyConfig {
   return {
-    apiUrl: (process.env.KLARIFY_API_URL || stored.apiUrl || DEFAULT_API_URL).replace(/\/$/, ''),
+    apiUrl: process.env.KLARIFY_API_URL
+      ? resolveApiUrl(process.env.KLARIFY_API_URL)
+      : safeApiUrl(stored.apiUrl ?? RESOLVED_DEFAULT_API_URL),
     token: process.env.KLARIFY_TOKEN || stored.token,
     projectId: process.env.KLARIFY_PROJECT || stored.projectId,
     theme: stored.theme ? resolveAgentTheme(stored.theme) : undefined,
@@ -85,7 +102,7 @@ export async function loadConfig(): Promise<KlarifyConfig> {
 export async function saveConfig(patch: Partial<KlarifyConfig>): Promise<KlarifyConfig> {
   const stored = await readStoredCached();
   const next: KlarifyConfig = {
-    apiUrl: (patch.apiUrl ?? stored.apiUrl ?? DEFAULT_API_URL).replace(/\/$/, ''),
+    apiUrl: resolveApiUrl(patch.apiUrl ?? stored.apiUrl ?? DEFAULT_API_URL),
   };
   const token = patch.token !== undefined ? patch.token : stored.token;
   const projectId = patch.projectId !== undefined ? patch.projectId : stored.projectId;

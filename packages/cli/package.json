@@ -32,6 +32,9 @@
   "scripts": {
     "start": "tsx --tsconfig tsconfig.json src/bin.ts",
     "klarify": "tsx --tsconfig tsconfig.json src/bin.ts",
+    "login": "tsx --tsconfig tsconfig.json src/bin.ts login",
+    "login:local": "tsx --tsconfig tsconfig.json src/bin.ts login --local",
+    "login:prod": "tsx --tsconfig tsconfig.json src/bin.ts login --prod",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

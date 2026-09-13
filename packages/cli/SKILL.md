@@ -18,7 +18,7 @@ klarify use <projectId>
 klarify context --format md
 ```
 
-Variables: `KLARIFY_TOKEN`, `KLARIFY_API_URL`, `KLARIFY_PROJECT`.
+Variables: `KLARIFY_TOKEN`, `KLARIFY_PROJECT`. API default: Cloud (`https://klarify.vercel.app`). Local solo con `--local` o `KLARIFY_API_URL=http://localhost:3000`.
 
 ## Crear un backlog completo (agentes)
 
