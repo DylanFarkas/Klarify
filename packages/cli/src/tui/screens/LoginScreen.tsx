@@ -21,7 +21,8 @@ function sleep(ms: number) {
 }
 
 function spacedCode(code: string): string {
-  return code.replace(/[-]/g, ' · ').toUpperCase();
+  // Mantener el guion canónico (ABCD-WXYZ) para copiar/pegar en la web.
+  return code.replace(/\s+/g, '').toUpperCase();
 }
 
 type Phase = 'env' | 'device' | 'token';
