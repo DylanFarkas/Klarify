@@ -1,6 +1,6 @@
 {
   "name": "@klarify/cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "CLI y TUI de Klarify para agentes de código y terminal. No envuelve a Klark.",
   "license": "MIT",
   "type": "module",

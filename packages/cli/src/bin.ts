@@ -1,13 +1,17 @@
 #!/usr/bin/env tsx
+import { createRequire } from 'node:module';
 import { defineCommand, runMain } from 'citty';
 import { fail } from './print';
 import { ApiError } from './core/client';
 import { shouldLaunchTuiBare } from './tui/detect';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
+
 const main = defineCommand({
   meta: {
     name: 'klarify',
-    version: '0.1.3',
+    version,
     description:
       'Controla Klarify desde la terminal. TUI para humanos; subcomandos para agentes de código. No es Klark.',
   },
