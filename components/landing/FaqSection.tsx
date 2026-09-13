@@ -49,7 +49,7 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={`h-4 w-4 shrink-0 text-[#191c1d]/45 transition-transform duration-300 ${
+      className={`h-4 w-4 shrink-0 text-white/45 transition-transform duration-300 ${
         expanded ? "rotate-180" : ""
       }`}
       fill="none"
@@ -83,17 +83,17 @@ function FaqAccordionItem({
   const panelId = `${baseId}-panel-${index}`;
 
   return (
-    <div className="border-t border-[#191c1d]/10 last:border-b">
+    <div className="border-t border-white/10 last:border-b">
       <h3>
         <button
           aria-controls={panelId}
           aria-expanded={isOpen}
-          className="flex w-full items-center justify-between gap-6 py-6 text-left transition-colors hover:text-[#191c1d]/80 md:py-7"
+          className="flex w-full items-center justify-between gap-6 py-6 text-left transition-colors hover:text-white/80 md:py-7"
           id={buttonId}
           onClick={onToggle}
           type="button"
         >
-          <span className="text-base font-semibold leading-snug tracking-[-0.01em] text-[#191c1d] md:text-[17px]">
+          <span className="text-base font-semibold leading-snug tracking-[-0.01em] text-white md:text-[17px]">
             {item.question}
           </span>
           <ChevronIcon expanded={isOpen} />
@@ -109,7 +109,7 @@ function FaqAccordionItem({
         style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
-          <p className="pb-6 pr-8 text-[15px] leading-7 text-[#191c1d]/70 md:pb-7 md:pr-12">
+          <p className="pb-6 pr-8 text-[15px] leading-7 text-white/55 md:pb-7 md:pr-12">
             {item.answer}
           </p>
         </div>
@@ -129,16 +129,16 @@ export function FaqSection() {
   return (
     <section
       aria-labelledby="faq-title"
-      className="scroll-mt-20 bg-white px-5 py-24 md:px-16 md:py-32"
+      className="scroll-mt-20 bg-[#000000] px-5 py-24 md:px-16 md:py-32"
       id="faq"
     >
       <div className="mx-auto max-w-360">
         <header className="mb-14 text-center md:mb-20">
-          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.22em] text-[#191c1d]/45">
+          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/45">
             FAQ
           </p>
           <h2
-            className="text-3xl font-light leading-[1.12] tracking-[-0.03em] text-[#191c1d] md:text-5xl md:leading-[1.08]"
+            className="text-3xl font-semibold leading-[1.12] tracking-[-0.03em] text-white md:text-5xl md:leading-[1.08]"
             id="faq-title"
           >
             Preguntas frecuentes

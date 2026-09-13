@@ -43,7 +43,7 @@ export const SPRINT_COLORS = [
 ];
 
 export const MOCK_SPRINT_PLANNING_PREFIX = 'Agente 5 (Mock Scrum Master):';
-export const GEMINI_SPRINT_PLANNING_PREFIX = 'Agente 5 (Scrum Master):';
+export const AGENT5_JUSTIFICATION_PREFIX = 'Agente 5 (Scrum Master):';
 export const FOUNDATIONAL_INFERENCE_PREFIX = 'Agente 5 (Capacidad habilitante):';
 
 export const MOCK_SPRINT_PLANNING_THOUGHTS = [

@@ -2,7 +2,7 @@ export function AutomatedWorkflow() {
   return (
     <section
       aria-labelledby="automated-workflow-title"
-      className="bg-black px-5 py-30 text-white md:px-8"
+      className="bg-[#000000] px-5 py-30 text-white md:px-8"
     >
       <div className="mx-auto flex max-w-360 flex-col items-center text-center">
         <svg

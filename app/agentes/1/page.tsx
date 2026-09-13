@@ -35,7 +35,6 @@ import { ClarifyingQuestionsPanel } from '@/components/agents/agent-1/Clarifying
 import { AgentActivityModal } from '@/components/agents/shared/activity-log/AgentActivityModal';
 import { LLMThinkingPanel } from '@/components/agents/shared/activity-log/LLMThinkingPanel';
 import { ApproveButton } from '@/components/agents/shared/workflow/ApproveButton';
-import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { useWorkspaceSettings } from '@/context/WorkspaceSettingsContext';
 import { notifySuccess } from '@/lib/notifications/toast';
 
@@ -453,86 +452,85 @@ export default function Agent1Page() {
   if (isLoading || !isHydrated || isRedirecting) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
       </div>
     );
   }
 
-  const showReviewStats = state.status === 'review' && state.wishes.length > 0;
+  const isReview = state.status === 'review';
+  const wishCount = state.wishes.length;
+  const answeredQuestions = state.discovery?.questions?.length ?? 0;
+  const isCapturePhase =
+    state.status === 'idle' ||
+    state.status === 'uploading' ||
+    state.status === 'transcribing';
+  const hasTranscriptionText = Boolean(state.transcription?.fullText?.trim());
+
+  const headerSubtitle =
+    state.status === 'editing_transcription'
+      ? 'Revisa el texto antes de analizar el contexto.'
+      : state.status === 'clarifying'
+        ? 'Unas preguntas cortas para afinar el alcance.'
+        : state.status === 'assessing' || state.status === 'extracting'
+          ? null
+          : isReview
+            ? null
+            : 'Audio, notas o un archivo para extraer los requerimientos.';
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-      <AgentPageHero
-        step={1}
-        variant="capture"
-        title="Ingesta de Contexto"
-        description="Comparte tu idea o la transcripción de una reunión. Analizamos el contexto, te hacemos unas preguntas rápidas si hace falta, y extraemos los requerimientos listos para revisar."
-        stats={
-          showReviewStats ? (
-            <>
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
-                }
-                value={state.wishes.length}
-                label={`deseo${state.wishes.length !== 1 ? 's' : ''} extraído${state.wishes.length !== 1 ? 's' : ''}`}
-              />
-              {state.discovery?.questions && state.discovery.questions.length > 0 && (
-                <AgentStat
-                  icon={
-                    <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                    </svg>
-                  }
-                  value={state.discovery.questions.length}
-                  label="preguntas respondidas"
-                />
-              )}
-            </>
-          ) : undefined
-        }
-      />
+    <div
+      className={[
+        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col px-6 pt-3 pb-5',
+        isReview || state.status === 'clarifying' ? 'max-w-5xl gap-5' : 'max-w-3xl gap-5',
+      ].join(' ')}
+    >
+      <header className="shrink-0 pb-3">
+        <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
+          Ingesta de Contexto
+        </h1>
+        <p className="mt-1 text-[12px] text-muted">
+          Paso 1/6 · Captura
+          {headerSubtitle ? <> · {headerSubtitle}</> : null}
+        </p>
+        {isReview && wishCount > 0 ? (
+          <p className="mt-1 text-[12px] text-muted">
+            <span className="tabular-nums text-foreground">{wishCount}</span>
+            {' '}
+            {wishCount === 1 ? 'deseo extraído' : 'deseos extraídos'}
+            {answeredQuestions > 0 ? (
+              <>
+                {' · '}
+                <span className="tabular-nums text-foreground">{answeredQuestions}</span>
+                {' '}
+                {answeredQuestions === 1 ? 'pregunta respondida' : 'preguntas respondidas'}
+              </>
+            ) : null}
+          </p>
+        ) : null}
+      </header>
 
-      {/* Upload */}
-      {(state.status === 'idle' ||
-        state.status === 'uploading' ||
-        state.status === 'transcribing') && (
+      {isCapturePhase ? (
         <FileUploader
           onFileSelect={handleFileUpload}
           onTranscriptionComplete={handleLiveTranscriptionComplete}
           isProcessing={state.status === 'transcribing'}
           error={state.error}
         />
-      )}
+      ) : null}
 
       {/* Edición de transcripción */}
       {state.status === 'editing_transcription' && (
-        <div className="animate-[fadeIn_0.3s_ease-out] overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-          <div className="border-b border-border bg-primary/5 px-6 py-5 md:px-8">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-hover">
-                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">
-                  {state.transcription?.fullText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
-                </h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted">
-                  {state.transcription?.fullText
-                    ? 'Corrige la transcripción si hace falta. Luego analizamos el contexto y te guiamos con preguntas puntuales si es necesario.'
-                    : 'Describe tu proyecto o pega apuntes de una reunión. Cuando estés listo, analizamos el contexto.'}
-                </p>
-              </div>
-            </div>
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="border-b border-border/60 px-4 py-3.5 md:px-5">
+            <h2 className="text-[20px] font-semibold tracking-tight text-foreground">
+              {hasTranscriptionText ? 'Revisa y corrige tu grabación' : 'Escribe tus requerimientos'}
+            </h2>
           </div>
 
-          <div className="flex flex-col gap-5 p-6 md:p-8">
+          <div className="px-4 py-4 md:px-5 md:py-5">
             <textarea
-              className="min-h-[220px] w-full resize-y rounded-xl border border-input-border bg-input p-5 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-primary focus:ring-2 focus:ring-primary/20"
+              autoFocus
+              className="min-h-52 w-full resize-y rounded-lg bg-input px-3 py-3 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-placeholder focus:border-border-strong"
               placeholder="Ejemplo: Quiero una app para vender zapatos online con catálogo, carrito y pagos..."
               value={state.transcription?.fullText || ''}
               onChange={(e) =>
@@ -547,23 +545,32 @@ export default function Agent1Page() {
               }
             />
 
-            {state.error && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3">
+            {state.error ? (
+              <div className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-2.5">
                 <p className="text-sm text-danger">{state.error}</p>
               </div>
-            )}
+            ) : null}
+          </div>
 
-            <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <div className="flex flex-col-reverse items-stretch justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center md:px-5">
+            <p className="text-[12px] text-subtle">
+              {hasTranscriptionText
+                ? 'Corrige la transcripción antes de continuar.'
+                : 'Describe el proyecto con el mayor detalle posible.'}
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
               <button
+                type="button"
                 onClick={handleReset}
-                className="rounded-xl border border-border px-6 py-3 text-sm font-medium text-muted transition-all hover:bg-surface-hover hover:text-foreground cursor-pointer"
+                className="cursor-pointer rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 Descartar y volver
               </button>
               <button
+                type="button"
                 onClick={() => handleAnalyzeText(state.transcription?.fullText || '')}
-                disabled={!state.transcription?.fullText?.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_35%,transparent)] transition-all hover:bg-primary-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!hasTranscriptionText}
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Analizar contexto
               </button>
@@ -588,26 +595,17 @@ export default function Agent1Page() {
       {/* Review */}
       {state.status === 'review' && (
         <>
-          {state.file && (
-            <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface-muted px-5 py-4 shadow-sm">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-lg">
-                {state.file.name.endsWith('.mp3') || state.file.name.endsWith('.wav') ? '🎵' : '📄'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-foreground">{state.file.name}</p>
-                <p className="text-xs text-muted">Procesado exitosamente</p>
-              </div>
-              <span className="shrink-0 rounded-full border border-success/30 bg-success/15 px-3 py-1 text-xs font-bold text-success">
-                ✓ Listo
+          {state.file ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+              <span className="font-medium text-foreground">{state.file.name}</span>
+              <span className="text-subtle" aria-hidden>
+                ·
               </span>
+              <span className="text-success">Procesado</span>
             </div>
-          )}
+          ) : null}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <TranscriptionPanel
-              transcription={state.transcription}
-              discovery={state.discovery}
-            />
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
             <WishesList
               wishes={state.wishes}
               onEdit={handleEditWish}
@@ -615,28 +613,28 @@ export default function Agent1Page() {
               onAdd={handleAddWish}
               isApproved={false}
             />
+            <TranscriptionPanel
+              transcription={state.transcription}
+              discovery={state.discovery}
+            />
           </div>
 
-          <div className="sticky bottom-6 z-20 animate-[slideUpFade_0.4s_ease-out]">
-            <div className="rounded-2xl border border-border/80 bg-surface-muted/80 backdrop-blur-xl px-6 py-4 shadow-[0_8px_32px_color-mix(in_srgb,var(--foreground)_8%,transparent)]">
-              <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-                <p className="hidden text-sm text-subtle sm:block">
-                  Revisa los deseos antes de continuar al backlog.
-                </p>
-                <div className="flex w-full flex-col-reverse items-center gap-3 sm:w-auto sm:flex-row">
-                  <button
-                    onClick={handleReset}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-medium text-muted transition-all hover:border-border-strong hover:bg-surface-hover hover:text-foreground cursor-pointer sm:w-auto"
-                  >
-                    Empezar de nuevo
-                  </button>
-                  <ApproveButton
-                    onClick={handleApprove}
-                    disabled={state.wishes.length === 0 || isApproving}
-                    label="Aprobar deseos y continuar"
-                  />
-                </div>
-              </div>
+          <div className="flex flex-col items-stretch justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
+            <p className="text-[13px] text-subtle">
+              Revisa los deseos antes de continuar al backlog.
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <button
+                onClick={handleReset}
+                className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-muted px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              >
+                Empezar de nuevo
+              </button>
+              <ApproveButton
+                onClick={handleApprove}
+                disabled={state.wishes.length === 0 || isApproving}
+                label="Aprobar deseos y continuar"
+              />
             </div>
           </div>
         </>

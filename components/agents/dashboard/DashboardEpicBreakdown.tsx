@@ -1,4 +1,5 @@
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 export function DashboardEpicBreakdown({ metrics }: { metrics: DashboardMetrics }) {
 	return (
@@ -33,9 +34,11 @@ export function DashboardEpicBreakdown({ metrics }: { metrics: DashboardMetrics 
 						</div>
 
 						<div className="mt-4 flex items-center justify-between gap-4 text-sm text-muted">
-							<span>{epic.points} SP totales</span>
+							<span>{formatEffortTotal(epic.points, metrics.estimationMode)} totales</span>
 							<span>
-								{epic.storyCount === 0 ? 'Sin historias' : `${(epic.points / epic.storyCount).toFixed(1)} SP/HU`}
+								{epic.storyCount === 0
+									? 'Sin historias'
+									: `${formatEffortTotal(epic.points / epic.storyCount, metrics.estimationMode)}/HU`}
 							</span>
 						</div>
 					</article>

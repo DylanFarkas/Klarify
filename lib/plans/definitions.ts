@@ -17,6 +17,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     export: 'manual',
     executionBoard: false,
     maxTeamMembers: 0,
+    maxHarnessMessages: 15,
   },
   starter: {
     maxProjects: 3,
@@ -30,6 +31,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     export: 'manual',
     executionBoard: true,
     maxTeamMembers: 8,
+    maxHarnessMessages: 60,
   },
   pro: {
     maxProjects: 10,
@@ -43,6 +45,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     export: 'full',
     executionBoard: true,
     maxTeamMembers: 25,
+    maxHarnessMessages: null,
   },
 };
 

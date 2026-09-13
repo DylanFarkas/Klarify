@@ -56,9 +56,11 @@ export interface AgentStep {
   path: string;
   /** Descripción breve para tooltips */
   description: string;
+  /** Si true, no se muestra en el stepper (desactivado temporalmente). */
+  disabled?: boolean;
 }
 
-/** Definición de los 6 agentes del pipeline de Klarify */
+/** Definición de los agentes del pipeline de Klarify (paso 5 desactivado: planificación manual en dashboard). */
 export const AGENT_STEPS: AgentStep[] = [
   { number: 1, name: 'Ingesta de Contexto', path: '/agentes/1', description: 'Carga y transcripción de reuniones' },
   { number: 2, name: 'Backlog Inicial', path: '/agentes/2', description: 'Clasificación y análisis de deseos' },
@@ -69,11 +71,14 @@ export const AGENT_STEPS: AgentStep[] = [
     name: 'Planificación de Sprints',
     path: '/agentes/5',
     description: 'Organiza HU priorizadas en sprints con objetivos, capacidad y cronograma',
+    disabled: true,
   },
-  { number: 6, 
-    name: 'Dashboard', 
-    path: '/agentes/6', 
-    description: 'Evaluación del impacto de las épicas y historias de usuario' }
+  {
+    number: 6,
+    name: 'Dashboard',
+    path: '/agentes/dashboard',
+    description: 'Backlog, sprints manuales y seguimiento del proyecto',
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ import { AgentLayout } from '@/components/agents/shared/layout/AgentLayout';
 export const metadata: Metadata = {
   title: 'Dashboard del workspace | Klarify',
   description:
-    'Resumen general del workspace con métricas de historias, prioridades, estimaciones y sprints.',
+    'Resumen del proyecto con sprint activo, historial de sprints y métricas generales.',
 };
 
 export default function Agent5Layout({

@@ -49,7 +49,7 @@ export function StoryExecutionDrawer({
 }: StoryExecutionDrawerProps) {
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!open || !item) return;
+      if (!open || !item || item.sprintLocked) return;
       const idx = Number(event.key) - 1;
       if (idx >= 0 && idx < KANBAN_COLUMNS.length) {
         onStatusChange(item.story.id, KANBAN_COLUMNS[idx].id);
@@ -74,21 +74,22 @@ export function StoryExecutionDrawer({
       title={item.story.title}
       subtitle={item.story.id}
       eyebrow={item.epicTitle}
-      maxWidth="xl"
+      maxWidth="2xl"
     >
       <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-background/50 p-4">
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Ejecución</h3>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-border/60 bg-surface-muted/30 p-3.5">
+          <h3 className="text-[11px] font-medium uppercase tracking-[0.12em] text-subtle">Ejecución</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="story-status" className="text-[11px] font-semibold text-subtle">
+              <label htmlFor="story-status" className="text-[11px] font-medium text-subtle">
                 Estado
               </label>
               <select
                 id="story-status"
                 value={item.execution.status}
                 onChange={(e) => onStatusChange(item.story.id, e.target.value as KanbanStatus)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface text-foreground px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+                disabled={item.sprintLocked}
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {KANBAN_COLUMNS.map((col) => (
                   <option key={col.id} value={col.id}>
@@ -96,10 +97,12 @@ export function StoryExecutionDrawer({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] text-subtle">Atajos: teclas 1–4</p>
+              <p className="mt-1 text-[10px] text-subtle">
+                {item.sprintLocked ? 'Sprint cerrado: no se puede cambiar.' : 'Atajos: teclas 1–4'}
+              </p>
             </div>
             <div>
-              <label htmlFor="story-assignee" className="text-[11px] font-semibold text-subtle">
+              <label htmlFor="story-assignee" className="text-[11px] font-medium text-subtle">
                 Responsable
               </label>
               <select
@@ -108,7 +111,8 @@ export function StoryExecutionDrawer({
                 onChange={(e) =>
                   onAssigneeChange(item.story.id, e.target.value ? e.target.value : null)
                 }
-                className="mt-1 w-full rounded-lg border border-border bg-surface text-foreground px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+                disabled={item.sprintLocked}
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Sin asignar</option>
                 {members.map((m) => (
@@ -121,7 +125,7 @@ export function StoryExecutionDrawer({
           </div>
           {item.sprintNumber !== null && (
             <p className="mt-3 text-xs text-muted">
-              Sprint planificado: <span className="font-semibold">Sprint {item.sprintNumber}</span>
+              Sprint planificado: <span className="font-medium text-foreground">Sprint {item.sprintNumber}</span>
             </p>
           )}
         </section>
@@ -129,21 +133,22 @@ export function StoryExecutionDrawer({
         <UserStoryDetailContent
           story={item.story}
           epicTitle={item.epicTitle}
-          estimation={item.points > 0 ? { points: item.points, justification: '', isModified: false } : undefined}
+          estimation={item.estimation}
+          estimationMode={item.estimationMode}
           prioritization={item.priority ?? undefined}
           framework={framework}
         />
 
         {activity.length > 0 && (
           <section>
-            <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+            <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-subtle">
               Actividad reciente
             </h3>
-            <ul className="space-y-2">
+            <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
               {activity.map((entry, i) => (
                 <li
                   key={`${entry.at}-${i}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-2 px-3 py-2.5 text-xs"
                 >
                   <span className="text-muted">{formatActivity(entry, members)}</span>
                   <time className="shrink-0 text-[10px] text-subtle">

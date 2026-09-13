@@ -3,12 +3,20 @@
 /**
  * @fileoverview AgentSidebarSettings — Acceso a configuración del workspace.
  *
- * Abre un modal con temas e integraciones. Se renderiza en el sidebar (desktop)
- * y en la barra superior (móvil).
+ * Abre un modal con temas, equipo e integraciones. Se renderiza en el sidebar
+ * (desktop) y en la barra superior (móvil). El modal vive en SettingsModalProvider.
  */
 
-import { useState } from 'react';
-import { WorkspaceSettingsModal } from '@/components/agents/shared/settings/WorkspaceSettingsModal';
+import { useSettingsModal } from '@/context/SettingsModalContext';
+import { AiModelPicker } from '@/components/agents/shared/settings/AiModelPicker';
+import {
+  SIDEBAR_ICON_CLASS,
+  sidebarCollapsibleClass,
+  sidebarCollapsibleInnerClass,
+  sidebarIconSlotClass,
+  sidebarLabelClass,
+  sidebarNavItemClass,
+} from './sidebar-styles';
 
 interface AgentSidebarSettingsProps {
   /** Clases extra para adaptar el componente en distintos layouts (ej. móvil) */
@@ -16,21 +24,24 @@ interface AgentSidebarSettingsProps {
 }
 
 export function AgentSidebarSettings({ className = '' }: AgentSidebarSettingsProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { openSettings } = useSettingsModal();
 
   return (
-    <>
-      <div className={['relative z-10 border-border', className].filter(Boolean).join(' ')}>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className={[
-            'flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium',
-            'text-muted transition-colors hover:bg-surface-hover hover:text-foreground',
-          ].join(' ')}
-        >
+    <div className={['relative z-10 flex flex-col gap-0.5', className].filter(Boolean).join(' ')}>
+      <div className={sidebarCollapsibleClass}>
+        <div className={sidebarCollapsibleInnerClass}>
+          <AiModelPicker compact />
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => openSettings()}
+        title="Configuración"
+        className={['cursor-pointer', sidebarNavItemClass(false)].join(' ')}
+      >
+        <span className={sidebarIconSlotClass}>
           <svg
-            className="h-5 w-5 shrink-0"
+            className={SIDEBAR_ICON_CLASS}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -44,23 +55,10 @@ export function AgentSidebarSettings({ className = '' }: AgentSidebarSettingsPro
             />
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
+        </span>
 
-          <span className="flex-1 text-left">Configuración</span>
-
-          <svg
-            className="h-4 w-4 shrink-0 text-subtle"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      <WorkspaceSettingsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </>
+        <span className={sidebarLabelClass}>Configuración</span>
+      </button>
+    </div>
   );
 }

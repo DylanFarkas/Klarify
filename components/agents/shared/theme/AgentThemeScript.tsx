@@ -1,18 +1,17 @@
 /**
  * @fileoverview AgentThemeScript — Script anti-FOUC para temas de agentes.
  *
- * Usa next/script con beforeInteractive para ejecutarse en la carga inicial
- * sin provocar el warning de React 19 sobre <script> en componentes cliente.
+ * Debe vivir en el layout raíz (`app/layout.tsx`), dentro de `<head>`: un
+ * script clásico bloqueante corre antes del primer paint. `next/script` con
+ * `beforeInteractive` no aplica a tiempo si se monta en un layout anidado.
  */
 
-import Script from 'next/script';
 import { getAgentThemeBootstrapScript } from '@/lib/constants/agent-theme';
 
 export function AgentThemeScript() {
   return (
-    <Script
+    <script
       id="klarify-agent-theme"
-      strategy="beforeInteractive"
       dangerouslySetInnerHTML={{ __html: getAgentThemeBootstrapScript() }}
     />
   );

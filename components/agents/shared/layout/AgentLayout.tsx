@@ -2,7 +2,8 @@
  * @fileoverview AgentLayout — Shell visual del workspace de agentes.
  *
  * Componente server-side que provee la estructura común para todas las
- * vistas de agentes: sidebar con stepper, header con info del agente,
+ * vistas de agentes: sidebar (stepper durante el pipeline, navegación
+ * de workspace al llegar al dashboard), header con info del agente,
  * y área de contenido principal.
  *
  * Cada agente usa este layout pasando su `currentStep` y `agentTitle`.

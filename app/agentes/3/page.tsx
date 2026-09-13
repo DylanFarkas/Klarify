@@ -13,17 +13,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import type { Agent3State, Agent3Status, StoryEstimation } from '@/lib/types/agent-3';
+import type { Agent3State, Agent3Status, EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
+import type { Agent3Input, UserWorkspace } from '@/lib/types/workspace';
 import { EmptyPrioritizationState } from '@/components/agents/agent-3/EmptyPrioritizationState';
 import { EstimationWorkspace } from '@/components/agents/agent-3/EstimationWorkspace';
-import { AgentPageHero, AgentStat } from '@/components/agents/shared/layout/AgentPageHero';
 import { AgentErrorBanner } from '@/components/agents/shared/AgentErrorBanner';
 import { AgentCelebrationBanner } from '@/components/agents/shared/AgentCelebrationBanner';
 import { errorMessage, notifyError, notifySuccess } from '@/lib/notifications/toast';
+import { formatEffortTotal, isEstimationMode, isStoryEstimated } from '@/lib/utils/estimation';
 
 const INITIAL_STATE: Agent3State = {
   input: null,
   estimations: {},
+  estimationMode: null,
   status: 'idle',
   error: null,
 };
@@ -32,6 +34,30 @@ function resolveHydratedStatus(a3: Agent3State): Agent3Status {
   if (a3.status === 'approved') return 'approved';
   if (Object.keys(a3.estimations).length > 0) return 'review';
   return 'idle';
+}
+
+/** Resuelve el input del Agente 3 desde pipeline, estado persistido o Agente 2 aprobado. */
+function resolveAgent3Input(workspace: UserWorkspace): Agent3Input | null {
+  const { agent1, agent2, agent3, pipeline } = workspace;
+
+  if (agent3.input?.epics.length) return agent3.input;
+  if (pipeline.agent3Input?.epics.length) return pipeline.agent3Input;
+
+  if (agent2.status === 'approved' && agent2.epics.length > 0) {
+    return {
+      epics: agent2.epics,
+      sourceWishIds:
+        pipeline.agent3Input?.sourceWishIds ??
+        agent2.input?.wishes.map((wish) => wish.id) ??
+        agent1.wishes.map((wish) => wish.id),
+      approvedAt:
+        pipeline.agent3Input?.approvedAt ??
+        agent3.input?.approvedAt ??
+        Date.now(),
+    };
+  }
+
+  return null;
 }
 
 export default function Agent3Page() {
@@ -46,30 +72,30 @@ export default function Agent3Page() {
     if (isLoading || !workspace) return;
 
     const a3 = workspace.agent3;
-    const pipelineInput = workspace.pipeline.agent3Input;
+    const resolvedInput = resolveAgent3Input(workspace);
     const pipelineEstimations = workspace.pipeline.agent4Input?.estimations ?? {};
+    const pipelineMode = workspace.pipeline.agent4Input?.estimationMode;
+    const estimationMode: EstimationMode | null = isEstimationMode(a3.estimationMode)
+      ? a3.estimationMode
+      : isEstimationMode(pipelineMode)
+        ? pipelineMode
+        : Object.keys(a3.estimations).length > 0 || Object.keys(pipelineEstimations).length > 0
+          ? 'story_points'
+          : null;
 
     const estimations =
       Object.keys(a3.estimations).length > 0 ? a3.estimations : pipelineEstimations;
 
-    if (Object.keys(estimations).length > 0 || a3.input || a3.status === 'approved') {
+    if (Object.keys(estimations).length > 0 || resolvedInput || a3.status === 'approved') {
       setState({
-        input: a3.input ?? pipelineInput ?? null,
+        input: resolvedInput,
         estimations,
+        estimationMode,
         status: resolveHydratedStatus({ ...a3, estimations }),
         error: null,
       });
       setIsHydrated(true);
       return;
-    }
-
-    if (pipelineInput && pipelineInput.epics.length > 0) {
-      setState({
-        input: pipelineInput,
-        estimations: {},
-        status: 'idle',
-        error: null,
-      });
     }
 
     setIsHydrated(true);
@@ -78,15 +104,16 @@ export default function Agent3Page() {
   // ── Persistir en Firestore (debounced) ────────────────────────
   useEffect(() => {
     if (!isHydrated) return;
-    if (state.input || Object.keys(state.estimations).length > 0) {
+    if (state.input || Object.keys(state.estimations).length > 0 || state.estimationMode) {
       saveAgent3({
         input: state.input,
         estimations: state.estimations,
+        estimationMode: state.estimationMode ?? null,
         status: state.status,
         error: state.error,
       });
     }
-  }, [state.input, state.estimations, state.status, state.error, isHydrated, saveAgent3]);
+  }, [state.input, state.estimations, state.estimationMode, state.status, state.error, isHydrated, saveAgent3]);
 
   const handleEstimationsChange = useCallback(
     (estimations: Record<string, StoryEstimation>) => {
@@ -100,6 +127,14 @@ export default function Agent3Page() {
     []
   );
 
+  const handleEstimationModeChange = useCallback((mode: EstimationMode) => {
+    setState((prev) => ({
+      ...prev,
+      estimationMode: mode,
+      error: null,
+    }));
+  }, []);
+
   const handleStatusChange = useCallback((status: Agent3Status) => {
     setState((prev) => ({ ...prev, status, error: null }));
   }, []);
@@ -112,6 +147,7 @@ export default function Agent3Page() {
       await approveAgent3({
         epics: state.input.epics,
         estimations: state.estimations,
+        estimationMode: state.estimationMode ?? 'story_points',
         sourceWishIds: state.input.sourceWishIds,
         approvedAt: Date.now(),
       });
@@ -131,87 +167,77 @@ export default function Agent3Page() {
     } finally {
       setIsApproving(false);
     }
-  }, [state.input, state.estimations, approveAgent3]);
+  }, [state.input, state.estimations, state.estimationMode, approveAgent3]);
 
   const allStories = state.input?.epics.flatMap((e) => e.userStories) ?? [];
   const epicCount = state.input?.epics.length ?? 0;
   const storyCount = allStories.length;
-  const totalPoints = allStories.reduce(
-    (sum, s) => sum + (state.estimations[s.id]?.points ?? 0),
-    0
-  );
+  const activeMode: EstimationMode = state.estimationMode ?? 'story_points';
+  const totalEffort = allStories.reduce((sum, s) => {
+    const est = state.estimations[s.id];
+    if (activeMode === 'time') return sum + (est?.durationMinutes ?? 0);
+    return sum + (est?.points ?? 0);
+  }, 0);
   const isApprovable =
     allStories.length > 0 &&
-    allStories.every((s) => (state.estimations[s.id]?.points ?? 0) > 0);
+    Boolean(state.estimationMode) &&
+    allStories.every((s) => isStoryEstimated(state.estimations[s.id], activeMode));
 
-  // ── Loading state ──────────────────────────────────────
   if (isLoading || !isHydrated) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <div className="animate-[fadeIn_0.3s_ease-out]">
-          <div className="mb-5 h-7 w-28 rounded-full bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-          <div className="mb-4 h-11 w-72 rounded-xl bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite] md:h-12" />
-          <div className="mb-2 h-5 w-96 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-          <div className="mb-8 h-5 w-64 rounded-lg bg-surface-hover animate-[shimmerPulse_2s_ease-in-out_infinite]" />
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-foreground" />
       </div>
     );
   }
 
   const hasInput = state.input !== null && state.input.epics.length > 0;
   const isApproved = state.status === 'approved';
+  const showReviewStats = hasInput && Object.keys(state.estimations).length > 0;
+  const headerSubtitle =
+    showReviewStats
+      ? null
+      : 'Elige el modo y sugiere estimaciones para cada historia.';
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-      <AgentPageHero
-        step={3}
-        variant="measure"
-        title="Estimación en Story Points"
-        description="El agente sugiere Story Points para cada historia según su complejidad técnica. Tu equipo revisa y ajusta antes de consolidar."
-        statusBadge={
-          isApproved ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-success">
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Aprobado
+    <div
+      className={[
+        'mx-auto flex w-full animate-[fadeIn_0.3s_ease-out] flex-col px-6 pt-3 pb-5',
+        showReviewStats ? 'max-w-5xl gap-5' : 'max-w-3xl gap-5',
+      ].join(' ')}
+    >
+      <header className="shrink-0 pb-3">
+        <h1 className="text-[50px] font-semibold tracking-tight text-foreground">
+          {activeMode === 'time' ? 'Estimación en tiempo' : 'Estimación en Story Points'}
+        </h1>
+        <p className="mt-1 text-[12px] text-muted">
+          Paso 3/6 · Medición
+          {headerSubtitle ? <> · {headerSubtitle}</> : null}
+        </p>
+        {showReviewStats ? (
+          <p className="mt-1 text-[12px] text-muted">
+            <span className="tabular-nums text-foreground">{epicCount}</span>
+            {' '}
+            {epicCount === 1 ? 'épica' : 'épicas'}
+            {' · '}
+            <span className="tabular-nums text-foreground">{storyCount}</span>
+            {' '}
+            {storyCount === 1 ? 'historia' : 'historias'}
+            {' · '}
+            <span className="tabular-nums text-foreground">
+              {formatEffortTotal(totalEffort, activeMode)}
             </span>
-          ) : undefined
-        }
-        stats={
-          hasInput && Object.keys(state.estimations).length > 0 ? (
-            <>
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 012.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
-                  </svg>
-                }
-                value={epicCount}
-                label={`épica${epicCount !== 1 ? 's' : ''}`}
-              />
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                  </svg>
-                }
-                value={storyCount}
-                label={`historia${storyCount !== 1 ? 's' : ''} de usuario`}
-              />
-              <AgentStat
-                icon={
-                  <svg className="h-4 w-4 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-                value={totalPoints}
-                label="Story Points"
-              />
-            </>
-          ) : undefined
-        }
-      />
+            {' '}
+            {activeMode === 'time' ? 'tiempo total' : 'Story Points'}
+            {isApproved ? (
+              <>
+                {' · '}
+                <span className="text-success">Aprobado</span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+      </header>
 
       {state.error && (
         <AgentErrorBanner
@@ -220,15 +246,14 @@ export default function Agent3Page() {
         />
       )}
 
-      {/* ═══════════════════════════════════════════════════════════
-          CONTENIDO PRINCIPAL
-         ═══════════════════════════════════════════════════════════ */}
       {hasInput && state.input ? (
         <>
           <EstimationWorkspace
             input={state.input}
             estimations={state.estimations}
             onEstimationsChange={handleEstimationsChange}
+            estimationMode={state.estimationMode ?? null}
+            onEstimationModeChange={handleEstimationModeChange}
             status={state.status}
             onStatusChange={handleStatusChange}
             onApprove={handleApprove}
@@ -237,26 +262,18 @@ export default function Agent3Page() {
             isApproving={isApproving}
           />
 
-          {/* ═════════════════════════════════════════════════════
-              ESTADO APROBADO — Celebración
-             ═════════════════════════════════════════════════════ */}
           {isApproved && (
             <AgentCelebrationBanner
               title="Backlog estimado"
-              description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${totalPoints} Story Points listos para el Agente 4.`}
+              description={`${epicCount} épica${epicCount !== 1 ? 's' : ''} · ${storyCount} historia${storyCount !== 1 ? 's' : ''} · ${formatEffortTotal(totalEffort, activeMode)} listos para el Agente 4.`}
               action={
                 <button
+                  type="button"
                   onClick={() => router.push('/agentes/4')}
-                  className={[
-                    'inline-flex w-full items-center justify-center gap-2 rounded-xl sm:w-auto',
-                    'bg-success px-6 py-3 text-sm font-bold text-black',
-                    'shadow-[0_4px_20px_color-mix(in_srgb,var(--success)_35%,transparent)]',
-                    'transition-all duration-200 hover:shadow-[0_6px_28px_color-mix(in_srgb,var(--success)_45%,transparent)] hover:opacity-90',
-                    'cursor-pointer',
-                  ].join(' ')}
+                  className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 sm:w-auto"
                 >
                   Continuar al Agente 4
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                   </svg>
                 </button>

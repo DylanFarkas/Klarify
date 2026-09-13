@@ -6,7 +6,7 @@ export type PlanId = 'free' | 'starter' | 'pro';
 
 export type BacklogDetail = 'compact' | 'standard' | 'detailed';
 
-export type RegenerationAgent = 'agent2' | 'agent3' | 'agent4' | 'agent5';
+export type RegenerationAgent = 'agent2' | 'agent3' | 'agent4' | 'agent5' | 'stack';
 
 export type PlanErrorCode =
   | 'PLAN_PROJECT_LIMIT'
@@ -15,6 +15,8 @@ export type PlanErrorCode =
   | 'PLAN_REGENERATION_BLOCKED'
   | 'PLAN_REGENERATION_LIMIT'
   | 'PLAN_STORY_LIMIT'
+  | 'PLAN_EPIC_LIMIT'
+  | 'PLAN_HARNESS_LIMIT'
   | 'PLAN_FEATURE_GITHUB'
   | 'PLAN_FEATURE_EXPORT'
   | 'PLAN_FEATURE_EXECUTION_BOARD'
@@ -33,6 +35,8 @@ export interface PlanLimits {
   export: false | 'manual' | 'full';
   executionBoard: boolean;
   maxTeamMembers: number;
+  /** Mensajes del harness de backlog por mes; null = ilimitado. */
+  maxHarnessMessages: number | null;
 }
 
 export interface AiGenerationConfig {
@@ -55,11 +59,14 @@ export interface RegenerationUsage {
   agent3: number;
   agent4: number;
   agent5: number;
+  stack: number;
 }
 
 export interface UserUsage {
   periodKey: string;
   regenerations: RegenerationUsage;
+  /** Mensajes enviados al harness de backlog en el periodo actual. */
+  harnessMessages: number;
 }
 
 export interface PlanSnapshot {

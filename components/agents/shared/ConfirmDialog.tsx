@@ -68,13 +68,16 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
     const focusTimer = window.setTimeout(() => confirmBtnRef.current?.focus(), 60);
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') finish(false);
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      finish(false);
     };
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
 
     return () => {
       window.clearTimeout(focusTimer);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
       unlockScroll();
     };
   }, [pending, finish]);

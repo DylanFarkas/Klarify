@@ -11,18 +11,20 @@ Klarify ayuda a Product Owners, equipos de producto y startups a pasar de reuni�
 | App | Next.js 16 (App Router), React 19, TypeScript |
 | UI | Tailwind CSS 4, @dnd-kit, react-day-picker, sileo |
 | Auth / datos | Firebase Auth + Firestore (`firebase` / `firebase-admin`) |
-| LLM | Google Gemini (`gemini-2.5-flash`) vía `@google/genai` |
+| LLM | Multi-proveedor: DeepSeek (default Klarify), OpenAI y Gemini (BYOK) |
 | ASR | OpenAI (`gpt-4o-mini-transcribe`) |
-| Integraciones | GitHub (Issues / Projects) |
+| Integraciones | GitHub (Issues / Projects), proveedor de IA (BYOK) |
 | Export | JSON, Markdown, XLSX |
+| CLI / TUI | `packages/cli` (`citty` + Ink 7; `fetch` sobre `/api/v1`) |
 
-Sin `GEMINI_API_KEY` / `OPENAI_API_KEY`, los agentes usan adapters mock.
+Sin `DEEPSEEK_API_KEY` ni BYOK del usuario, los agentes usan adapters mock. La transcripción de audio sigue necesitando `OPENAI_API_KEY`.
 
 ## Requisitos
 
-- Node.js 20+
+- Node.js 20+ (app web). El CLI/TUI (`@klarify/cli`) requiere Node.js 22+.
 - Cuenta Firebase (Auth + Firestore)
-- Claves de Gemini y OpenAI (opcionales en desarrollo)
+- `DEEPSEEK_API_KEY` (default de Klarify) y `AI_PROVIDER_ENCRYPTION_KEY` (para guardar BYOK)
+- OpenAI opcional (ASR); Gemini/OpenAI/DeepSeek opcionales como BYOK del usuario
 
 ## Configuración
 
@@ -32,7 +34,7 @@ Sin `GEMINI_API_KEY` / `OPENAI_API_KEY`, los agentes usan adapters mock.
 npm install
 ```
 
-2. Crea un archivo `.env.local` en la raíz:
+2. Crea un archivo `.env.local` (o `.env`) en la raíz:
 
 ```env
 # Firebase (cliente)
@@ -46,9 +48,16 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 # Firebase Admin (JSON del service account en una línea)
 FIREBASE_SERVICE_ACCOUNT_KEY=
 
-# IA
-GEMINI_API_KEY=
+# IA — default Klarify (DeepSeek)
+DEEPSEEK_API_KEY=
+# Hex de 64 chars (32 bytes) o cualquier secreto; se usa para cifrar API keys BYOK
+AI_PROVIDER_ENCRYPTION_KEY=
+
+# ASR (Agente 1 — audio)
 OPENAI_API_KEY=
+
+# Opcional (legacy / no requerido para el LLM por defecto)
+GEMINI_API_KEY=
 ```
 
 3. Arranca el servidor de desarrollo:
@@ -67,6 +76,7 @@ Abre [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Build de producción |
 | `npm start` | Sirve el build |
 | `npm run lint` | ESLint |
+| `npm run klarify -- <cmd>` | CLI de plataforma (backlog, no Klark) |
 
 ## Pipeline de agentes
 
@@ -84,6 +94,14 @@ Cada paso genera output revisable; el usuario aprueba antes de continuar.
 | Proyectos | `/agentes/proyectos` | Gestión de proyectos del workspace |
 
 Guía de uso en la app: `/manual`. Login: `/login` (Google y GitHub vía Firebase).
+
+## Proveedor de IA (BYOK)
+
+- **Default:** Klarify usa DeepSeek (`DEEPSEEK_API_KEY`) con `deepseek-chat`.
+- **BYOK:** en Configuración → Integraciones el usuario puede conectar DeepSeek, OpenAI o Gemini con su propia API key.
+- **Modelo:** selector siempre visible en el sidebar del workspace; se puede cambiar en cualquier momento.
+- **Fallback:** si la key del usuario falla (cuota, auth, rate limit), Klarify reintenta con modelos DeepSeek del servidor.
+- Las keys BYOK se cifran con `AI_PROVIDER_ENCRYPTION_KEY` y se guardan en Firestore (`users/{uid}.aiProvider`).
 
 ## Planes
 
@@ -107,12 +125,16 @@ components/
   manual/            # Guía de uso
   ui/                # Primitivos compartidos
 lib/
-  adapters/          # Gemini / OpenAI / mocks por agente
+  llm/               # Multi-proveedor + BYOK (DeepSeek / OpenAI / Gemini)
+  adapters/          # Adaptadores por agente (LLM unificado + mocks + ASR)
   services/          # Lógica de negocio
+  harness/           # Klark (chat de edición de backlog)
+  platform/          # API v1 para CLI / agentes de código
   github/            # Export a GitHub
   export/            # JSON / Markdown / XLSX
   plans/             # Límites y guards por plan
   board/             # Utilidades Kanban
+packages/cli/        # Binario `klarify` (cliente HTTP; no importa server-only)
 context/             # Auth, workspace, tema
 hooks/
 firestore.rules
@@ -127,8 +149,38 @@ firestore.rules
 | `/api/agentes/3/estimate` | Estimación |
 | `/api/agentes/4/prioritize` | Priorización |
 | `/api/agentes/5/plan` | Sprints |
+| `/api/harness/chat` | Klark |
+| `/api/v1/*` | API de plataforma (CLI, PAT `klf_…`, device login) |
+| `/api/ai-provider` | BYOK + modelo activo |
 | `/api/workspace` · `/api/projects` | Workspace y proyectos |
 | `/api/github/connect` · `/repos` · `/projects` · `/export` | GitHub |
+
+## CLI (agentes de código)
+
+El CLI **no es Klark**. No llama al chat ni al pipeline HITL. Lee y escribe el mismo backlog que la web (`/api/v1`).
+
+**Instalación global** (comando `klarify` en el PATH):
+
+```bash
+npm install -g ./packages/cli
+# o desde la raíz: npm run klarify:link
+```
+
+```bash
+klarify          # TUI (humanos, terminal interactiva)
+klarify login
+klarify projects create "Mi app"
+klarify backlog import --file backlog.json --rm
+klarify context --format md
+```
+
+`--rm` borra el JSON temporal. No lo dejes en el repo.
+
+- Tokens: Configuración → Integraciones, o `klarify login` (device flow en `/cli/device`).
+- TUI: `klarify` o `klarify tui` (Windows Terminal). Los agentes no la usan.
+- Skill para Cursor/Codex: `.agents/skills/klarify-cli/`.
+- MCP opcional: `klarify mcp` (ver `packages/cli/mcp.example.json`).
+- `klarify status` usa el tablero Kanban (planes Starter / Pro).
 
 ## Notas para desarrollo
 

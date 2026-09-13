@@ -1,13 +1,10 @@
 /**
  * @fileoverview Servicio del Agente 1 — Capa de lógica de negocio.
  *
- * Abstrae el procesamiento de archivos y la extracción de deseos.
- * Actualmente usa datos mock con delays para simular llamadas a API.
- *
- * 🔄 PUNTO DE INTEGRACIÓN: Cuando se conecten APIs reales (Whisper, Gemini),
- * solo hay que modificar las funciones `processFile` y `extractWishes` aquí.
- * El resto de la app no necesita cambios.
+ * Solo servidor: ASR + LLM (contexto y deseos).
  */
+
+import 'server-only';
 
 import type {
   ClarificationAnswer,
@@ -16,7 +13,6 @@ import type {
   Wish,
 } from '@/lib/types/agent-1';
 import {
-  WISH_ID_PREFIX,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
@@ -28,39 +24,24 @@ import { ILLMAdapter } from '@/lib/adapters/agent-1/ILLMAdapter';
 import { MockASRAdapter } from '@/lib/adapters/agent-1/MockASRAdapter';
 import { MockLLMAdapter } from '@/lib/adapters/agent-1/MockLLMAdapter';
 import { OpenAIASRAdapter } from '@/lib/adapters/agent-1/OpenAIASRAdapter';
-import { GeminiLLMAdapter } from '@/lib/adapters/agent-1/GeminiLLMAdapter';
+import { LlmContextAdapter } from '@/lib/adapters/agent-1/LlmContextAdapter';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
+
+export { generateWishId } from '@/lib/utils/agent-1-ids';
 
 // ---------------------------------------------------------------------------
 // Adaptadores
 // ---------------------------------------------------------------------------
-// Instanciamos los adaptadores. Si las keys están en .env.local usamos las APIs reales,
-// de lo contrario usamos mocks para evitar fallos durante demostraciones o desarrollo.
 
 const asrAdapter: IASRAdapter = process.env.OPENAI_API_KEY 
   ? new OpenAIASRAdapter() 
   : new MockASRAdapter();
 
-const llmAdapter: ILLMAdapter = process.env.GEMINI_API_KEY 
-  ? new GeminiLLMAdapter() 
-  : new MockLLMAdapter();
-
-// ---------------------------------------------------------------------------
-// Utilidades internas
-// ---------------------------------------------------------------------------
-
-/**
- * Genera un ID de deseo con formato DESEO-001, DESEO-002, etc.
- * Calcula el siguiente número basándose en los deseos existentes.
- */
-export function generateWishId(existingWishes: Wish[] = []): string {
-  const maxNum = existingWishes.reduce((max, wish) => {
-    const numStr = wish.id.replace(`${WISH_ID_PREFIX}-`, '');
-    const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
-  }, 0);
-
-  return `${WISH_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
+async function resolveLlmAdapter(uid: string): Promise<ILLMAdapter> {
+  const credentials = await resolveLlmCredentials(uid);
+  if (!credentials) return new MockLLMAdapter();
+  return new LlmContextAdapter(credentials);
 }
 
 /**
@@ -232,17 +213,21 @@ export function processText(text: string): TranscriptionResult {
  * Evalúa si el contexto del usuario es suficiente para generar un backlog.
  */
 export async function analyzeContext(
+  uid: string,
   transcription: TranscriptionResult,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<ContextDiscovery> {
+  const llmAdapter = await resolveLlmAdapter(uid);
   return llmAdapter.analyzeContext(transcription, aiConfig);
 }
 
 export async function analyzeContextStream(
+  uid: string,
   transcription: TranscriptionResult,
   onThought: LLMThoughtCallback,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<ContextDiscovery> {
+  const llmAdapter = await resolveLlmAdapter(uid);
   return llmAdapter.analyzeContextStream(transcription, onThought, aiConfig);
 }
 
@@ -250,11 +235,13 @@ export async function analyzeContextStream(
  * Extrae deseos/necesidades del cliente a partir del contexto enriquecido.
  */
 export async function extractWishesFromContext(
+  uid: string,
   transcription: TranscriptionResult,
   discovery: ContextDiscovery,
   answers: ClarificationAnswer[] = [],
   skipped = false
 ): Promise<{ wishes: Wish[]; enrichedContext: string }> {
+  const llmAdapter = await resolveLlmAdapter(uid);
   const enrichedContext = buildEnrichedContext(transcription, discovery, answers, skipped);
   const wishes = await llmAdapter.extractWishes(transcription, enrichedContext);
   return { wishes, enrichedContext };
@@ -264,6 +251,7 @@ export async function extractWishesFromContext(
  * Extrae deseos emitiendo pensamientos del LLM en tiempo real.
  */
 export async function extractWishesFromContextStream(
+  uid: string,
   transcription: TranscriptionResult,
   discovery: ContextDiscovery,
   onThought: LLMThoughtCallback,
@@ -271,6 +259,7 @@ export async function extractWishesFromContextStream(
   skipped = false,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<{ wishes: Wish[]; enrichedContext: string }> {
+  const llmAdapter = await resolveLlmAdapter(uid);
   const enrichedContext = buildEnrichedContext(transcription, discovery, answers, skipped);
   const wishes = await llmAdapter.extractWishesStream(
     transcription,

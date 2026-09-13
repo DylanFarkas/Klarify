@@ -185,8 +185,13 @@ export function KanbanBoard({
   const activeItem = activeStoryId ? storiesById[activeStoryId] ?? null : null;
 
   const handleDragStart = (event: DragStartEvent) => {
+    const storyId = String(event.active.id);
+    if (storiesById[storyId]?.sprintLocked) {
+      isDraggingRef.current = false;
+      return;
+    }
     isDraggingRef.current = true;
-    setActiveStoryId(String(event.active.id));
+    setActiveStoryId(storyId);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -250,7 +255,7 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-5 overflow-x-auto pb-4">
         {KANBAN_COLUMNS.map((col) => (
           <KanbanColumn
             key={col.id}
@@ -270,9 +275,9 @@ export function KanbanBoard({
 
       <DragOverlay dropAnimation={null}>
         {activeItem ? (
-          <div className="w-[260px] rotate-2 rounded-xl border border-primary/40 bg-background/95 p-3 shadow-lg">
+          <div className="w-65 rounded-lg border border-border-strong bg-surface p-3 shadow-md">
             <span className="font-mono text-[10px] font-medium text-subtle">{activeItem.story.id}</span>
-            <p className="mt-1 line-clamp-2 text-sm font-semibold text-foreground">{activeItem.story.title}</p>
+            <p className="mt-1 line-clamp-2 text-[13px] font-medium text-foreground">{activeItem.story.title}</p>
             <p className="mt-0.5 line-clamp-1 text-[11px] text-subtle">{activeItem.epicTitle}</p>
           </div>
         ) : null}

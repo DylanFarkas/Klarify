@@ -5,6 +5,8 @@ import { exportProjectToGithub, mapGithubExportError } from '@/lib/github/export
 import { getProjectGithubExport } from '@/lib/project-service';
 import type { GithubExportRepoTarget, GithubExportRequest } from '@/lib/types/github-export';
 import { createNdjsonStream, ndjsonStreamResponse } from '@/lib/utils/llm-stream';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { githubExportBodySchema } from '@/lib/schemas/misc-api';
 
 function resolveRepoTarget(body: GithubExportRequest): GithubExportRepoTarget | null {
   if (body.repo?.mode) {
@@ -19,11 +21,14 @@ function resolveRepoTarget(body: GithubExportRequest): GithubExportRepoTarget | 
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as GithubExportRequest;
+    const body = parseApiBody(
+      githubExportBodySchema,
+      await request.json()
+    ) as GithubExportRequest;
 
     const repo = resolveRepoTarget(body);
 
-    if (!body.projectId || !repo || !body.destination?.mode) {
+    if (!repo) {
       return NextResponse.json({ error: 'Datos de exportación incompletos.' }, { status: 400 });
     }
 

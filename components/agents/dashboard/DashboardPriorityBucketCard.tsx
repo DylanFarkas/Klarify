@@ -1,14 +1,14 @@
 interface DashboardPriorityBucketCardProps {
 	title: string;
 	count: number;
-	points: number;
+	effortLabel: string;
 	description: string;
 }
 
 export function DashboardPriorityBucketCard({
 	title,
 	count,
-	points,
+	effortLabel,
 	description,
 }: DashboardPriorityBucketCardProps) {
 	return (
@@ -24,8 +24,8 @@ export function DashboardPriorityBucketCard({
 			</div>
 			<p className="mt-3 text-sm leading-relaxed text-muted">{description}</p>
 			<div className="mt-4 flex items-center justify-between gap-4 text-sm">
-				<span className="text-muted">Story Points</span>
-				<span className="font-bold text-foreground">{points}</span>
+				<span className="text-muted">Esfuerzo</span>
+				<span className="font-bold text-foreground">{effortLabel}</span>
 			</div>
 		</div>
 	);

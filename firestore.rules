@@ -5,7 +5,8 @@ rules_version = '2';
 // Todo el acceso a datos ocurre en el servidor mediante el Admin SDK
 // (lib/firebase-admin.ts), que omite estas reglas. El cliente NUNCA lee ni
 // escribe Firestore directamente: solo usa Firebase Auth + las API routes
-// autenticadas (/api/workspace, /api/github, ...).
+// autenticadas (/api/workspace, /api/v1, /api/github, ...). PATs del CLI
+// (`cliTokens`, `cliTokenIndex`, `cliDeviceCodes`) también van por Admin SDK.
 //
 // Por eso negamos todo acceso directo desde el cliente.
 //

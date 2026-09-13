@@ -1,9 +1,12 @@
 import type { Epic } from '@/lib/types/agent-2';
 import type { UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { PrioritizationFramework, StoryPrioritization } from '@/lib/types/agent-4';
 import type { SprintPlan } from '@/lib/types/agent-5';
-import { normalizeSprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { createEmptySprintPlan } from '@/lib/utils/sprint-plan-mutations';
+import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import { getEffortValue, isStoryEstimated } from '@/lib/utils/estimation';
+import { getTranscriptSegmentCount } from '@/lib/artifacts/transcription-utils';
 import type { KanbanStatus } from '@/lib/types/execution';
 import type { UserWorkspace } from '@/lib/types/workspace';
 
@@ -12,7 +15,10 @@ export type PriorityBucket = 'alta' | 'media' | 'baja';
 export interface DashboardMetrics {
 	epics: Epic[];
 	storyCount: number;
+	bugCount: number;
+	taskCount: number;
 	totalPoints: number;
+	estimationMode: EstimationMode;
 	wishesCount: number;
 	estimatedStoryCount: number;
 	prioritizedStoryCount: number;
@@ -49,6 +55,7 @@ export interface DashboardMetrics {
 		title: string;
 		description: string;
 		storyCount: number;
+		doneCount: number;
 		points: number;
 		highPriorityCount: number;
 		mediumPriorityCount: number;
@@ -76,52 +83,30 @@ export interface DashboardSprintStoryRow {
 }
 
 function resolveEpics(workspace: UserWorkspace): Epic[] {
-	return (
-		workspace.agent5.input?.epics ??
-		workspace.pipeline.agent6Input?.epics ??
-		workspace.pipeline.agent5Input?.epics ??
-		workspace.agent4.input?.epics ??
-		workspace.pipeline.agent4Input?.epics ??
-		workspace.agent3.input?.epics ??
-		workspace.pipeline.agent3Input?.epics ??
-		workspace.agent2.epics ??
-		[]
-	);
+	return getLiveBacklog(workspace).epics;
 }
 
 function resolveEstimations(workspace: UserWorkspace): Record<string, StoryEstimation> {
-	return (
-		workspace.agent5.input?.estimations ??
-		workspace.pipeline.agent6Input?.estimations ??
-		workspace.pipeline.agent5Input?.estimations ??
-		workspace.agent3.estimations ??
-		{}
-	);
+	return getLiveBacklog(workspace).estimations;
 }
 
 function resolvePriorities(workspace: UserWorkspace): Record<string, StoryPrioritization> {
-	return (
-		workspace.agent5.input?.priorities ??
-		workspace.pipeline.agent6Input?.priorities ??
-		workspace.pipeline.agent5Input?.priorities ??
-		workspace.agent4.priorities ??
-		{}
-	);
+	return getLiveBacklog(workspace).priorities;
 }
 
 function resolveFramework(workspace: UserWorkspace): PrioritizationFramework | null {
-	return (
-		workspace.agent5.input?.framework ??
-		workspace.pipeline.agent6Input?.framework ??
-		workspace.pipeline.agent5Input?.framework ??
-		workspace.agent4.framework ??
-		null
-	);
+	return getLiveBacklog(workspace).framework;
 }
 
 function resolvePlan(workspace: UserWorkspace): SprintPlan | null {
-	const plan = workspace.agent5.plan ?? workspace.pipeline.agent6Input?.plan ?? null;
-	return plan ? normalizeSprintPlan(plan) : null;
+	const live = getLiveBacklog(workspace);
+	if (live.plan) return live.plan;
+
+	// Defensa: backlog priorizado sin plan materializado aún
+	if (workspace.agent4.status === 'approved' && live.epics.length > 0) {
+		return createEmptySprintPlan(live.epics);
+	}
+	return null;
 }
 
 function getPriorityBucket(
@@ -215,16 +200,25 @@ export function getStatusTone(status: string): 'success' | 'default' | 'warning'
 
 export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetrics {
 	const epics = resolveEpics(workspace);
-	const estimations = resolveEstimations(workspace);
-	const priorities = resolvePriorities(workspace);
-	const framework = resolveFramework(workspace);
+	const live = getLiveBacklog(workspace);
+	const estimations = live.estimations;
+	const estimationMode = live.estimationMode;
+	const priorities = live.priorities;
+	const framework = live.framework;
 	const plan = resolvePlan(workspace);
 
 	const stories = epics.flatMap((epic) => epic.userStories);
 	const storyCount = stories.length;
+	const bugCount = stories.filter((story) => (story.type ?? 'story') === 'bug').length;
+	const taskCount = stories.filter((story) => (story.type ?? 'story') === 'task').length;
 	const wishesCount = workspace.agent1.wishes.length;
-	const totalPoints = stories.reduce((sum, story) => sum + (estimations[story.id]?.points ?? 0), 0);
-	const estimatedStoryCount = stories.filter((story) => Boolean(estimations[story.id])).length;
+	const totalPoints = stories.reduce(
+		(sum, story) => sum + getEffortValue(estimations[story.id], estimationMode),
+		0
+	);
+	const estimatedStoryCount = stories.filter((story) =>
+		isStoryEstimated(estimations[story.id], estimationMode)
+	).length;
 	const prioritizedStoryCount = stories.filter((story) => Boolean(priorities[story.id])).length;
 	const totalAcceptanceCriteria = stories.reduce(
 		(sum, story) => sum + story.acceptanceCriteria.length,
@@ -243,7 +237,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 
 		const bucket = getPriorityBucket(framework, prioritization.category);
 		priorityBuckets[bucket].count += 1;
-		priorityBuckets[bucket].points += estimations[story.id]?.points ?? 0;
+		priorityBuckets[bucket].points += getEffortValue(estimations[story.id], estimationMode);
 	});
 
 	const completionCount = [
@@ -251,7 +245,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		workspace.agent2.status,
 		workspace.agent3.status,
 		workspace.agent4.status,
-		workspace.agent5.status,
+		workspace.pipeline.agent6Input ? 'approved' : 'idle',
 	].filter((status) => status === 'approved').length;
 
 	const completionPercentage = Math.round((completionCount / 5) * 100);
@@ -295,22 +289,23 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 							href: '/agentes/4',
 							description: 'Aun hay historias sin ordenar por valor y esfuerzo.',
 						}
-					: !plan
+					: !plan || plan.sprints.length === 0
 						? {
-								label: 'Planificar sprints',
-								href: '/agentes/5',
-								description: 'El backlog esta listo para convertirse en un plan de sprints.',
+								label: 'Crear sprints',
+								href: '/agentes/backlog',
+								description: 'Organiza el backlog en sprints de forma manual.',
 							}
 						: {
 								label: 'Revisar el backlog',
-								href: '/agentes/2',
-								description: 'El ciclo principal esta completo; puedes volver a ajustar el backlog.',
+								href: '/agentes/backlog',
+								description: 'Ajusta sprints, mueve HU o edita historias cuando lo necesites.',
 							};
 
 	const epicBreakdown = epics.map((epic) => {
 		const storyEntries = epic.userStories.map((story) => ({
 			priority: priorities[story.id],
-			points: estimations[story.id]?.points ?? 0,
+			points: getEffortValue(estimations[story.id], estimationMode),
+			done: (workspace.execution?.stories[story.id]?.status ?? 'todo') === 'done',
 		}));
 
 		return {
@@ -318,6 +313,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 			title: epic.title,
 			description: epic.description,
 			storyCount: epic.userStories.length,
+			doneCount: storyEntries.filter((entry) => entry.done).length,
 			points: storyEntries.reduce((sum, entry) => sum + entry.points, 0),
 			highPriorityCount: storyEntries.filter(
 				(entry) => entry.priority && getPriorityBucket(framework, entry.priority.category) === 'alta'
@@ -390,7 +386,10 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 	return {
 		epics,
 		storyCount,
+		bugCount,
+		taskCount,
 		totalPoints,
+		estimationMode,
 		wishesCount,
 		estimatedStoryCount,
 		prioritizedStoryCount,
@@ -401,7 +400,7 @@ export function buildDashboardMetrics(workspace: UserWorkspace): DashboardMetric
 		completionPercentage,
 		transcriptLanguage: transcript?.language ?? 'Sin datos',
 		transcriptDurationLabel: transcript ? formatDuration(transcript.duration) : '0 min',
-		transcriptSegmentCount: transcript?.segments.length ?? 0,
+		transcriptSegmentCount: getTranscriptSegmentCount(transcript),
 		contextIsSufficient,
 		framework,
 		priorityBuckets,

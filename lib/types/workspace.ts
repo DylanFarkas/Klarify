@@ -1,14 +1,16 @@
 /**
- * @fileoverview Tipos del workspace persistido en Firestore.
+ * @fileoverview Tipos del workspace en memoria.
  *
- * El workspace vive en `users/{uid}.workspace` y guarda el estado del
- * pipeline de agentes además del puente entre ellos. Es el reemplazo
- * de las claves de localStorage que antes mantenían este estado en el navegador.
+ * El contrato en runtime sigue siendo `UserWorkspace`. En Firestore (schema v4)
+ * el estado vive en `users/{uid}/projects/{id}` + subcolecciones (backlog,
+ * artifacts, pipelineHistory, execution). Un compositor hidrata este shape.
  */
+
+import type { WorkspaceScope } from '@/lib/types/project-schema';
 
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, Epic } from '@/lib/types/agent-2';
-import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
+import type { Agent3State, EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type {
   Agent4State,
   StoryPrioritization,
@@ -16,6 +18,7 @@ import type {
 } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { ExecutionState } from '@/lib/types/execution';
+import type { ProjectStack } from '@/lib/types/stack';
 
 /** Input que el Agente 2 entrega al Agente 3 al aprobar el backlog */
 export interface Agent3Input {
@@ -28,6 +31,8 @@ export interface Agent3Input {
 export interface Agent4Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  /** Ausente en proyectos legacy → story_points. */
+  estimationMode?: EstimationMode;
   sourceWishIds: string[];
   approvedAt: number;
 }
@@ -36,6 +41,7 @@ export interface Agent4Input {
 export interface Agent5Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode?: EstimationMode;
   priorities: Record<string, StoryPrioritization>;
   framework: PrioritizationFramework;
   sourceWishIds: string[];
@@ -46,6 +52,7 @@ export interface Agent5Input {
 export interface Agent6Input {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode?: EstimationMode;
   priorities: Record<string, StoryPrioritization>;
   framework: PrioritizationFramework;
   plan: SprintPlan;
@@ -77,6 +84,8 @@ export interface UserWorkspace {
   pipeline: WorkspacePipeline;
   /** Estado operativo del tablero Kanban (post-pipeline) */
   execution?: ExecutionState | null;
+  /** Stack tecnológico y arquitectura del proyecto */
+  stack?: ProjectStack | null;
 }
 
 /** Preferencias de usuario que antes vivían en localStorage */
@@ -99,11 +108,14 @@ export interface WorkspaceResponse {
   preferences: WorkspacePreferences;
   activeProjectId: string | null;
   plan: WorkspacePlanSnapshot;
+  scope?: WorkspaceScope;
+  agent?: string;
 }
 
 const EMPTY_AGENT3: Agent3State = {
   input: null,
   estimations: {},
+  estimationMode: null,
   status: 'idle',
   error: null,
 };
@@ -151,5 +163,6 @@ export function createEmptyWorkspace(): UserWorkspace {
       agent5Input: null,
       agent6Input: null,
     },
+    stack: null,
   };
 }

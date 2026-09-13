@@ -32,8 +32,8 @@ export function SprintDateEditor({
 
   const wrapperClass =
     variant === 'modal'
-      ? 'rounded-xl border border-border bg-surface-muted/30 px-4 py-4'
-      : 'mt-3 rounded-lg border border-border bg-surface-muted/30 px-4 py-3';
+      ? 'rounded-lg border border-border bg-surface-muted/25 px-4 py-4'
+      : 'mt-3 rounded-lg border border-border bg-surface-muted/25 px-4 py-3';
 
   const handleUnitChange = (nextUnit: SprintDurationUnit) => {
     if (nextUnit === unit) return;

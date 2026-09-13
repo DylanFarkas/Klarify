@@ -1,10 +1,8 @@
 /**
- * @fileoverview WishesList — Panel de deseos del cliente (lado derecho).
- *
- * Renderiza la lista de deseos extraídos con acciones HITL (editar,
- * eliminar, añadir). Muestra un contador y estado vacío.
+ * @fileoverview WishesList — Lista HITL de deseos (foco de la revisión).
  *
  * Cumple CA2 (listado estructurado) y CA3 (HITL: editar/añadir/eliminar).
+ * Alta y edición van en WishFormModal (DetailModal), no inline.
  */
 
 'use client';
@@ -12,18 +10,13 @@
 import { useState } from 'react';
 import type { Wish } from '@/lib/types/agent-1';
 import { WishItem } from './WishItem';
-import { AddWishForm } from './AddWishForm';
+import { WishFormModal, type WishFormValues } from './WishFormModal';
 
 interface WishesListProps {
-  /** Lista actual de deseos */
   wishes: Wish[];
-  /** Callback para editar un deseo */
   onEdit: (id: string, newText: string) => void;
-  /** Callback para eliminar un deseo */
   onDelete: (id: string) => void;
-  /** Callback para añadir un nuevo deseo */
   onAdd: (text: string) => void;
-  /** Si la lista ya fue aprobada (deshabilita edición) */
   isApproved: boolean;
 }
 
@@ -34,114 +27,98 @@ export function WishesList({
   onAdd,
   isApproved,
 }: WishesListProps) {
-  const [isAddingWish, setIsAddingWish] = useState(false);
+  const [formWish, setFormWish] = useState<Wish | 'new' | null>(null);
 
-  // Contadores para stats
-  const autoCount = wishes.filter((w) => w.source === 'auto').length;
   const manualCount = wishes.filter((w) => w.source === 'manual').length;
+
+  const handleFormSubmit = (values: WishFormValues) => {
+    if (formWish === 'new') {
+      onAdd(values.text);
+    } else if (formWish && values.text !== formWish.text) {
+      onEdit(formWish.id, values.text);
+    }
+    setFormWish(null);
+  };
 
   return (
     <section
-      className="flex flex-col rounded-2xl border border-border bg-surface-muted backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]"
+      className="flex flex-col rounded-xl bg-surface"
       aria-labelledby="wishes-heading"
     >
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <h3 id="wishes-heading" className="text-lg font-bold text-foreground">
-            Deseos del Cliente
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 md:px-5">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h3
+            id="wishes-heading"
+            className="text-[15px] font-semibold tracking-tight text-foreground"
+          >
+            Deseos del cliente
           </h3>
-          <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-bold text-primary">
+          <span className="text-[12px] tabular-nums text-subtle">
             {wishes.length}
+            {manualCount > 0 ? ` · ${manualCount} manuales` : ''}
           </span>
         </div>
 
-        {/* Botón añadir (solo si no está aprobado) */}
-        {!isApproved && !isAddingWish && (
+        {!isApproved ? (
           <button
             id="add-wish-button"
-            onClick={() => setIsAddingWish(true)}
-            className={[
-              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
-              'text-xs font-bold text-primary',
-              'hover:bg-primary/10 transition-colors cursor-pointer',
-            ].join(' ')}
+            type="button"
+            onClick={() => setFormWish('new')}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Añadir
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* ── Contenido ──────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 max-h-[500px]">
-        {wishes.length === 0 && !isAddingWish ? (
-          // Estado vacío
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-hover">
-              <svg
-                className="h-7 w-7 text-icon-muted"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-sm text-subtle">
-              Los deseos del cliente aparecerán aquí tras procesar el archivo.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {/* Lista de deseos */}
-            {wishes.map((wish, index) => (
+      {wishes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+          <p className="text-sm text-muted">Aún no hay deseos.</p>
+          <p className="mt-1 text-[12px] text-subtle">
+            Añade uno manualmente o vuelve a procesar el contexto.
+          </p>
+          {!isApproved ? (
+            <button
+              type="button"
+              onClick={() => setFormWish('new')}
+              className="mt-4 cursor-pointer rounded-lg bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Añadir deseo
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <ol>
+          {wishes.map((wish, index) => (
+            <li key={wish.id}>
               <WishItem
-                key={wish.id}
                 wish={wish}
-                onEdit={onEdit}
+                onRequestEdit={setFormWish}
                 onDelete={onDelete}
                 isApproved={isApproved}
                 index={index}
               />
-            ))}
-
-            {/* Formulario de nuevo deseo */}
-            {isAddingWish && (
-              <AddWishForm
-                onAdd={(text) => {
-                  onAdd(text);
-                  setIsAddingWish(false);
-                }}
-                onCancel={() => setIsAddingWish(false)}
-              />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Footer con stats ───────────────────────────────────── */}
-      {wishes.length > 0 && (
-        <div className="border-t border-border px-6 py-3">
-          <div className="flex items-center gap-4 text-xs text-subtle">
-            <span>{autoCount} extraídos por IA</span>
-            {manualCount > 0 && (
-              <>
-                <span>•</span>
-                <span>{manualCount} añadidos manualmente</span>
-              </>
-            )}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ol>
       )}
+
+      <WishFormModal
+        open={formWish !== null}
+        onClose={() => setFormWish(null)}
+        onSubmit={handleFormSubmit}
+        wish={formWish === 'new' || formWish === null ? null : formWish}
+      />
     </section>
   );
 }

@@ -1,32 +1,43 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { getPlanDisplayName } from '@/lib/plans/plan-display';
+import { SIDEBAR_DURATION, SIDEBAR_EASE, sidebarIconTileClass, sidebarLabelClass } from './sidebar-styles';
 
 export function WorkspaceAccountSection() {
   const { user, signOut, loading } = useAuth();
+  const { plan } = useWorkspace();
 
   if (loading || !user) return null;
 
   const displayName = user.displayName ?? user.email?.split('@')[0] ?? 'Usuario';
   const initial = displayName.charAt(0).toUpperCase();
+  const planId = plan?.id ?? 'free';
 
   return (
-    <div className="border-t border-border/60 px-4 py-3.5">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 ring-2 ring-primary/10 text-sm font-bold text-primary">
-          {initial}
-        </div>
+    <div
+      className={[
+        'grid min-h-8 w-full grid-cols-[1.5rem_minmax(0,1fr)] items-center justify-center gap-x-2 overflow-hidden rounded-md px-2 py-1.5',
+        `transition-[grid-template-columns,gap,padding] ${SIDEBAR_DURATION} ${SIDEBAR_EASE} motion-reduce:transition-none`,
+        'group-data-[collapsed=true]/sidebar:grid-cols-[1.5rem_0fr]',
+        'group-data-[collapsed=true]/sidebar:gap-x-0',
+        'group-data-[collapsed=true]/sidebar:px-0',
+      ].join(' ')}
+    >
+      <div className={`${sidebarIconTileClass} rounded-full`} title={displayName}>
+        {initial}
+      </div>
+      <div className={`${sidebarLabelClass} flex items-center gap-2`}>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-          {user.email ? (
-            <p className="truncate text-[11px] text-subtle">{user.email}</p>
-          ) : null}
+          <p className="truncate text-sm font-medium leading-tight text-foreground">{displayName}</p>
+          <p className="truncate text-[11px] leading-tight text-subtle">Plan {getPlanDisplayName(planId)}</p>
         </div>
         <button
           type="button"
           onClick={() => void signOut()}
           title="Cerrar sesión"
-          className="shrink-0 cursor-pointer rounded-lg p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+          className="shrink-0 cursor-pointer rounded-md p-1 text-subtle hover:bg-surface-hover hover:text-foreground"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
             <path

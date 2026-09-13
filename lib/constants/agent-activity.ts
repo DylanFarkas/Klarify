@@ -21,7 +21,8 @@ export const AGENT_ACTIVITY = {
   PHASE_GENERATE: { id: 'generate', label: 'Generando backlog' },
   ACTION_READ_WISHES: { id: 'read-wishes', label: 'Leyendo deseos aprobados' },
   ACTION_GROUP_EPICS: { id: 'group-epics', label: 'Agrupando en épicas temáticas' },
-  ACTION_GENERATE_STORIES: { id: 'generate-stories', label: 'Generando historias de usuario' },
+  ACTION_GENERATE_STORIES: { id: 'generate-stories', label: 'Generando historias y subtareas' },
+  ACTION_GENERATE_SUBTASKS: { id: 'generate-subtasks', label: 'Desglosando subtareas' },
 
   // Agente 4 — prioritize
   PHASE_PRIORITIZE: { id: 'prioritize', label: 'Priorizando backlog' },
@@ -45,6 +46,12 @@ export const AGENT_ACTIVITY = {
     id: 'build-schedule',
     label: 'Generando cronograma',
   },
+
+  // Stack — recommend
+  PHASE_RECOMMEND_STACK: { id: 'recommend-stack', label: 'Recomendando stack' },
+  ACTION_READ_STACK_CONTEXT: { id: 'read-stack-context', label: 'Leyendo contexto del proyecto' },
+  ACTION_WEB_RESEARCH: { id: 'web-research', label: 'Investigando en la web' },
+  ACTION_COMPOSE_STACK: { id: 'compose-stack', label: 'Componiendo stack tecnológico' },
 } as const;
 
 /** Acciones que invocan al LLM y emiten bloques de razonamiento. */
@@ -54,6 +61,7 @@ export const LLM_STREAM_ACTION_IDS = new Set<string>([
   AGENT_ACTIVITY.ACTION_GENERATE_STORIES.id,
   AGENT_ACTIVITY.ACTION_PRIORITIZE_STORIES.id,
   AGENT_ACTIVITY.ACTION_ASSIGN_SPRINTS.id,
+  AGENT_ACTIVITY.ACTION_COMPOSE_STACK.id,
 ]);
 
 /** Tiempo mínimo visible para acciones de preparación (evita que desaparezcan al instante). */

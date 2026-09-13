@@ -277,17 +277,17 @@ export function ImpactMetrics() {
   return (
     <section
       aria-labelledby="impact-metrics-title"
-      className="impact-metrics relative scroll-mt-20 overflow-hidden bg-[#050505] text-white"
+      className="impact-metrics relative scroll-mt-20 overflow-hidden bg-[#000000] text-white"
       id="impacto"
     >
       <div className="relative min-h-screen mx-auto max-w-390 px-5 py-16 sm:py-20 md:px-16 md:py-24">
-        <div className="relative min-h-[480px] sm:min-h-[520px] lg:min-h-[600px] xl:min-h-[660px]">
+        <div className="relative min-h-120 sm:min-h-130 lg:min-h-150 xl:min-h-165">
           <div className="impact-metrics__chart-wrap">
             <ImpactChart activeIndex={activeIndex} />
           </div>
 
           <article
-            className={`impact-metrics__card relative z-10 w-full max-w-[360px] rounded-2xl border border-white/10 bg-[#131313]/90 p-6 backdrop-blur-md transition-all duration-300 sm:p-8 lg:absolute lg:left-0 lg:top-12 lg:p-10 ${
+            className={`impact-metrics__card relative z-10 w-full max-w-90 rounded-2xl border border-white/10 bg-[#131313]/90 p-6 backdrop-blur-md transition-all duration-300 sm:p-8 lg:absolute lg:left-0 lg:top-12 lg:p-10 ${
               isTransitioning ? "translate-y-1 opacity-0" : "translate-y-0 opacity-100"
             }`}
           >
@@ -326,7 +326,7 @@ export function ImpactMetrics() {
                       {isActive ? (
                         <span
                           aria-hidden="true"
-                          className="relative h-[3px] w-10 overflow-hidden bg-white/12 sm:w-16 lg:w-20 xl:w-24"
+                          className="relative h-0.75 w-10 overflow-hidden bg-white/12 sm:w-16 lg:w-20 xl:w-24"
                         >
                           <span
                             className="impact-metrics__progress-fill absolute inset-y-0 left-0 bg-white"

@@ -36,7 +36,7 @@ export function PhaseTimeline({ group, variant = 'default' }: PhaseTimelineProps
   if (timeline.length === 0) {
     if (!showModelReasoning && isLive) {
       return (
-        <div className="flex min-h-0 flex-1 flex-col pl-3">
+        <div className="flex min-h-0 flex-1 flex-col">
           <ReasoningLoader fillAvailable />
         </div>
       );
@@ -59,18 +59,13 @@ export function PhaseTimeline({ group, variant = 'default' }: PhaseTimelineProps
   return (
     <div
       className={[
-        'relative pl-3',
+        'relative',
         isLive ? 'flex min-h-0 flex-1 flex-col' : '',
       ].join(' ')}
     >
-      <span
-        aria-hidden="true"
-        className="absolute bottom-1 left-0 top-1 w-px bg-border/80"
-      />
-
       <div
         className={[
-          'flex flex-col gap-3',
+          'flex flex-col gap-2.5',
           isLive ? 'min-h-0 flex-1' : '',
         ].join(' ')}
       >

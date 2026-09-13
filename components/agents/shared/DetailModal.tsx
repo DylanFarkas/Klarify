@@ -11,14 +11,19 @@ interface DetailModalProps {
   subtitle?: string;
   eyebrow?: string;
   children: ReactNode;
+  /** Acciones fijas al pie (fuera del scroll). */
+  footer?: ReactNode;
+  /** Título de panel (formularios), no display de detalle. */
+  compact?: boolean;
   /** Ancho máximo del panel */
-  maxWidth?: 'md' | 'lg' | 'xl';
+  maxWidth?: 'md' | 'lg' | 'xl' | '2xl';
 }
 
 const MAX_WIDTH: Record<NonNullable<DetailModalProps['maxWidth']>, string> = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-3xl',
+  '2xl': 'max-w-5xl',
 };
 
 export function DetailModal({
@@ -28,6 +33,8 @@ export function DetailModal({
   subtitle,
   eyebrow,
   children,
+  footer,
+  compact = false,
   maxWidth = 'lg',
 }: DetailModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -40,24 +47,33 @@ export function DetailModal({
   }, []);
 
   const handleClose = useCallback(() => {
-    setClosing(true);
-    window.setTimeout(() => {
-      setVisible(false);
-      setClosing(false);
-      onClose();
-    }, 220);
+    onClose();
   }, [onClose]);
 
   useEffect(() => {
     if (open) {
       setVisible(true);
       setClosing(false);
+      return;
     }
-  }, [open]);
+
+    // Cierre externo (Cancelar, Escape, backdrop, X): open=false
+    if (!visible) return;
+
+    setClosing(true);
+    const timer = window.setTimeout(() => {
+      setVisible(false);
+      setClosing(false);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [open, visible]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (event.key === 'Escape') handleClose();
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleClose();
     },
     [handleClose]
   );
@@ -65,14 +81,14 @@ export function DetailModal({
   useEffect(() => {
     if (!visible) return;
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     const unlockScroll = lockPageScroll();
 
     const focusTimer = window.setTimeout(() => closeBtnRef.current?.focus(), 80);
 
     return () => {
       window.clearTimeout(focusTimer);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
       unlockScroll();
     };
   }, [visible, handleKeyDown]);
@@ -81,14 +97,14 @@ export function DetailModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-200 flex items-end justify-center p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-200 flex items-end justify-center p-0 sm:items-center sm:p-5"
       role="dialog"
       aria-modal="true"
       aria-labelledby="detail-modal-title"
     >
       <div
         className={[
-          'absolute inset-0 bg-background/70 backdrop-blur-md',
+          'absolute inset-0 bg-background/75 backdrop-blur-md',
           closing ? 'detail-modal-backdrop-out' : 'detail-modal-backdrop-in',
         ].join(' ')}
         aria-hidden="true"
@@ -97,56 +113,74 @@ export function DetailModal({
 
       <div
         className={[
-          'detail-modal-shell relative w-full sm:mx-auto',
+          'relative w-full sm:mx-auto',
           MAX_WIDTH[maxWidth],
           closing ? 'detail-modal-panel-out' : 'detail-modal-panel-in',
         ].join(' ')}
       >
-        <div className="relative flex max-h-[min(92vh,820px)] flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl">
-          <div
-            className="pointer-events-none absolute -top-20 left-1/2 h-36 w-[65%] -translate-x-1/2 rounded-full bg-primary/8 blur-3xl"
-            aria-hidden="true"
-          />
-
-          <header className="relative shrink-0 border-b border-border/60 px-5 py-4 sm:px-6">
+        <div className="relative flex max-h-[min(92vh,860px)] flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-surface shadow-2xl sm:rounded-2xl">
+          <header
+            className={[
+              'relative shrink-0 px-5 sm:px-6',
+              compact ? 'pt-4 pb-3.5 sm:pt-5' : 'pt-5 pb-4 sm:pt-6',
+            ].join(' ')}
+          >
             <button
               ref={closeBtnRef}
               type="button"
               onClick={handleClose}
-              className={[
-                'cursor-pointer absolute right-3 top-3 rounded-lg p-2 text-muted',
-                'transition-colors hover:bg-surface-hover hover:text-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-              ].join(' ')}
+              className="absolute right-4 top-4 cursor-pointer rounded-xl p-2 text-subtle transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong sm:right-5 sm:top-5"
               aria-label="Cerrar detalles"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            <div className="pr-10">
-              {eyebrow && (
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80">
-                  {eyebrow}
+            <div className="min-w-0 pr-10">
+              {eyebrow ? (
+                <p className="text-[11px] font-medium tracking-[0.04em] text-subtle">{eyebrow}</p>
+              ) : null}
+              {subtitle ? (
+                <p
+                  className={[
+                    'font-mono text-[12px] text-muted',
+                    eyebrow ? 'mt-1.5' : '',
+                  ].join(' ')}
+                >
+                  {subtitle}
                 </p>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                {subtitle && (
-                  <span className="shrink-0 rounded-md border border-border bg-surface-muted px-2 py-0.5 font-mono text-[10px] font-medium text-muted">
-                    {subtitle}
-                  </span>
-                )}
-                <h2 id="detail-modal-title" className="text-base font-bold text-foreground sm:text-lg">
-                  {title}
-                </h2>
-              </div>
+              ) : null}
+              <h2
+                id="detail-modal-title"
+                className={[
+                  'font-semibold tracking-tight text-foreground',
+                  compact
+                    ? 'text-[20px] leading-snug sm:text-[22px]'
+                    : 'text-lg sm:text-[30px] sm:leading-tight',
+                  eyebrow || subtitle ? 'mt-1' : '',
+                ].join(' ')}
+              >
+                {title}
+              </h2>
             </div>
           </header>
 
-          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="detail-modal-scroll relative min-h-0 flex-1 overflow-y-auto border-t border-border/60 px-5 py-5 sm:px-6">
             {children}
           </div>
+
+          {footer ? (
+            <div className="shrink-0 border-t border-border/60 px-5 py-3.5 sm:px-6">
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>,

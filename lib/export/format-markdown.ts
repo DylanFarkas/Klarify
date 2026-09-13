@@ -5,6 +5,7 @@
 import { MEMBER_ROLE_LABELS } from '@/lib/export/resolve-project-export';
 import type { ProjectExportPayload, ProjectExportResult, ProjectExportStoryRow } from '@/lib/export/types';
 import { slugifyExportFilename } from '@/lib/export/filename';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 function formatDependencies(row: ProjectExportStoryRow, stories: ProjectExportStoryRow[]): string {
   if (row.dependencies.length === 0) return '_Sin dependencias_';
@@ -23,6 +24,13 @@ function formatAcceptanceCriteria(criteria: string[]): string {
   return criteria.map((criterion) => `- [ ] ${criterion}`).join('\n');
 }
 
+function formatSubtasks(subtasks: ProjectExportStoryRow['subtasks']): string {
+  if (subtasks.length === 0) return '_Sin subtareas_';
+  return subtasks
+    .map((subtask) => `- [${subtask.done ? 'x' : ' '}] ${subtask.id} ${subtask.title}`)
+    .join('\n');
+}
+
 export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectExportResult {
   const lines: string[] = [
     `# ${payload.projectName}`,
@@ -35,7 +43,7 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
     '| --- | --- |',
     `| Épicas | ${payload.summary.epicCount} |`,
     `| Historias de usuario | ${payload.summary.storyCount} |`,
-    `| Story points totales | ${payload.summary.totalStoryPoints} |`,
+    `| ${payload.estimationMode === 'time' ? 'Tiempo total' : 'Story points totales'} | ${payload.summary.totalEffortLabel} |`,
     `| Historias estimadas | ${payload.summary.estimatedStoryCount} |`,
     `| Historias priorizadas | ${payload.summary.prioritizedStoryCount} |`,
     `| Sprints planificados | ${payload.summary.sprintCount} |`,
@@ -62,7 +70,7 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
         `### Sprint ${sprint.number}: ${sprint.sprintGoal}`,
         '',
         `- **Período:** ${sprint.startDate} → ${sprint.endDate}`,
-        `- **Velocidad:** ${sprint.velocitySp} SP`,
+        `- **Velocidad:** ${formatEffortTotal(sprint.velocitySp, payload.estimationMode)}`,
         `- **Historias:** ${sprint.storyIds.join(', ') || '_Ninguna_'}`,
         ''
       );
@@ -95,6 +103,8 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
       lines.push(
         `#### ${row.storyId}: ${row.storyTitle}`,
         '',
+        `**Tipo:** ${row.storyType}`,
+        '',
         '**Descripción**',
         '',
         row.storyDescription,
@@ -102,11 +112,19 @@ export function formatProjectAsMarkdown(payload: ProjectExportPayload): ProjectE
         '**Criterios de aceptación**',
         '',
         formatAcceptanceCriteria(row.acceptanceCriteria),
+        '',
+        '**Subtareas**',
+        '',
+        formatSubtasks(row.subtasks),
         ''
       );
 
       const metadata: string[] = [];
-      if (row.storyPoints !== null) metadata.push(`Story Points: **${row.storyPoints}**`);
+      if (row.effortLabel) {
+        metadata.push(
+          `${payload.estimationMode === 'time' ? 'Tiempo' : 'Story Points'}: **${row.effortLabel}**`
+        );
+      }
       if (row.priorityLabel) metadata.push(`Prioridad: **${row.priorityLabel}**`);
       if (row.sprintNumber !== null) metadata.push(`Sprint: **${row.sprintNumber}** (${row.sprintGoal})`);
       if (row.kanbanStatusLabel) metadata.push(`Estado Kanban: **${row.kanbanStatusLabel}**`);

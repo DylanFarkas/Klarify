@@ -25,21 +25,36 @@ import type { ProjectSlotsInfo, ProjectSummary } from '@/lib/types/project';
 import { createEmptyWorkspace } from '@/lib/types/workspace';
 import type { WorkspacePlanSnapshot } from '@/lib/types/workspace';
 import type { Agent1State } from '@/lib/types/agent-1';
-import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
+import type { Agent2State, Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
 import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { UserWorkspace, WorkspaceResponse, Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
+import type { ProjectStack } from '@/lib/types/stack';
 import type { KanbanStatus, ProjectMember, ProjectMemberInput } from '@/lib/types/execution';
+import { generateMemberId, pickAvatarColor } from '@/lib/types/execution';
 import { buildInitialExecutionState } from '@/lib/board/board-utils';
 import {
+  buildAgent6InputFromAgent4,
   normalizeSprintPlan,
   withUpdatedSprintPlan,
 } from '@/lib/utils/sprint-plan-mutations';
+import {
+  withCreatedEpic,
+  withCreatedUserStory,
+  withDeletedEpic,
+  withDeletedUserStory,
+  withUpdatedEpic,
+  withUpdatedUserStory,
+} from '@/lib/utils/user-story-mutations';
+import { getLiveBacklog } from '@/lib/utils/live-backlog';
+import { buildManualEstimation } from '@/lib/utils/estimation';
+import { mergeScopedWorkspace, scopeFromPathname } from '@/lib/project-store/scope';
 
 const SAVE_DEBOUNCE_MS = 500;
 const BULK_REORDER_DEBOUNCE_MS = 400;
 const SPRINT_PLAN_DEBOUNCE_MS = 350;
+const SPRINT_FILTER_DEBOUNCE_MS = 250;
 
 export interface UpdateDashboardUserStoryOptions {
   epicId?: string;
@@ -49,11 +64,17 @@ export interface UpdateDashboardUserStoryOptions {
 export interface CreateDashboardUserStoryInput {
   epicId: string;
   sprintId?: string | null;
+  type?: import('@/lib/types/agent-2').WorkItemType;
   title: string;
   description: string;
   acceptanceCriteria: string[];
-  points: number;
+  subtasks?: import('@/lib/types/agent-2').StorySubtask[];
+  points?: number;
+  durationLabel?: string;
   category?: FrameworkCategory;
+  severity?: import('@/lib/types/agent-2').BugSeverity;
+  stepsToReproduce?: string[];
+  technicalNotes?: string;
 }
 
 export interface UseWorkspaceResult {
@@ -84,8 +105,13 @@ export interface UseWorkspaceResult {
   approveAgent3: (input: Agent4Input) => Promise<void>;
   approveAgent4: (input: Agent5Input) => Promise<void>;
   approveAgent5: (input: Agent6Input) => Promise<void>;
+  /** Materializa agent6Input si Agente 4 está aprobado y falta el plan (migración). */
+  bootstrapDashboardFromAgent4: () => Promise<void>;
   createUserStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
   deleteUserStory: (storyId: string) => Promise<void>;
+  createEpic: (input: { title: string; description: string }) => Promise<void>;
+  updateEpic: (epicId: string, updates: { title?: string; description?: string }) => Promise<void>;
+  deleteEpic: (epicId: string) => Promise<void>;
   updateUserStory: (
     storyId: string,
     updates: Partial<UserStory>,
@@ -94,6 +120,11 @@ export interface UseWorkspaceResult {
     prioritizationUpdates?: Partial<StoryPrioritization>
   ) => Promise<void>;
   updateSprintPlan: (plan: SprintPlan) => void;
+  startSprint: (sprintId: string) => Promise<void>;
+  completeSprint: (
+    sprintId: string,
+    rollover?: 'backlog' | 'next_planned'
+  ) => Promise<void>;
   initializeExecution: () => Promise<void>;
   upsertMember: (member: ProjectMemberInput) => Promise<void>;
   deleteMember: (memberId: string) => Promise<void>;
@@ -105,6 +136,8 @@ export interface UseWorkspaceResult {
     updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]
   ) => void;
   updateExecutionSprintFilter: (sprintFilter: string | 'all') => Promise<void>;
+  saveStack: (stack: ProjectStack) => Promise<void>;
+  clearStack: () => Promise<void>;
   resetAgent1: () => Promise<void>;
   resetAgent2: () => Promise<void>;
   resetAgent3: () => Promise<void>;
@@ -122,7 +155,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null);
   const [plan, setPlan] = useState<WorkspacePlanSnapshot | null>(null);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectSlots, setProjectSlots] = useState<ProjectSlotsInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -138,15 +171,38 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const agent5Abort = useRef<AbortController | null>(null);
   const bulkReorderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingBulkReorder = useRef<
-    { storyId: string; status: KanbanStatus; columnOrder: number }[] | null
+    {
+      storyId: string;
+      status: KanbanStatus;
+      columnOrder: number;
+      previousStatus?: KanbanStatus;
+    }[] | null
   >(null);
   const sprintPlanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSprintPlan = useRef<SprintPlan | null>(null);
   const sprintPlanGeneration = useRef(0);
-  const storyExecutionGeneration = useRef(0);
   const lastPersistedAgent = useRef<string | null>(null);
   const lastFetchedRouteKey = useRef<string | null>(null);
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
+  const sprintFilterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintFilterRequestId = useRef(0);
+  const lastSentSprintFilter = useRef<string | null>(null);
+  const bootstrapInFlight = useRef<Promise<void> | null>(null);
+  /** lastAgent conocido del servidor (evita PATCH innecesario al montar). */
+  const serverLastAgent = useRef<string | null>(null);
+  /**
+   * Proyecto activo accesible de forma síncrona: se manda en cada petición del
+   * workspace para que el servidor no tenga que resolverlo leyendo Firestore.
+   */
+  const activeProjectIdRef = useRef<string | null>(null);
+
+  const setActiveProjectId = useCallback((id: string | null) => {
+    activeProjectIdRef.current = id;
+    setActiveProjectIdState(id);
+  }, []);
 
   const cancelPendingSaves = useCallback(() => {
     if (agent1Timer.current) clearTimeout(agent1Timer.current);
@@ -160,6 +216,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     bulkReorderTimer.current = null;
     if (sprintPlanTimer.current) clearTimeout(sprintPlanTimer.current);
     sprintPlanTimer.current = null;
+    if (sprintFilterTimer.current) clearTimeout(sprintFilterTimer.current);
+    sprintFilterTimer.current = null;
   }, []);
 
   const persistBulkReorder = useCallback(async () => {
@@ -177,6 +235,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({
         action: 'bulkUpdateStoryExecutions',
         payload: { updates: payload },
+        projectId: activeProjectIdRef.current ?? undefined,
       }),
     });
     if (!response.ok) {
@@ -201,6 +260,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({
         action: 'updateSprintPlan',
         payload: { plan },
+        projectId: activeProjectIdRef.current ?? undefined,
       }),
     });
 
@@ -219,11 +279,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setError(null);
     }
     try {
-      const response = await authFetch('/api/workspace', user);
+      const resolved = scopeFromPathname(pathnameRef.current);
+      const params = new URLSearchParams({ scope: resolved.scope });
+      if (resolved.agent) params.set('agent', resolved.agent);
+      if (activeProjectIdRef.current) params.set('projectId', activeProjectIdRef.current);
+      const response = await authFetch(`/api/workspace?${params.toString()}`, user);
       if (!response.ok) throw new Error('No se pudo cargar el workspace');
       const data = (await response.json()) as WorkspaceResponse;
       setWorkspace((prev) => {
-        const incoming = data.workspace;
+        const incoming = mergeScopedWorkspace(prev, data.workspace, data.scope ?? resolved.scope);
         const localStories = prev?.execution?.stories;
         const serverStories = incoming.execution?.stories;
         if (!localStories || !serverStories || !incoming.execution) return incoming;
@@ -243,6 +307,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       });
       setPlan(data.plan);
       setActiveProjectId(data.activeProjectId);
+      if (data.preferences?.lastAgent) {
+        serverLastAgent.current = data.preferences.lastAgent;
+      }
     } catch (err) {
       if (!options?.silent) {
         setError(err instanceof Error ? err.message : 'Error al cargar el workspace');
@@ -276,15 +343,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const bootstrapWorkspace = useCallback(async () => {
     if (!user) return;
+    if (bootstrapInFlight.current) {
+      await bootstrapInFlight.current;
+      return;
+    }
     setIsLoading(true);
     setError(null);
-    try {
-      // Esperar ambas cargas: si solo esperamos workspace, la UI muestra
-      // "sin proyectos" mientras /api/projects sigue en vuelo.
-      await Promise.all([fetchWorkspace({ silent: true }), refreshProjects()]);
-    } finally {
-      setIsLoading(false);
-    }
+    const promise = (async () => {
+      try {
+        // Esperar ambas cargas: si solo esperamos workspace, la UI muestra
+        // "sin proyectos" mientras /api/projects sigue en vuelo.
+        await Promise.all([fetchWorkspace({ silent: true }), refreshProjects()]);
+      } finally {
+        setIsLoading(false);
+        bootstrapInFlight.current = null;
+      }
+    })();
+    bootstrapInFlight.current = promise;
+    await promise;
   }, [user, fetchWorkspace, refreshProjects]);
 
   const createProject = useCallback(
@@ -324,20 +400,42 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         persistSprintPlan().catch(() => undefined),
       ]);
       cancelPendingSaves();
-      const response = await authFetch('/api/projects', user, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
-      if (!response.ok) {
-        const err = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await authFetch('/api/projects', user, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId }),
+        });
+        if (!response.ok) {
+          const err = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? 'No se pudo cambiar de proyecto');
+        }
+        const data = (await response.json()) as WorkspaceResponse & {
+          project: ProjectSummary;
+          activeProjectId: string;
+        };
+        setWorkspace(data.workspace);
+        setPlan(data.plan);
+        setActiveProjectId(data.activeProjectId);
+        lastFetchedRouteKey.current = (() => {
+          const resolved = scopeFromPathname(pathnameRef.current);
+          return `${resolved.scope}:${resolved.agent ?? ''}`;
+        })();
+        if (data.preferences?.lastAgent) {
+          serverLastAgent.current = data.preferences.lastAgent;
+          lastPersistedAgent.current = data.preferences.lastAgent;
+        }
+        setSessionVersion((v) => v + 1);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al cambiar de proyecto');
+        throw err;
+      } finally {
+        setIsLoading(false);
       }
-      setActiveProjectId(projectId);
-      setSessionVersion((v) => v + 1);
-      await fetchWorkspace();
     },
-    [user, cancelPendingSaves, fetchWorkspace, persistBulkReorder, persistSprintPlan]
+    [user, cancelPendingSaves, persistBulkReorder, persistSprintPlan]
   );
 
   const activateProjects = useCallback(
@@ -425,6 +523,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveProjectId(null);
       setPlan(null);
       setIsLoading(false);
+      serverLastAgent.current = null;
+      lastPersistedAgent.current = null;
+      bootstrapInFlight.current = null;
       return;
     }
     void bootstrapWorkspace();
@@ -444,12 +545,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!user || !pathname?.startsWith('/agentes')) return;
     if (pathname === '/agentes/proyectos') return;
 
-    const routeKey =
-      pathname.match(/^\/agentes\/(\d+)/)?.[1] ??
-      (pathname.startsWith('/agentes/board') ? 'board' : null) ??
-      (pathname.startsWith('/agentes/dashboard') ? 'dashboard' : null);
-
-    if (!routeKey) return;
+    const resolved = scopeFromPathname(pathname);
+    const routeKey = `${resolved.scope}:${resolved.agent ?? ''}`;
     if (lastFetchedRouteKey.current === routeKey) return;
     lastFetchedRouteKey.current = routeKey;
 
@@ -467,27 +564,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Persistir el último agente visitado en preferencias (p. ej. tras login).
   useEffect(() => {
     if (!user || !pathname?.startsWith('/agentes')) return;
+    // Esperar bootstrap para comparar contra preferences del servidor.
+    if (isLoading) return;
+
+    const persistIfChanged = (agentKey: string) => {
+      if (lastPersistedAgent.current === agentKey) return;
+      // Evita write si el servidor ya tiene este valor (p. ej. reentrada al dashboard).
+      if (serverLastAgent.current === agentKey) {
+        lastPersistedAgent.current = agentKey;
+        return;
+      }
+      lastPersistedAgent.current = agentKey;
+      void saveLastAgent(user, agentKey)
+        .then(() => {
+          serverLastAgent.current = agentKey;
+        })
+        .catch(() => {
+          lastPersistedAgent.current = null;
+        });
+    };
 
     if (pathname === '/agentes/dashboard' || pathname.startsWith('/agentes/dashboard/')) {
-      if (lastPersistedAgent.current === 'dashboard') return;
-      lastPersistedAgent.current = 'dashboard';
-      void saveLastAgent(user, 'dashboard').catch(() => {
-        lastPersistedAgent.current = null;
-      });
+      persistIfChanged('dashboard');
       return;
     }
 
     const match = pathname.match(/^\/agentes\/(\d+)/);
     if (!match) return;
-
-    const agentId = match[1];
-    if (lastPersistedAgent.current === agentId) return;
-    lastPersistedAgent.current = agentId;
-
-    void saveLastAgent(user, agentId).catch(() => {
-      lastPersistedAgent.current = null;
-    });
-  }, [pathname, user]);
+    persistIfChanged(match[1]);
+  }, [pathname, user, isLoading]);
 
   useEffect(() => {
     const flushOnUnload = () => {
@@ -518,6 +623,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           JSON.stringify({
             action: 'bulkUpdateStoryExecutions',
             payload: { updates: payload },
+            projectId: activeProjectIdRef.current ?? undefined,
           })
         );
       }
@@ -533,6 +639,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           JSON.stringify({
             action: 'updateSprintPlan',
             payload: { plan },
+            projectId: activeProjectIdRef.current ?? undefined,
           })
         );
       }
@@ -646,10 +753,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, payload }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
       if (!response.ok) {
-        throw new Error('No se pudo actualizar el workspace');
+        let message = 'No se pudo actualizar el workspace';
+        try {
+          const err = (await response.json()) as { error?: string };
+          if (err.error?.trim()) message = err.error.trim();
+        } catch {
+          /* keep fallback */
+        }
+        throw new Error(message);
       }
       const data = (await response.json()) as { workspace?: UserWorkspace };
       return data.workspace ?? null;
@@ -663,7 +781,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, payload }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
       if (!response.ok) {
         throw new Error('No se pudo actualizar el workspace');
@@ -726,6 +848,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 ...prev.agent3,
                 input: agent3Input,
                 estimations: input.estimations,
+                estimationMode: input.estimationMode ?? prev.agent3.estimationMode ?? 'story_points',
                 status: 'approved',
                 error: null,
               },
@@ -744,9 +867,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const agent4Input: Agent4Input = {
         epics: input.epics,
         estimations: input.estimations,
+        estimationMode: input.estimationMode ?? 'story_points',
         sourceWishIds: input.sourceWishIds,
         approvedAt: input.approvedAt,
       };
+      const agent6Input = buildAgent6InputFromAgent4(input);
       setWorkspace((prev) =>
         prev
           ? {
@@ -763,14 +888,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               pipeline: {
                 ...prev.pipeline,
                 agent5Input: input,
-                agent6Input: null,
+                agent6Input,
               },
+              execution: buildInitialExecutionState(agent6Input.epics),
             }
           : prev
       );
     },
     [runAction]
   );
+
+  const bootstrapDashboardFromAgent4 = useCallback(async () => {
+    if (!user) return;
+    const res = await authFetch('/api/workspace', user, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bootstrapDashboardFromAgent4' }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error ?? 'No se pudo inicializar el dashboard');
+    }
+    const data = (await res.json()) as { workspace?: UserWorkspace };
+    if (data.workspace) {
+      setWorkspace(data.workspace);
+    }
+  }, [user]);
 
   const approveAgent5 = useCallback(
     async (input: Agent6Input) => {
@@ -779,6 +922,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const agent5Input: Agent5Input = {
         epics: input.epics,
         estimations: input.estimations,
+        estimationMode: input.estimationMode ?? 'story_points',
         priorities: input.priorities,
         framework: input.framework,
         sourceWishIds: input.sourceWishIds,
@@ -813,22 +957,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       prioritizationUpdates?: Partial<StoryPrioritization>
     ) => {
       if (!user) return;
-      const response = await authFetch('/api/workspace', user, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'updateUserStory',
-          payload: { storyId, updates, estimationUpdates, prioritizationUpdates, ...options },
-        }),
+
+      let previous: UserWorkspace | null = null;
+      // Optimistic UI: la tabla se actualiza al instante; Firestore sigue en segundo plano.
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev
+          ? withUpdatedUserStory(
+              prev,
+              storyId,
+              updates,
+              estimationUpdates,
+              options,
+              prioritizationUpdates
+            )
+          : prev;
       });
 
-      if (!response.ok) {
-        throw new Error('No se pudo actualizar la historia de usuario');
-      }
+      try {
+        const response = await authFetch('/api/workspace', user, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'updateUserStory',
+            payload: { storyId, updates, estimationUpdates, prioritizationUpdates, ...options },
+          }),
+        });
 
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
+        if (!response.ok) {
+          throw new Error('No se pudo actualizar la historia de usuario');
+        }
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
       }
     },
     [user]
@@ -853,46 +1014,187 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [user, persistSprintPlan]
   );
 
-  const createUserStory = useCallback(
-    async (input: CreateDashboardUserStoryInput) => {
+  const startSprint = useCallback(
+    async (sprintId: string) => {
       if (!user) return;
+      await persistSprintPlan().catch(() => undefined);
+      const ws = await runActionWithWorkspace('startSprint', { sprintId });
+      if (ws) setWorkspace(ws);
+    },
+    [user, persistSprintPlan, runActionWithWorkspace]
+  );
+
+  const completeSprint = useCallback(
+    async (sprintId: string, rollover: 'backlog' | 'next_planned' = 'backlog') => {
+      if (!user) return;
+      await persistSprintPlan().catch(() => undefined);
+      const ws = await runActionWithWorkspace('completeSprint', { sprintId, rollover });
+      if (ws) setWorkspace(ws);
+    },
+    [user, persistSprintPlan, runActionWithWorkspace]
+  );
+
+  const postWorkspaceAction = useCallback(
+    async <T,>(action: string, payload: unknown, fallbackError: string): Promise<T> => {
+      if (!user) throw new Error(fallbackError);
       const response = await authFetch('/api/workspace', user, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'createUserStory', payload: input }),
+        body: JSON.stringify({
+          action,
+          payload,
+          projectId: activeProjectIdRef.current ?? undefined,
+        }),
       });
-
+      const data = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
       if (!response.ok) {
-        throw new Error('No se pudo crear la historia de usuario');
+        throw new Error(data?.error ?? fallbackError);
       }
-
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
-      }
+      return (data ?? {}) as T;
     },
     [user]
+  );
+
+  const createUserStory = useCallback(
+    async (input: CreateDashboardUserStoryInput) => {
+      if (!user) return;
+      const { storyId } = await postWorkspaceAction<{ storyId?: string }>(
+        'createUserStory',
+        input,
+        'No se pudo crear la historia de usuario'
+      );
+      if (!storyId) {
+        throw new Error('No se pudo crear la historia de usuario');
+      }
+      const story: UserStory = {
+        id: storyId,
+        type: input.type ?? 'story',
+        title: input.title,
+        description: input.description,
+        acceptanceCriteria: input.acceptanceCriteria,
+        subtasks: input.subtasks ?? [],
+        ...(input.type === 'bug'
+          ? {
+              severity: input.severity ?? 'medium',
+              stepsToReproduce: input.stepsToReproduce ?? [],
+            }
+          : {}),
+        ...(input.type === 'task' && input.technicalNotes
+          ? { technicalNotes: input.technicalNotes }
+          : {}),
+        sourceWishIds: [],
+        source: 'manual',
+        isEdited: false,
+        createdAt: Date.now(),
+      };
+      setWorkspace((prev) => {
+        if (!prev) return prev;
+        const mode = getLiveBacklog(prev).estimationMode;
+        return withCreatedUserStory(prev, {
+              story,
+              epicId: input.epicId,
+              sprintId: input.sprintId,
+              estimation: buildManualEstimation({
+                mode,
+                points: input.points,
+                durationLabel: input.durationLabel,
+                workItemType: input.type ?? 'story',
+                justification: 'Estimacion creada manualmente desde el dashboard.',
+              }),
+              prioritization: input.category
+                ? {
+                    category: input.category,
+                    justification: 'Priorizacion creada manualmente desde el dashboard.',
+                    isModified: true,
+                  }
+                : null,
+            });
+      });
+    },
+    [postWorkspaceAction, user]
   );
 
   const deleteUserStory = useCallback(
     async (storyId: string) => {
       if (!user) return;
-      const response = await authFetch('/api/workspace', user, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'deleteUserStory', payload: { storyId } }),
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withDeletedUserStory(prev, storyId) : prev;
       });
-
-      if (!response.ok) {
-        throw new Error('No se pudo eliminar la historia de usuario');
-      }
-
-      const data = (await response.json()) as { workspace?: UserWorkspace };
-      if (data.workspace) {
-        setWorkspace(data.workspace);
+      try {
+        await postWorkspaceAction('deleteUserStory', { storyId }, 'No se pudo eliminar la historia de usuario');
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
       }
     },
-    [user]
+    [postWorkspaceAction, user]
+  );
+
+  const createEpic = useCallback(
+    async (input: { title: string; description: string }) => {
+      if (!user) return;
+      const { epicId } = await postWorkspaceAction<{ epicId?: string }>(
+        'createEpic',
+        input,
+        'No se pudo crear la épica'
+      );
+      if (!epicId) {
+        throw new Error('No se pudo crear la épica');
+      }
+      const epic: Epic = {
+        id: epicId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        userStories: [],
+        source: 'manual',
+        isEdited: false,
+        createdAt: Date.now(),
+      };
+      setWorkspace((prev) => (prev ? withCreatedEpic(prev, epic) : prev));
+    },
+    [postWorkspaceAction, user]
+  );
+
+  const updateEpic = useCallback(
+    async (epicId: string, updates: { title?: string; description?: string }) => {
+      if (!user) return;
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withUpdatedEpic(prev, epicId, updates) : prev;
+      });
+      try {
+        await postWorkspaceAction(
+          'updateEpic',
+          { epicId, ...updates },
+          'No se pudo actualizar la épica'
+        );
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
+      }
+    },
+    [postWorkspaceAction, user]
+  );
+
+  const deleteEpic = useCallback(
+    async (epicId: string) => {
+      if (!user) return;
+      let previous: UserWorkspace | null = null;
+      setWorkspace((prev) => {
+        previous = prev;
+        return prev ? withDeletedEpic(prev, epicId) : prev;
+      });
+      try {
+        await postWorkspaceAction('deleteEpic', { epicId }, 'No se pudo eliminar la épica');
+      } catch (error) {
+        if (previous) setWorkspace(previous);
+        throw error;
+      }
+    },
+    [postWorkspaceAction, user]
   );
 
   const initializeExecution = useCallback(async () => {
@@ -902,16 +1204,84 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const upsertMember = useCallback(
     async (member: ProjectMemberInput) => {
-      const ws = await runActionWithWorkspace('upsertProjectMember', { member });
-      if (ws) setWorkspace(ws);
+      const previous = workspaceRef.current;
+      if (!previous?.execution) {
+        const ws = await runActionWithWorkspace('upsertProjectMember', { member });
+        if (ws) setWorkspace(ws);
+        return;
+      }
+      const execution = previous.execution;
+
+      const existingIndex = member.id
+        ? execution.members.findIndex((m) => m.id === member.id)
+        : -1;
+      const nextMember: ProjectMember =
+        existingIndex >= 0
+          ? {
+              ...execution.members[existingIndex],
+              displayName: member.displayName,
+              email: member.email,
+              role: member.role,
+            }
+          : {
+              id: member.id ?? generateMemberId(execution.members),
+              displayName: member.displayName,
+              email: member.email,
+              role: member.role,
+              avatarColor: pickAvatarColor(execution.members.length),
+              createdAt: Date.now(),
+            };
+      const members =
+        existingIndex >= 0
+          ? execution.members.map((m, i) => (i === existingIndex ? nextMember : m))
+          : [...execution.members, nextMember];
+
+      setWorkspace({
+        ...previous,
+        execution: { ...execution, members },
+      });
+
+      try {
+        await runActionWithWorkspace('upsertProjectMember', {
+          member: { ...member, id: nextMember.id },
+        });
+      } catch (error) {
+        setWorkspace(previous);
+        throw error;
+      }
     },
     [runActionWithWorkspace]
   );
 
   const deleteMember = useCallback(
     async (memberId: string) => {
-      const ws = await runActionWithWorkspace('deleteProjectMember', { memberId });
-      if (ws) setWorkspace(ws);
+      const previous = workspaceRef.current;
+      if (!previous?.execution) {
+        const ws = await runActionWithWorkspace('deleteProjectMember', { memberId });
+        if (ws) setWorkspace(ws);
+        return;
+      }
+      const execution = previous.execution;
+
+      const members = execution.members.filter((m) => m.id !== memberId);
+      const stories = { ...execution.stories };
+      for (const [storyId, storyExec] of Object.entries(stories)) {
+        if (storyExec.assigneeId === memberId) {
+          stories[storyId] = { ...storyExec, assigneeId: null, updatedAt: Date.now() };
+        }
+      }
+
+      setWorkspace({
+        ...previous,
+        execution: { ...execution, members, stories },
+      });
+
+      try {
+        await runActionWithWorkspace('deleteProjectMember', { memberId });
+      } catch (error) {
+        setWorkspace(previous);
+        throw error;
+      }
     },
     [runActionWithWorkspace]
   );
@@ -921,45 +1291,58 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       storyId: string,
       patch: Partial<{ status: KanbanStatus; assigneeId: string | null; columnOrder: number }>
     ) => {
-      const requestId = ++storyExecutionGeneration.current;
+      let previous: { status?: KanbanStatus; assigneeId?: string | null } = {};
+
       setWorkspace((prev) => {
         if (!prev?.execution) return prev;
         const current = prev.execution.stories[storyId];
         if (!current) return prev;
+        previous = { status: current.status, assigneeId: current.assigneeId };
+
+        const now = Date.now();
+        let activity = current.activity ?? [];
+        if (patch.status !== undefined && patch.status !== current.status) {
+          activity = [
+            ...activity,
+            {
+              type: 'status_change' as const,
+              from: current.status,
+              to: patch.status,
+              at: now,
+            },
+          ].slice(-20);
+        }
+        if (patch.assigneeId !== undefined && patch.assigneeId !== current.assigneeId) {
+          activity = [
+            ...activity,
+            {
+              type: 'assignee_change' as const,
+              from: current.assigneeId,
+              to: patch.assigneeId,
+              at: now,
+            },
+          ].slice(-20);
+        }
+
         return {
           ...prev,
           execution: {
             ...prev.execution,
             stories: {
               ...prev.execution.stories,
-              [storyId]: { ...current, ...patch, updatedAt: Date.now() },
+              [storyId]: { ...current, ...patch, updatedAt: now, activity },
             },
           },
         };
       });
 
-      const ws = await runActionWithWorkspace('updateStoryExecution', { storyId, patch });
-      if (!ws?.execution || requestId !== storyExecutionGeneration.current) return;
-
-      const serverStory = ws.execution.stories[storyId];
-      if (!serverStory) return;
-
-      setWorkspace((prev) => {
-        if (!prev?.execution) return prev;
-        const local = prev.execution.stories[storyId];
-        if (!local) return prev;
-        // Conservar layout/campos locales; solo traer activity del servidor.
-        if (local.activity === serverStory.activity) return prev;
-        return {
-          ...prev,
-          execution: {
-            ...prev.execution,
-            stories: {
-              ...prev.execution.stories,
-              [storyId]: { ...local, activity: serverStory.activity },
-            },
-          },
-        };
+      // No bloqueamos la UI: el tablero ya refleja el cambio optimista.
+      void runActionWithWorkspace('updateStoryExecution', {
+        storyId,
+        patch,
+        previous,
+      }).catch(() => {
+        /* el siguiente gesto reintentará / un fetch silent reconciliará */
       });
     },
     [runActionWithWorkspace]
@@ -967,8 +1350,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const bulkReorderExecutions = useCallback(
     (updates: { storyId: string; status: KanbanStatus; columnOrder: number }[]) => {
+      const withPrevious: {
+        storyId: string;
+        status: KanbanStatus;
+        columnOrder: number;
+        previousStatus?: KanbanStatus;
+      }[] = [];
+
       setWorkspace((prev) => {
         if (!prev?.execution) return prev;
+        withPrevious.length = 0;
         const stories = { ...prev.execution.stories };
         const now = Date.now();
         for (const update of updates) {
@@ -981,17 +1372,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               updatedAt: now,
               activity: [],
             });
+          withPrevious.push({
+            ...update,
+            previousStatus: current.status,
+          });
+          let activity = current.activity ?? [];
+          if (update.status !== current.status) {
+            activity = [
+              ...activity,
+              {
+                type: 'status_change' as const,
+                from: current.status,
+                to: update.status,
+                at: now,
+              },
+            ].slice(-20);
+          }
           stories[update.storyId] = {
             ...current,
             status: update.status,
             columnOrder: update.columnOrder,
             updatedAt: now,
+            activity,
           };
         }
         return { ...prev, execution: { ...prev.execution, stories } };
       });
 
-      pendingBulkReorder.current = updates;
+      pendingBulkReorder.current = withPrevious;
       if (bulkReorderTimer.current) clearTimeout(bulkReorderTimer.current);
       bulkReorderTimer.current = setTimeout(() => {
         void persistBulkReorder().catch(() => {
@@ -1004,16 +1412,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const updateExecutionSprintFilter = useCallback(
     async (sprintFilter: string | 'all') => {
+      if (lastSentSprintFilter.current === sprintFilter) {
+        setWorkspace((prev) =>
+          prev?.execution
+            ? { ...prev, execution: { ...prev.execution, sprintFilter } }
+            : prev
+        );
+        return;
+      }
+
       const requestId = ++sprintFilterRequestId.current;
+      lastSentSprintFilter.current = sprintFilter;
       setWorkspace((prev) =>
         prev?.execution
           ? { ...prev, execution: { ...prev.execution, sprintFilter } }
           : prev
       );
-      const ws = await runActionWithWorkspace('updateExecutionSprintFilter', { sprintFilter });
-      if (ws && requestId === sprintFilterRequestId.current) {
-        setWorkspace(ws);
-      }
+
+      if (sprintFilterTimer.current) clearTimeout(sprintFilterTimer.current);
+      sprintFilterTimer.current = setTimeout(() => {
+        void runActionWithWorkspace('updateExecutionSprintFilter', { sprintFilter })
+          .then((ws) => {
+            if (ws && requestId === sprintFilterRequestId.current) {
+              setWorkspace(ws);
+            }
+          })
+          .catch(() => {
+            if (lastSentSprintFilter.current === sprintFilter) {
+              lastSentSprintFilter.current = null;
+            }
+          });
+      }, SPRINT_FILTER_DEBOUNCE_MS);
     },
     [runActionWithWorkspace]
   );
@@ -1023,6 +1452,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const resetAgent3 = useCallback(() => runAction('resetAgent3'), [runAction]);
   const resetAgent4 = useCallback(() => runAction('resetAgent4'), [runAction]);
   const resetAgent5 = useCallback(() => runAction('resetAgent5'), [runAction]);
+
+  const saveStack = useCallback(
+    async (stack: ProjectStack) => {
+      if (!user) return;
+      const result = await postWorkspaceAction<{ stack?: ProjectStack }>(
+        'saveStack',
+        { ...stack, status: 'saved' },
+        'No se pudo guardar el stack'
+      );
+      const saved = result.stack ?? stack;
+      setWorkspace((prev) => (prev ? { ...prev, stack: saved } : prev));
+    },
+    [postWorkspaceAction, user]
+  );
+
+  const clearStack = useCallback(async () => {
+    if (!user) return;
+    await postWorkspaceAction('clearStack', {}, 'No se pudo limpiar el stack');
+    setWorkspace((prev) => (prev ? { ...prev, stack: null } : prev));
+  }, [postWorkspaceAction, user]);
 
   const resetSession = useCallback(async () => {
     if (!user) return;
@@ -1058,16 +1507,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         approveAgent3,
         approveAgent4,
         approveAgent5,
+        bootstrapDashboardFromAgent4,
         createUserStory,
         deleteUserStory,
+        createEpic,
+        updateEpic,
+        deleteEpic,
         updateUserStory,
         updateSprintPlan,
+        startSprint,
+        completeSprint,
         initializeExecution,
         upsertMember,
         deleteMember,
         updateStoryExecution,
         bulkReorderExecutions,
         updateExecutionSprintFilter,
+        saveStack,
+        clearStack,
         resetAgent1,
         resetAgent2,
         resetAgent3,

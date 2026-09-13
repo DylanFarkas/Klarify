@@ -1,22 +1,15 @@
-import { DashboardCoverageMetrics } from './DashboardCoverageMetrics';
+import { getSprintStatus } from '@/lib/types/agent-5';
 import { DashboardEmptyState } from './DashboardEmptyState';
-import { DashboardEpicBreakdown } from './DashboardEpicBreakdown';
 import { DashboardHero } from './DashboardHero';
-import { DashboardNextActionPanel } from './DashboardNextActionPanel';
-import { DashboardPipelinePanel } from './DashboardPipelinePanel';
-import { DashboardPriorityBuckets } from './DashboardPriorityBuckets';
-import { DashboardSecondaryMetrics } from './DashboardSecondaryMetrics';
+import { DashboardSummaryStrip } from './DashboardSummaryStrip';
+import { DashboardEpicProgress } from './DashboardEpicProgress';
+import { DashboardActiveSprint } from './DashboardActiveSprint';
+import { DashboardCompletedSprints } from './DashboardCompletedSprints';
 import { ProjectExportPanel } from '@/components/agents/export/ProjectExportPanel';
 import { GitHubExportButton } from '@/components/agents/github/GitHubExportButton';
 import type { DashboardMetrics } from './dashboardMetrics';
-import type { UserStory } from '@/lib/types/agent-2';
-import type { StoryEstimation } from '@/lib/types/agent-3';
-import type { StoryPrioritization } from '@/lib/types/agent-4';
-import type { CreateDashboardUserStoryInput, UpdateDashboardUserStoryOptions } from '@/context/WorkspaceContext';
-import type { SprintPlan } from '@/lib/types/agent-5';
-import { DashboardSprintPlan } from './DashboardSprintPlan';
-import { DashboardExecutionPanel } from './DashboardExecutionPanel';
 import type { UserWorkspace } from '@/lib/types/workspace';
+import type { KanbanStatus } from '@/lib/types/execution';
 
 interface DashboardContentProps {
 	hasContent: boolean;
@@ -25,16 +18,11 @@ interface DashboardContentProps {
 	projectId: string | null;
 	projectName: string;
 	canExportGithub: boolean;
-	onCreateStory: (input: CreateDashboardUserStoryInput) => Promise<void>;
-	onDeleteStory: (storyId: string) => Promise<void>;
-	onEditStory: (
-		storyId: string,
-		updates: Partial<UserStory>,
-		estimationUpdates?: Partial<StoryEstimation>,
-		options?: UpdateDashboardUserStoryOptions,
-		prioritizationUpdates?: Partial<StoryPrioritization>
+	onUpdateStoryStatus: (storyId: string, status: KanbanStatus) => Promise<void>;
+	onCompleteSprint: (
+		sprintId: string,
+		rollover?: 'backlog' | 'next_planned'
 	) => Promise<void>;
-	onUpdateSprintPlan: (plan: SprintPlan) => void;
 	workspace: UserWorkspace;
 }
 
@@ -45,71 +33,85 @@ export function DashboardContent({
 	projectId,
 	projectName,
 	canExportGithub,
-	onCreateStory,
-	onDeleteStory,
-	onEditStory,
-	onUpdateSprintPlan,
+	onUpdateStoryStatus,
+	onCompleteSprint,
 	workspace,
 }: DashboardContentProps) {
-	const activeAgents = [
-		{ name: 'Agente 1', status: workspace.agent1.status, href: '/agentes/1' },
-		{ name: 'Agente 2', status: workspace.agent2.status, href: '/agentes/2' },
-		{ name: 'Agente 3', status: workspace.agent3.status, href: '/agentes/3' },
-		{ name: 'Agente 4', status: workspace.agent4.status, href: '/agentes/4' },
-		{ name: 'Agente 5', status: workspace.agent5.status, href: '/agentes/5' },
-	] as const;
+	const hasCompletedSprints = Boolean(
+		metrics.plan?.sprints.some((sprint) => getSprintStatus(sprint) === 'completed')
+	);
+	const showAside = metrics.epicBreakdown.length > 0 || hasCompletedSprints;
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-			<DashboardHero hasContent={hasContent} metrics={metrics} />
-			{projectId ? (
-				<section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-					<ProjectExportPanel projectName={projectName} />
-					<div className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-surface/80 p-5">
-						<div>
-							<p className="text-sm font-semibold text-foreground">GitHub Projects</p>
-							<p className="mt-1 text-xs text-muted">
-								Exporta épicas, historias, criterios de aceptación, estimaciones, prioridades y sprints
-								directamente a GitHub. Disponible en Pro.
-							</p>
-						</div>
-						<GitHubExportButton
-							projectId={projectId}
-							projectName={projectName}
-							canExport={canExportGithub}
-							variant="secondary"
-							className="shrink-0 self-start"
-						/>
-					</div>
-				</section>
-			) : null}
-			<DashboardCoverageMetrics metrics={metrics} />
-
-			<section className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-				<DashboardPipelinePanel
-					activeAgents={activeAgents}
-					completionPercentage={metrics.completionPercentage}
+		<div className="flex w-full flex-col gap-8 px-6 pt-3 pb-5 animate-[fadeIn_0.3s_ease-out]">
+			<div className="flex flex-col gap-5 border-b border-border/60 pb-5">
+				<DashboardHero
+					projectName={projectName}
+					hasContent={hasContent}
+					metrics={metrics}
+					executionBoardEnabled={executionBoardEnabled}
 				/>
-				<DashboardNextActionPanel metrics={metrics} executionBoardEnabled={executionBoardEnabled} />
-			</section>
 
-			<DashboardExecutionPanel workspace={workspace} executionBoardEnabled={executionBoardEnabled} />
+				{hasContent ? (
+					<DashboardSummaryStrip
+						metrics={metrics}
+						workspace={workspace}
+						executionBoardEnabled={executionBoardEnabled}
+					/>
+				) : null}
+			</div>
 
-			<DashboardPriorityBuckets metrics={metrics} />
-			<DashboardSecondaryMetrics metrics={metrics} />
-			<DashboardSprintPlan
-				epics={metrics.epics}
-				estimations={metrics.estimations}
-				framework={metrics.framework}
-				plan={metrics.plan}
-				rows={metrics.sprintStoryRows}
-				unassignedRows={metrics.unassignedStoryRows}
-				onCreateStory={onCreateStory}
-				onDeleteStory={onDeleteStory}
-				onEditStory={onEditStory}
-				onUpdateSprintPlan={onUpdateSprintPlan}
-			/>
-			{hasContent ? <DashboardEpicBreakdown metrics={metrics} /> : <DashboardEmptyState />}
+			{hasContent ? (
+				<>
+					<div
+						className={
+							showAside
+								? 'grid items-start gap-10 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:gap-12'
+								: 'min-w-0'
+						}
+					>
+						<DashboardActiveSprint
+							metrics={metrics}
+							workspace={workspace}
+							executionBoardEnabled={executionBoardEnabled}
+							onUpdateStoryStatus={onUpdateStoryStatus}
+							onCompleteSprint={onCompleteSprint}
+						/>
+
+						{showAside ? (
+							<aside className="flex min-w-0 flex-col gap-10">
+								<DashboardEpicProgress metrics={metrics} />
+								<DashboardCompletedSprints metrics={metrics} />
+							</aside>
+						) : null}
+					</div>
+
+					{projectId ? (
+						<section className="flex flex-col gap-3 border-t border-border/60 pt-5">
+							<div className="flex flex-wrap items-start justify-between gap-3">
+								<div className="min-w-0">
+									<h2 className="text-[15px] font-semibold tracking-tight text-foreground">
+										Exportar
+									</h2>
+									<p className="mt-0.5 text-[12px] text-muted">
+										Descarga el proyecto o envíalo a GitHub Projects.
+									</p>
+								</div>
+								<GitHubExportButton
+									projectId={projectId}
+									projectName={projectName}
+									canExport={canExportGithub}
+									variant="secondary"
+									className="shrink-0 self-start"
+								/>
+							</div>
+							<ProjectExportPanel projectName={projectName} compact />
+						</section>
+					) : null}
+				</>
+			) : (
+				<DashboardEmptyState />
+			)}
 		</div>
 	);
 }

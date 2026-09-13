@@ -8,8 +8,9 @@ import type { PrioritizationFramework, FrameworkCategory } from '@/lib/types/age
 import {
   getFrameworkCategories,
   getFrameworkLabels,
-  getFrameworkColors,
+  getFrameworkShortLabels,
 } from '@/lib/constants/agent-4';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 
 interface CategorySelectProps {
   framework: PrioritizationFramework;
@@ -17,6 +18,8 @@ interface CategorySelectProps {
   onChange: (category: FrameworkCategory) => void;
   disabled?: boolean;
   className?: string;
+  size?: 'default' | 'compact';
+  variant?: 'default' | 'ghost';
 }
 
 export function CategorySelect({
@@ -25,27 +28,26 @@ export function CategorySelect({
   onChange,
   disabled,
   className,
+  size,
+  variant,
 }: CategorySelectProps) {
   const categories = getFrameworkCategories(framework);
   const labels = getFrameworkLabels(framework);
 
   return (
-    <select
-      disabled={disabled}
+    <DropdownSelect
       value={value}
-      onChange={(e) => onChange(e.target.value as FrameworkCategory)}
-      className={[
-        'h-9 min-w-36 rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40',
-        className ?? 'w-44',
-      ].join(' ')}
-    >
-      <option value="">---</option>
-      {categories.map((cat) => (
-        <option key={cat} value={cat}>
-          {labels[cat]}
-        </option>
-      ))}
-    </select>
+      onChange={(next) => onChange(next as FrameworkCategory)}
+      options={categories.map((cat) => ({
+        value: cat,
+        label: labels[cat] ?? cat,
+      }))}
+      placeholder="—"
+      disabled={disabled}
+      className={className ?? 'w-44'}
+      size={size}
+      variant={variant}
+    />
   );
 }
 
@@ -55,14 +57,11 @@ interface CategoryBadgeProps {
 }
 
 export function CategoryBadge({ framework, category }: CategoryBadgeProps) {
-  const labels = getFrameworkLabels(framework);
-  const colors = getFrameworkColors(framework);
+  const labels = getFrameworkShortLabels(framework);
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${colors[category]}`}
-    >
-      {labels[category]}
+    <span className="inline-flex items-center rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-foreground">
+      {labels[category] ?? category}
     </span>
   );
 }

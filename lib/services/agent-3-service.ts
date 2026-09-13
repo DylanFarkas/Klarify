@@ -1,58 +1,66 @@
 /**
- * @fileoverview Servicio del Agente 3 — Capa de lógica de negocio (Scrum Master / Estimador).
- * Abstrae el procesamiento y cálculo de estimaciones de esfuerzo (Story Points).
- * Instancia el adaptador correcto detectando automáticamente el entorno de Klarify.
+ * @fileoverview Servicio del Agente 3 — Estimación (Scrum Master).
  */
 
-import type { Agent3Input } from '@/lib/types/workspace';
-import type { LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
-import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import 'server-only';
 
-// Importación de la arquitectura de adaptadores del Agente 3
+import type { Agent3Input } from '@/lib/types/workspace';
+import type { EstimationMode, LocalEpic, Agent3SuggestionItem } from '@/lib/types/agent-3';
+import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { isEstimationMode } from '@/lib/utils/estimation';
+
 import { IEstimationAdapter } from '../adapters/agent-3/IEstimationAdapter';
 import { MockEstimationAdapter } from '../adapters/agent-3/MockEstimationAdapter';
-import { GeminiEstimationAdapter } from '../adapters/agent-3/GeminiBacklogAdapter';
+import { LlmEstimationAdapter } from '../adapters/agent-3/LlmEstimationAdapter';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
 
-// Instanciación dinámica idéntica a la estrategia del Agente 2
-const estimationAdapter: IEstimationAdapter = process.env.GEMINI_API_KEY
-  ? new GeminiEstimationAdapter()
-  : new MockEstimationAdapter();
+async function resolveEstimationAdapter(uid: string): Promise<IEstimationAdapter> {
+  const credentials = await resolveLlmCredentials(uid);
+  if (!credentials) return new MockEstimationAdapter();
+  return new LlmEstimationAdapter(credentials);
+}
 
 export interface ValidationResult {
   valid: boolean;
   error?: string;
-  code?: 'NO_INPUT' | 'EMPTY_BACKLOG';
+  code?: 'NO_INPUT' | 'EMPTY_BACKLOG' | 'INVALID_MODE';
 }
 
-/**
- * Valida que el input del Agente 3 contenga la estructura necesaria.
- * Replica el patrón estricto de validación de Klarify.
- */
-export function validateAgent3Input(input: Agent3Input | null): ValidationResult {
+export function validateAgent3Input(
+  input: (Agent3Input & { estimationMode?: unknown }) | null
+): ValidationResult {
   if (!input) {
     return { valid: false, error: 'No hay input proveído al Agente 3.', code: 'NO_INPUT' };
   }
   if (!input.epics || input.epics.length === 0) {
     return { valid: false, error: 'El listado de épicas entrante está vacío.', code: 'EMPTY_BACKLOG' };
   }
+  if (!isEstimationMode(input.estimationMode)) {
+    return {
+      valid: false,
+      error: 'Debes elegir un modo de estimación (Story Points o tiempo).',
+      code: 'INVALID_MODE',
+    };
+  }
   return { valid: true };
 }
 
-/**
- * Lógica base de estimación asíncrona estándar (Promesa clásica).
- */
-export async function estimateBacklog(epics: LocalEpic[]): Promise<Agent3SuggestionItem[]> {
-  return estimationAdapter.estimateBacklog(epics);
+export async function estimateBacklog(
+  uid: string,
+  epics: LocalEpic[],
+  estimationMode: EstimationMode
+): Promise<Agent3SuggestionItem[]> {
+  const estimationAdapter = await resolveEstimationAdapter(uid);
+  return estimationAdapter.estimateBacklog(epics, estimationMode);
 }
 
-/**
- * Genera estimaciones transmitiendo los pensamientos (Thoughts) del modelo en tiempo real.
- * Se conecta directamente al adaptador activo para delegar el trabajo a la IA o al Mock.
- */
 export async function estimateBacklogStream(
+  uid: string,
   epics: LocalEpic[],
+  estimationMode: EstimationMode,
   onThought: LLMThoughtCallback,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Agent3SuggestionItem[]> {
-  return estimationAdapter.estimateBacklogStream(epics, onThought, aiConfig);
+  const estimationAdapter = await resolveEstimationAdapter(uid);
+  return estimationAdapter.estimateBacklogStream(epics, estimationMode, onThought, aiConfig);
 }

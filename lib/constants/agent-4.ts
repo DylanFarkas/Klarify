@@ -185,7 +185,7 @@ export function getFrameworkColors(framework: PrioritizationFramework): Record<s
 export const MAX_PRIORITIZATION_JUSTIFICATION_LENGTH = 140;
 
 export const MOCK_PRIORITIZATION_PREFIX = 'Agente 4 (Mock Product Owner):';
-export const GEMINI_PRIORITIZATION_PREFIX = 'Agente 4 (Product Owner):';
+export const AGENT4_JUSTIFICATION_PREFIX = 'Agente 4 (Product Owner):';
 
 /** Delay total de simulación mock (ms) */
 export const PRIORITIZATION_DELAY_MS = 2500;

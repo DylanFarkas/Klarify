@@ -42,7 +42,7 @@ export function GitHubExportButton({
   const baseClasses =
     variant === 'primary'
       ? 'rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50'
-      : 'rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50';
+      : 'rounded-md bg-surface-muted px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <>

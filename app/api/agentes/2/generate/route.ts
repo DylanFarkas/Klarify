@@ -17,13 +17,18 @@ import {
   createNdjsonStream,
   ndjsonStreamResponse,
 } from '@/lib/utils/llm-stream';
+import { parseApiBody } from '@/lib/schemas/parse';
+import { agent2GenerateBodySchema } from '@/lib/schemas/agent-inputs';
 
 type GenerateBody = Agent2Input & { isRegeneration?: boolean };
 
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as GenerateBody;
+    const body = parseApiBody(
+      agent2GenerateBodySchema,
+      await request.json()
+    ) as GenerateBody;
 
     const validation = validateAgent2Input(body);
     if (!validation.valid) {
@@ -68,6 +73,7 @@ export async function POST(request: NextRequest) {
               AGENT_ACTIVITY.ACTION_GENERATE_STORIES.label,
               () =>
                 generateBacklogStream(
+                  uid,
                   body.wishes,
                   emitter.bindThought(),
                   body.transcription,

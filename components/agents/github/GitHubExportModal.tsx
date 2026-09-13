@@ -372,8 +372,7 @@ export function GitHubExportModal({
 
               {!canExport ? (
                 <div className="rounded-xl border border-border bg-elevated px-4 py-4 text-sm text-muted">
-                  Completa la planificación de sprints (Agente 5) antes de exportar el backlog a
-                  GitHub.
+                  Completa la priorización del backlog antes de exportar a GitHub.
                 </div>
               ) : null}
 

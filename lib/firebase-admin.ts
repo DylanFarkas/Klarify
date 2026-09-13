@@ -60,9 +60,22 @@ async function verifyRequestUser(request: NextRequest): Promise<string> {
     throw new Error("UNAUTHORIZED");
   }
 
-  const idToken = authHeader.slice("Bearer ".length);
-  const decoded = await adminAuth.verifyIdToken(idToken);
-  return decoded.uid;
+  const credential = authHeader.slice("Bearer ".length).trim();
+  if (!credential) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  if (credential.startsWith("klf_")) {
+    const { verifyCliToken } = await import("@/lib/platform/tokens");
+    return verifyCliToken(credential);
+  }
+
+  try {
+    const decoded = await adminAuth.verifyIdToken(credential);
+    return decoded.uid;
+  } catch {
+    throw new Error("UNAUTHORIZED");
+  }
 }
 
 export { adminApp, adminAuth, adminDb, verifyRequestUser };

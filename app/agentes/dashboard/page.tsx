@@ -4,13 +4,35 @@
 
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { DashboardContent } from '@/components/agents/dashboard/DashboardContent';
 import { DashboardLoadingState } from '@/components/agents/dashboard/DashboardLoadingState';
 import { buildDashboardMetrics } from '@/components/agents/dashboard/dashboardMetrics';
 import { useWorkspace } from '@/hooks/useWorkspace';
 
 export default function DashboardPage() {
-	const { workspace, isLoading, plan, activeProjectId, projects, createUserStory, deleteUserStory, updateUserStory, updateSprintPlan } = useWorkspace();
+	const {
+		workspace,
+		isLoading,
+		plan,
+		activeProjectId,
+		projects,
+		updateStoryExecution,
+		completeSprint,
+		bootstrapDashboardFromAgent4,
+	} = useWorkspace();
+	const bootstrapped = useRef(false);
+
+	useEffect(() => {
+		if (!workspace || bootstrapped.current) return;
+		if (workspace.pipeline.agent6Input) return;
+		if (workspace.agent4.status !== 'approved') return;
+
+		bootstrapped.current = true;
+		void bootstrapDashboardFromAgent4().catch(() => {
+			bootstrapped.current = false;
+		});
+	}, [workspace, bootstrapDashboardFromAgent4]);
 
 	if (isLoading || !workspace) {
 		return <DashboardLoadingState />;
@@ -29,10 +51,10 @@ export default function DashboardPage() {
 			projectId={activeProjectId}
 			projectName={activeProject?.name ?? 'Proyecto activo'}
 			canExportGithub={canExportGithub}
-			onCreateStory={createUserStory}
-			onDeleteStory={deleteUserStory}
-			onEditStory={updateUserStory}
-			onUpdateSprintPlan={updateSprintPlan}
+			onUpdateStoryStatus={async (storyId, status) => {
+				await updateStoryExecution(storyId, { status });
+			}}
+			onCompleteSprint={completeSprint}
 			workspace={workspace}
 		/>
 	);

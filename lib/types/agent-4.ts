@@ -3,7 +3,7 @@
  */
 
 import type { Agent4Input } from '@/lib/types/workspace';
-import type { StoryEstimation } from '@/lib/types/agent-3';
+import type { EstimationMode, StoryEstimation } from '@/lib/types/agent-3';
 import type { Epic } from '@/lib/types/agent-2';
 
 export type Agent4Status = 'idle' | 'prioritizing' | 'review' | 'approved';
@@ -55,30 +55,41 @@ export interface LocalUserStoryWithEstimation {
   title: string;
   description: string;
   points: number;
+  effortLabel: string;
   pointsJustification?: string;
 }
 
 export interface Agent4PrioritizeRequest {
   epics: Epic[];
   estimations: Record<string, StoryEstimation>;
+  estimationMode?: EstimationMode;
   framework?: PrioritizationFramework;
 }
 
 /** Convierte Epic[] + estimations al formato que consume el adaptador */
 export function toLocalEpicsWithEstimation(
   epics: Epic[],
-  estimations: Record<string, StoryEstimation>
+  estimations: Record<string, StoryEstimation>,
+  estimationMode: EstimationMode = 'story_points'
 ): LocalEpicWithEstimation[] {
   return epics.map((epic) => ({
     id: epic.id,
     title: epic.title,
     description: epic.description,
-    userStories: epic.userStories.map((story) => ({
-      id: story.id,
-      title: story.title,
-      description: story.description,
-      points: estimations[story.id]?.points ?? 0,
-      pointsJustification: estimations[story.id]?.justification,
-    })),
+    userStories: epic.userStories.map((story) => {
+      const estimation = estimations[story.id];
+      return {
+        id: story.id,
+        title: story.title,
+        description: story.description,
+        points: estimationMode === 'time' ? estimation?.durationMinutes ?? 0 : estimation?.points ?? 0,
+        effortLabel:
+          estimationMode === 'time'
+            ? estimation?.durationLabel ||
+              (estimation?.durationMinutes ? `${estimation.durationMinutes}m` : '—')
+            : `${estimation?.points ?? 0} SP`,
+        pointsJustification: estimation?.justification,
+      };
+    }),
   }));
 }

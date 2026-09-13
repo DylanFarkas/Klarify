@@ -1,0 +1,113 @@
+'use client';
+
+/**
+ * @fileoverview Navegación del workspace una vez cerrado el pipeline.
+ *
+ * Sustituye el stepper de agentes: las etapas 1–4 ya no se editan y no
+ * merecen una lista permanente. Aquí solo viven las vistas de trabajo.
+ */
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useWorkspace } from '@/hooks/useWorkspace';
+import {
+  SIDEBAR_ICON_CLASS,
+  sidebarGroupLabelClass,
+  sidebarIconSlotClass,
+  sidebarLabelClass,
+  sidebarNavItemClass,
+} from './sidebar-styles';
+
+const DESTINATIONS = [
+  {
+    href: '/agentes/dashboard',
+    label: 'Dashboard',
+    description: 'Sprint activo, historial y métricas del proyecto.',
+    requiresBoard: false,
+    icon: (
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: '/agentes/backlog',
+    label: 'Backlog',
+    description: 'Historias, épicas y planificación de sprints.',
+    requiresBoard: false,
+    icon: (
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm0 5.25h.007v.008H3.75v-.008zm0 5.25h.007v.008H3.75v-.008z"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: '/agentes/board',
+    label: 'Tablero',
+    description: 'Kanban de ejecución y equipo del sprint.',
+    requiresBoard: true,
+    icon: (
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 4.5v15m6-15v15M4.5 9.75h15M4.5 14.25h15"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: '/agentes/stack',
+    label: 'Stack',
+    description: 'Arquitectura y tecnologías del proyecto.',
+    requiresBoard: false,
+    icon: (
+      <svg className={SIDEBAR_ICON_CLASS} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
+        />
+      </svg>
+    ),
+  },
+] as const;
+
+export function WorkspaceSidebarNav() {
+  const pathname = usePathname();
+  const { plan } = useWorkspace();
+  const boardEnabled = plan?.limits.executionBoard ?? false;
+
+  const items = DESTINATIONS.filter((item) => !item.requiresBoard || boardEnabled || pathname === item.href);
+
+  return (
+    <nav className="flex flex-col gap-0.5" aria-label="Vistas del proyecto">
+      <p className={sidebarGroupLabelClass}>Workspace</p>
+
+      {items.map((item) => {
+        const isActive = pathname === item.href;
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            title={item.label}
+            className={sidebarNavItemClass(isActive)}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            <span className={sidebarIconSlotClass}>{item.icon}</span>
+            <span className={sidebarLabelClass}>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

@@ -42,7 +42,7 @@ export function DependencyBadge({ storyId, dependencies, storyMap, isDetailed, c
         title={tooltip.title}
         description={tooltip.description}
         detail={tooltip.detail}
-        className="shrink-0 inline-flex text-amber-500 hover:text-amber-400 transition-colors cursor-default outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded"
+        className="inline-flex shrink-0 cursor-default rounded text-subtle outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-border-strong"
       >
         <LinkIcon className="h-3.5 w-3.5" />
       </HoverTooltip>
@@ -62,9 +62,9 @@ export function DependencyBadge({ storyId, dependencies, storyMap, isDetailed, c
             title={tooltip.title}
             description={tooltip.description}
             detail={tooltip.detail}
-            className="inline-flex cursor-default outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded-full"
+            className="inline-flex cursor-default rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
           >
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-muted">
               <LinkIcon className="h-2.5 w-2.5" />
               {displayText}
             </span>

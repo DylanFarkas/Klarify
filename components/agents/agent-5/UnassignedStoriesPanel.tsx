@@ -49,15 +49,15 @@ export function UnassignedStoriesPanel({
     <div
       ref={setNodeRef}
       className={[
-        'overflow-hidden rounded-xl border border-dashed transition-colors',
-        isOver ? 'border-primary bg-primary/5' : 'border-border bg-surface-muted/30',
+        'overflow-hidden rounded-xl border border-dashed bg-surface transition-colors',
+        isOver ? 'border-border-strong bg-surface-hover/40' : 'border-border',
       ].join(' ')}
     >
-      <div className="border-b border-border bg-surface-muted/40 px-4 py-2.5 sm:px-5">
-        <h4 className="text-sm font-semibold text-foreground">
+      <div className="border-b border-border px-4 py-2.5 sm:px-5">
+        <h4 className="text-[15px] font-semibold tracking-tight text-foreground">
           Sin asignar
           {unassignedStories.length > 0 && (
-            <span className="ml-1.5 text-xs font-normal text-muted">
+            <span className="ml-1.5 text-[12px] font-normal tabular-nums text-subtle">
               {unassignedStories.length}
             </span>
           )}
@@ -84,7 +84,7 @@ export function UnassignedStoriesPanel({
           ))}
         </div>
       ) : (
-        <div className="px-6 py-8 text-center text-sm text-muted">
+        <div className="px-5 py-8 text-center text-sm text-muted">
           {isEditable ? 'Suelta historias aquí para desasignarlas.' : 'No hay historias sin asignar.'}
         </div>
       )}

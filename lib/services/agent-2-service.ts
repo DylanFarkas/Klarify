@@ -1,21 +1,26 @@
 /**
  * @fileoverview Servicio del Agente 2 — Capa de lógica de negocio.
- * 
- * Abstrae el procesamiento y generación de backlog.
- * Instancia el adaptador correcto simulando o conectando LLM.
+ *
+ * Solo servidor: resuelve LLM y genera backlog.
  */
 
+import 'server-only';
+
 import type { Wish, TranscriptionResult } from '@/lib/types/agent-1';
-import type { Agent2Input, Epic, UserStory } from '@/lib/types/agent-2';
+import type { Agent2Input, Epic } from '@/lib/types/agent-2';
 import { IBacklogLLMAdapter } from '@/lib/adapters/agent-2/IBacklogLLMAdapter';
 import { MockBacklogAdapter } from '@/lib/adapters/agent-2/MockBacklogAdapter';
-import { GeminiBacklogAdapter } from '@/lib/adapters/agent-2/GeminiBacklogAdapter';
-import { EPIC_ID_PREFIX, USER_STORY_ID_PREFIX } from '@/lib/constants/agent-2';
+import { LlmBacklogAdapter } from '@/lib/adapters/agent-2/LlmBacklogAdapter';
 import type { LLMThoughtCallback } from '@/lib/utils/llm-stream';
+import { resolveLlmCredentials } from '@/lib/llm/resolve';
 
-const backlogAdapter: IBacklogLLMAdapter = process.env.GEMINI_API_KEY
-  ? new GeminiBacklogAdapter()
-  : new MockBacklogAdapter();
+export { generateEpicId, generateUserStoryId } from '@/lib/utils/agent-2-ids';
+
+async function resolveBacklogAdapter(uid: string): Promise<IBacklogLLMAdapter> {
+  const credentials = await resolveLlmCredentials(uid);
+  if (!credentials) return new MockBacklogAdapter();
+  return new LlmBacklogAdapter(credentials);
+}
 
 export interface ValidationResult {
   valid: boolean;
@@ -33,37 +38,23 @@ export function validateAgent2Input(input: Agent2Input | null): ValidationResult
   return { valid: true };
 }
 
-export function generateEpicId(existing: Epic[] = []): string {
-  const maxNum = existing.reduce((max, epic) => {
-    const numStr = epic.id.replace(`${EPIC_ID_PREFIX}-`, '');
-    const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
-  }, 0);
-  return `${EPIC_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
-}
-
-export function generateUserStoryId(existing: UserStory[] = []): string {
-  const maxNum = existing.reduce((max, story) => {
-    const numStr = story.id.replace(`${USER_STORY_ID_PREFIX}-`, '');
-    const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
-  }, 0);
-  return `${USER_STORY_ID_PREFIX}-${String(maxNum + 1).padStart(3, '0')}`;
-}
-
 export async function generateBacklog(
+  uid: string,
   wishes: Wish[],
   transcription?: TranscriptionResult | null,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Epic[]> {
+  const backlogAdapter = await resolveBacklogAdapter(uid);
   return backlogAdapter.generateBacklog(wishes, transcription, aiConfig);
 }
 
 export async function generateBacklogStream(
+  uid: string,
   wishes: Wish[],
   onThought: LLMThoughtCallback,
   transcription?: TranscriptionResult | null,
   aiConfig?: import('@/lib/plans/types').AiGenerationConfig
 ): Promise<Epic[]> {
+  const backlogAdapter = await resolveBacklogAdapter(uid);
   return backlogAdapter.generateBacklogStream(wishes, onThought, transcription, aiConfig);
 }

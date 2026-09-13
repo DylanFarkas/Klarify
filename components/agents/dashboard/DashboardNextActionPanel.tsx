@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DashboardMetricCard, type DashboardCardTone } from './DashboardMetricCard';
 import type { DashboardMetrics } from './dashboardMetrics';
+import { formatEffortTotal } from '@/lib/utils/estimation';
 
 export function DashboardNextActionPanel({
   metrics,
@@ -55,7 +56,7 @@ export function DashboardNextActionPanel({
 					value={metrics.sprintCount}
 					hint={
 						metrics.hasPlan
-							? `${metrics.averageVelocity} SP por sprint en promedio y ${metrics.averageStoriesPerSprint.toFixed(1)} HU por sprint.`
+							? `${formatEffortTotal(metrics.averageVelocity, metrics.estimationMode)} por sprint en promedio y ${metrics.averageStoriesPerSprint.toFixed(1)} HU por sprint.`
 							: 'Aun no hay sprints creados en el workspace.'
 					}
 				/>

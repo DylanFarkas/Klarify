@@ -14,6 +14,7 @@ const MOCK_BACKLOG_THOUGHTS = [
   'Diseñando épicas temáticas para el backlog...',
   'Redactando historias de usuario en formato ágil...',
   'Definiendo criterios de aceptación verificables...',
+  'Desglosando subtareas de implementación y validación...',
   'Validando trazabilidad con los deseos originales...',
 ];
 

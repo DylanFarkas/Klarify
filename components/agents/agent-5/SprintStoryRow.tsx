@@ -64,13 +64,13 @@ export function SprintStoryRow({
       <div
         ref={setNodeRef}
         style={style}
-        className={`group px-4 py-2.5 sm:px-5 hover:bg-surface-hover/30 transition-colors ${isDragging ? 'bg-surface-muted/50' : ''}`}
+        className={`group px-4 py-2.5 transition-colors hover:bg-surface-hover/40 sm:px-5 ${isDragging ? 'bg-surface-hover/40' : ''}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           {isDraggable && (
             <button
               type="button"
-              className="shrink-0 cursor-grab touch-none rounded p-0.5 text-muted/50 hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
+              className="shrink-0 cursor-grab touch-none rounded p-0.5 text-subtle hover:bg-surface-hover hover:text-foreground active:cursor-grabbing"
               aria-label="Arrastrar historia"
               {...listeners}
               {...attributes}
@@ -80,8 +80,8 @@ export function SprintStoryRow({
               </svg>
             </button>
           )}
-          <span className="shrink-0 font-mono text-[10px] text-muted/70">{story.id}</span>
-          <h5 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{story.title}</h5>
+          <span className="shrink-0 font-mono text-[11px] text-subtle">{story.id}</span>
+          <h5 className="min-w-0 flex-1 truncate text-[15px] font-medium text-foreground">{story.title}</h5>
           <DependencyBadge
             storyId={story.id}
             dependencies={dependencies}
@@ -90,18 +90,18 @@ export function SprintStoryRow({
           />
           <div className="flex shrink-0 items-center gap-1.5">
             {pri && (
-              <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${colors[pri.category] ?? ''}`}>
+              <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${colors[pri.category] ?? ''}`}>
                 {labels[pri.category] ?? pri.category}
               </span>
             )}
             {est && (
-              <span className="text-[10px] font-semibold tabular-nums text-muted">
+              <span className="text-[12px] font-medium tabular-nums text-subtle">
                 {est.points} SP
               </span>
             )}
             <ViewDetailsButton
               onClick={() => setDetailOpen(true)}
-              className="p-1 text-muted/50 hover:text-primary sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+              className="p-1 text-subtle transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"
             />
             {showSprintSelector && (
               <select
@@ -110,7 +110,7 @@ export function SprintStoryRow({
                   const val = e.target.value;
                   onAssign!(story.id, val === '_unassigned' ? null : val);
                 }}
-                className="rounded-lg border border-border bg-surface px-2 py-1 text-[10px] font-semibold text-foreground focus:border-primary focus:outline-none cursor-pointer"
+                className="cursor-pointer rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground focus:border-border-strong focus:outline-none"
                 aria-label="Asignar sprint"
               >
                 <option value="_unassigned">Sin asignar</option>

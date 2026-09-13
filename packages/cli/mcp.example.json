@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "klarify": {
+      "command": "npx",
+      "args": ["tsx", "packages/cli/src/bin.ts", "mcp"],
+      "env": {
+        "KLARIFY_API_URL": "http://localhost:3000"
+      }
+    }
+  }
+}

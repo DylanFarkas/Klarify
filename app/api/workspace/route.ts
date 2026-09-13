@@ -25,10 +25,16 @@ import {
   approveAgent3,
   approveAgent4,
   approveAgent5,
+  bootstrapDashboardFromAgent4,
   createUserStoryAcrossWorkspace,
   deleteUserStoryAcrossWorkspace,
   updateUserStoryAcrossWorkspace,
+  createEpicAcrossWorkspace,
+  updateEpicAcrossWorkspace,
+  deleteEpicAcrossWorkspace,
   updateSprintPlanAcrossWorkspace,
+  startSprintAcrossWorkspace,
+  completeSprintAcrossWorkspace,
   resetAgent1,
   resetAgent2,
   resetAgent3,
@@ -41,91 +47,22 @@ import {
   updateStoryExecution,
   bulkUpdateStoryExecutions,
   updateExecutionSprintFilter,
+  saveStackAcrossWorkspace,
+  clearStackAcrossWorkspace,
 } from '@/lib/workspace-service';
 import type { Agent1State } from '@/lib/types/agent-1';
 import type { Agent2State, Agent2Input, UserStory } from '@/lib/types/agent-2';
 import type { Agent3State, StoryEstimation } from '@/lib/types/agent-3';
-import type { Agent4State, FrameworkCategory, StoryPrioritization } from '@/lib/types/agent-4';
+import type { Agent4State, StoryPrioritization } from '@/lib/types/agent-4';
 import type { Agent5State, SprintPlan } from '@/lib/types/agent-5';
 import type { Agent3Input, Agent4Input, Agent5Input, Agent6Input } from '@/lib/types/workspace';
-import type { KanbanStatus, ProjectMember, ProjectMemberRole } from '@/lib/types/execution';
-
-interface PatchBody {
-  agent?: 'agent1' | 'agent2' | 'agent3' | 'agent4' | 'agent5';
-  data?: Agent1State | Agent2State | Agent3State | Agent4State | Agent5State;
-  preferences?: { lastAgent?: string };
-}
-
-interface PostBody {
-  action?:
-    | 'approveAgent1'
-    | 'approveAgent2'
-    | 'approveAgent3'
-    | 'approveAgent4'
-    | 'approveAgent5'
-    | 'createUserStory'
-    | 'deleteUserStory'
-    | 'updateUserStory'
-    | 'updateSprintPlan'
-    | 'initializeExecution'
-    | 'upsertProjectMember'
-    | 'deleteProjectMember'
-    | 'updateStoryExecution'
-    | 'bulkUpdateStoryExecutions'
-    | 'updateExecutionSprintFilter'
-    | 'resetAgent1'
-    | 'resetAgent2'
-    | 'resetAgent3'
-    | 'resetAgent4'
-    | 'resetAgent5'
-    | 'resetWorkspace';
-  payload?:
-    | Agent2Input
-    | Agent3Input
-    | Agent4Input
-    | Agent5Input
-    | Agent6Input
-    | {
-        storyId: string;
-        updates: Partial<UserStory>;
-        estimationUpdates?: Partial<StoryEstimation>;
-        prioritizationUpdates?: Partial<StoryPrioritization>;
-        epicId?: string;
-        sprintId?: string | null;
-      }
-    | {
-        plan: SprintPlan;
-      }
-    | {
-        epicId: string;
-        sprintId?: string | null;
-        title: string;
-        description: string;
-        acceptanceCriteria: string[];
-        points: number;
-        category?: FrameworkCategory;
-      }
-    | {
-        storyId: string;
-      }
-    | {
-        member?: {
-          id?: string;
-          displayName: string;
-          email?: string;
-          role: ProjectMemberRole;
-        };
-        memberId?: string;
-        storyId?: string;
-        patch?: {
-          status?: KanbanStatus;
-          assigneeId?: string | null;
-          columnOrder?: number;
-        };
-        updates?: { storyId: string; status: KanbanStatus; columnOrder: number }[];
-        sprintFilter?: string | 'all';
-      };
-}
+import type { ProjectStack } from '@/lib/types/stack';
+import { parseWorkspaceScope } from '@/lib/project-store/scope';
+import { parseApiBody } from '@/lib/schemas/parse';
+import {
+  workspacePatchSchema,
+  workspacePostSchema,
+} from '@/lib/schemas/workspace-api';
 
 function handleError(error: unknown, fallback: string): NextResponse {
   return handleApiError(error, fallback);
@@ -134,7 +71,10 @@ function handleError(error: unknown, fallback: string): NextResponse {
 export async function GET(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const data = await getWorkspaceData(uid);
+    const scope = parseWorkspaceScope(request.nextUrl.searchParams.get('scope'));
+    const agent = request.nextUrl.searchParams.get('agent') ?? undefined;
+    const projectId = request.nextUrl.searchParams.get('projectId')?.trim() || undefined;
+    const data = await getWorkspaceData(uid, { scope, agent, projectId });
     return NextResponse.json(data);
   } catch (error) {
     return handleError(error, 'Error al obtener el workspace');
@@ -144,39 +84,30 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as PatchBody;
+    const body = parseApiBody(workspacePatchSchema, await request.json());
 
-    if (body.preferences?.lastAgent !== undefined) {
-      await saveLastAgent(uid, String(body.preferences.lastAgent));
+    if ('preferences' in body) {
+      await saveLastAgent(uid, body.preferences.lastAgent);
       return NextResponse.json({ ok: true });
     }
 
-    if (body.agent === 'agent1' && body.data) {
-      await saveAgent1State(uid, body.data as Agent1State);
-      return NextResponse.json({ ok: true });
+    switch (body.agent) {
+      case 'agent1':
+        await saveAgent1State(uid, body.data as unknown as Agent1State);
+        return NextResponse.json({ ok: true });
+      case 'agent2':
+        await saveAgent2State(uid, body.data as unknown as Agent2State);
+        return NextResponse.json({ ok: true });
+      case 'agent3':
+        await saveAgent3State(uid, body.data as unknown as Agent3State);
+        return NextResponse.json({ ok: true });
+      case 'agent4':
+        await saveAgent4State(uid, body.data as unknown as Agent4State);
+        return NextResponse.json({ ok: true });
+      case 'agent5':
+        await saveAgent5State(uid, body.data as unknown as Agent5State);
+        return NextResponse.json({ ok: true });
     }
-
-    if (body.agent === 'agent2' && body.data) {
-      await saveAgent2State(uid, body.data as Agent2State);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (body.agent === 'agent3' && body.data) {
-      await saveAgent3State(uid, body.data as Agent3State);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (body.agent === 'agent4' && body.data) {
-      await saveAgent4State(uid, body.data as Agent4State);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (body.agent === 'agent5' && body.data) {
-      await saveAgent5State(uid, body.data as Agent5State);
-      return NextResponse.json({ ok: true });
-    }
-
-    return NextResponse.json({ error: 'Petición inválida' }, { status: 400 });
   } catch (error) {
     return handleError(error, 'Error al guardar el workspace');
   }
@@ -185,87 +116,115 @@ export async function PATCH(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyRequestUser(request);
-    const body = (await request.json()) as PostBody;
+    const body = parseApiBody(workspacePostSchema, await request.json());
+    const projectId = body.projectId;
 
     switch (body.action) {
       case 'approveAgent1':
-        await approveAgent1(uid, body.payload as Agent2Input);
+        await approveAgent1(uid, body.payload as unknown as Agent2Input);
         return NextResponse.json({ ok: true });
       case 'approveAgent2':
-        await approveAgent2(uid, body.payload as Agent3Input);
+        await approveAgent2(uid, body.payload as unknown as Agent3Input);
         return NextResponse.json({ ok: true });
       case 'approveAgent3':
-        await approveAgent3(uid, body.payload as Agent4Input);
+        await approveAgent3(uid, body.payload as unknown as Agent4Input);
         return NextResponse.json({ ok: true });
       case 'approveAgent4':
-        await approveAgent4(uid, body.payload as Agent5Input);
+        await approveAgent4(uid, body.payload as unknown as Agent5Input);
         return NextResponse.json({ ok: true });
       case 'approveAgent5':
-        await approveAgent5(uid, body.payload as Agent6Input);
+        await approveAgent5(uid, body.payload as unknown as Agent6Input);
         return NextResponse.json({ ok: true });
+      case 'bootstrapDashboardFromAgent4': {
+        const workspace = await bootstrapDashboardFromAgent4(uid);
+        return NextResponse.json({ ok: true, workspace: workspace ?? undefined });
+      }
       case 'createUserStory': {
-        const payload = body.payload as {
-          epicId?: string;
-          sprintId?: string | null;
-          title?: string;
-          description?: string;
-          acceptanceCriteria?: string[];
-          points?: number;
-          category?: FrameworkCategory;
-        };
-        if (!payload.epicId || !payload.title || !payload.description || payload.points === undefined) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        const payload = body.payload;
+        try {
+          const { storyId } = await createUserStoryAcrossWorkspace(uid, {
+            epicId: payload.epicId,
+            sprintId: payload.sprintId ?? null,
+            type: payload.type,
+            title: payload.title ?? '',
+            description: payload.description ?? '',
+            acceptanceCriteria: payload.acceptanceCriteria ?? [],
+            subtasks: payload.subtasks as import('@/lib/types/agent-2').StorySubtask[] | string[] | undefined,
+            points: payload.points,
+            durationLabel: payload.durationLabel,
+            category: payload.category,
+            severity: payload.severity,
+            stepsToReproduce: payload.stepsToReproduce,
+            technicalNotes: payload.technicalNotes,
+          }, projectId);
+          return NextResponse.json({ ok: true, storyId });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'No se pudo crear el ítem';
+          return NextResponse.json({ error: message }, { status: 400 });
         }
-        const workspace = await createUserStoryAcrossWorkspace(uid, {
-          epicId: payload.epicId,
-          sprintId: payload.sprintId ?? null,
-          title: payload.title,
-          description: payload.description,
-          acceptanceCriteria: payload.acceptanceCriteria ?? [],
-          points: payload.points,
-          category: payload.category,
-        });
-        return NextResponse.json({ ok: true, workspace });
       }
       case 'deleteUserStory': {
-        const payload = body.payload as { storyId?: string };
-        if (!payload.storyId) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await deleteUserStoryAcrossWorkspace(uid, payload.storyId);
-        return NextResponse.json({ ok: true, workspace });
+        await deleteUserStoryAcrossWorkspace(uid, body.payload.storyId, projectId);
+        return NextResponse.json({ ok: true });
       }
       case 'updateUserStory': {
-        const payload = body.payload as {
-          storyId?: string;
-          updates?: Partial<UserStory>;
-          estimationUpdates?: Partial<StoryEstimation>;
-          prioritizationUpdates?: Partial<StoryPrioritization>;
-          epicId?: string;
-          sprintId?: string | null;
-        };
-        if (!payload.storyId || !payload.updates) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
+        const payload = body.payload;
+        try {
+          await updateUserStoryAcrossWorkspace(
+            uid,
+            payload.storyId,
+            payload.updates as Partial<UserStory>,
+            payload.estimationUpdates as Partial<StoryEstimation> | undefined,
+            {
+              epicId: payload.epicId,
+              sprintId: payload.sprintId,
+            },
+            payload.prioritizationUpdates as Partial<StoryPrioritization> | undefined,
+            projectId
+          );
+          return NextResponse.json({ ok: true });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'No se pudo actualizar el ítem';
+          return NextResponse.json({ error: message }, { status: 400 });
         }
-        const workspace = await updateUserStoryAcrossWorkspace(
-          uid,
-          payload.storyId,
-          payload.updates,
-          payload.estimationUpdates,
-          {
-            epicId: payload.epicId,
-            sprintId: payload.sprintId,
-          },
-          payload.prioritizationUpdates
-        );
-        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'createEpic': {
+        const { epicId } = await createEpicAcrossWorkspace(uid, {
+          title: body.payload.title,
+          description: body.payload.description,
+        }, projectId);
+        return NextResponse.json({ ok: true, epicId });
+      }
+      case 'updateEpic': {
+        await updateEpicAcrossWorkspace(uid, body.payload.epicId, {
+          title: body.payload.title,
+          description: body.payload.description,
+        }, projectId);
+        return NextResponse.json({ ok: true });
+      }
+      case 'deleteEpic': {
+        await deleteEpicAcrossWorkspace(uid, body.payload.epicId, projectId);
+        return NextResponse.json({ ok: true });
       }
       case 'updateSprintPlan': {
-        const payload = body.payload as { plan?: SprintPlan };
-        if (!payload.plan) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await updateSprintPlanAcrossWorkspace(uid, payload.plan);
+        await updateSprintPlanAcrossWorkspace(
+          uid,
+          body.payload.plan as unknown as SprintPlan,
+          projectId
+        );
+        return NextResponse.json({ ok: true });
+      }
+      case 'startSprint': {
+        const workspace = await startSprintAcrossWorkspace(uid, body.payload.sprintId, projectId);
+        return NextResponse.json({ ok: true, workspace });
+      }
+      case 'completeSprint': {
+        const workspace = await completeSprintAcrossWorkspace(
+          uid,
+          body.payload.sprintId,
+          body.payload.rollover ?? 'backlog',
+          projectId
+        );
         return NextResponse.json({ ok: true, workspace });
       }
       case 'initializeExecution': {
@@ -273,60 +232,46 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, workspace });
       }
       case 'upsertProjectMember': {
-        const payload = body.payload as {
-          member?: {
-            id?: string;
-            displayName: string;
-            email?: string;
-            role: ProjectMemberRole;
-          };
-        };
-        if (!payload.member?.displayName || !payload.member.role) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await upsertProjectMember(uid, payload.member);
-        return NextResponse.json({ ok: true, workspace });
+        const workspace = await upsertProjectMember(uid, body.payload.member, projectId);
+        return NextResponse.json({ ok: true, ...(workspace ? { workspace } : {}) });
       }
       case 'deleteProjectMember': {
-        const payload = body.payload as { memberId?: string };
-        if (!payload.memberId) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await deleteProjectMember(uid, payload.memberId);
-        return NextResponse.json({ ok: true, workspace });
+        const workspace = await deleteProjectMember(uid, body.payload.memberId, projectId);
+        return NextResponse.json({ ok: true, ...(workspace ? { workspace } : {}) });
       }
       case 'updateStoryExecution': {
-        const payload = body.payload as {
-          storyId?: string;
-          patch?: {
-            status?: KanbanStatus;
-            assigneeId?: string | null;
-            columnOrder?: number;
-          };
-        };
-        if (!payload.storyId || !payload.patch) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await updateStoryExecution(uid, payload.storyId, payload.patch);
+        const workspace = await updateStoryExecution(
+          uid,
+          body.payload.storyId,
+          body.payload.patch,
+          projectId,
+          body.payload.previous
+        );
         return NextResponse.json({ ok: true, workspace });
       }
       case 'bulkUpdateStoryExecutions': {
-        const payload = body.payload as {
-          updates?: { storyId: string; status: KanbanStatus; columnOrder: number }[];
-        };
-        if (!payload.updates?.length) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await bulkUpdateStoryExecutions(uid, payload.updates);
+        const workspace = await bulkUpdateStoryExecutions(uid, body.payload.updates, projectId);
         return NextResponse.json({ ok: true, workspace });
       }
       case 'updateExecutionSprintFilter': {
-        const payload = body.payload as { sprintFilter?: string | 'all' };
-        if (payload.sprintFilter === undefined) {
-          return NextResponse.json({ error: 'Payload invalido' }, { status: 400 });
-        }
-        const workspace = await updateExecutionSprintFilter(uid, payload.sprintFilter);
-        return NextResponse.json({ ok: true, workspace });
+        const workspace = await updateExecutionSprintFilter(
+          uid,
+          body.payload.sprintFilter,
+          projectId
+        );
+        return NextResponse.json({ ok: true, ...(workspace ? { workspace } : {}) });
+      }
+      case 'saveStack': {
+        const stack = await saveStackAcrossWorkspace(
+          uid,
+          body.payload as unknown as ProjectStack,
+          projectId
+        );
+        return NextResponse.json({ ok: true, stack });
+      }
+      case 'clearStack': {
+        await clearStackAcrossWorkspace(uid, projectId);
+        return NextResponse.json({ ok: true, stack: null });
       }
       case 'resetAgent1':
         await resetAgent1(uid);
@@ -346,8 +291,6 @@ export async function POST(request: NextRequest) {
       case 'resetWorkspace':
         await resetWorkspace(uid);
         return NextResponse.json({ ok: true });
-      default:
-        return NextResponse.json({ error: 'Acción inválida' }, { status: 400 });
     }
   } catch (error) {
     return handleError(error, 'Error al actualizar el workspace');
